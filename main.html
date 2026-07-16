@@ -104,7 +104,7 @@
                 document.getElementById("job").innerText = data.character_class;
                 document.getElementById("blood").innerText = data.bloodline;
                 // undefined이거나 값이 없으면 빈 문자열("") 또는 "-"로 표시
-                document.getElementById("blood_member").innerText = (data.bloodline && data.bloodline !== "undefined") ? data.bloodline : "";
+                document.getElementById("blood_member").innerText = (data.blood_member && data.blood_member !== "undefined") ? data.bloodline : "";
                 
                 card.style.display = "block"; 
                 error.style.display = "none";
