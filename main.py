@@ -80,19 +80,31 @@ def dragon(): return FileResponse("dragon.html")
 @app.get("/search/{name}")
 def search_user(name: str):
     rows = get_all_rows()
-    search = name.strip().lower()
+    # 입력받은 검색어에서 공백 제거 후 소문자화
+    search = name.strip().replace(" ", "").lower()
+    
     for row in rows[2:]:
-        if len(row) <= 5: 
+        # 최소 C열(아이디, 인덱스 2)까지는 데이터가 있어야 함
+        if len(row) < 3: 
             continue
-        char_name = row[2].strip()  # c열: 아이디 (인덱스 2)
-        if char_name.split("(")[0].strip().lower() == search:
+            
+        char_name = row[2].strip()  # C열: 아이디 (인덱스 2)
+        if not char_name:
+            continue
+            
+        # 괄호 제거 및 비교용 이름 생성 (공백 제거)
+        clean_name = char_name.split("(")[0].strip().replace(" ", "").lower()
+        
+        # 완전 일치하거나 검색어가 포함되어 있으면 반환
+        if clean_name == search or search in clean_name:
             return {
                 "status": "success",
                 "name": char_name,
-                "character_class": row[3].strip(),  # D열: 직업 (인덱스 3)
-                "skill": row[4].strip(),            # E열: 기술 (인덱스 4)
-                "bloodline": row[5].strip()         # F열: 혈맹 (인덱스 5)
+                "character_class": row[3].strip() if len(row) > 3 else "",  # D열: 직업
+                "skill": row[4].strip() if len(row) > 4 else "",            # E열: 기술
+                "bloodline": row[5].strip() if len(row) > 5 else ""         # F열: 혈맹
             }
+            
     raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
 
 @app.get("/bloodlines")
