@@ -81,17 +81,17 @@ def dragon(): return FileResponse("dragon.html")
 def search_user(name: str):
     rows = get_all_rows()
     search = name.strip().lower()
-    for row in rows[1:]:
+    for row in rows[2:]:
         if len(row) <= 5: 
             continue
-        char_name = row[2].strip()  # c열: 아이디 (인덱스 3)
+        char_name = row[2].strip()  # c열: 아이디 (인덱스 2)
         if char_name.split("(")[0].strip().lower() == search:
             return {
                 "status": "success",
                 "name": char_name,
                 "character_class": row[3].strip(),  # D열: 직업 (인덱스 3)
                 "skill": row[4].strip(),            # E열: 기술 (인덱스 4)
-                "bloodline": row[5].strip()         # F열: 혈맹 (인덱스 6)
+                "bloodline": row[5].strip()         # F열: 혈맹 (인덱스 5)
             }
     raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
 
