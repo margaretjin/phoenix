@@ -103,13 +103,14 @@
                 document.getElementById("name").innerText = data.name;
                 document.getElementById("job").innerText = data.character_class;
                 document.getElementById("blood").innerText = data.bloodline;
-                document.getElementById("blood_member").innerText = data.bloodline_member;
+                // undefined이거나 값이 없으면 빈 문자열("") 또는 "-"로 표시
+                document.getElementById("blood_member").innerText = (data.bloodline && data.bloodline !== "undefined") ? data.bloodline : "";
                 
                 card.style.display = "block"; 
                 error.style.display = "none";
 
                 /* 검색 성공 시, 해당 유저의 소속 혈맹 이름을 바탕으로 하단 명단 현황 업데이트 */
-                fetchBloodlineStatus(data.bloodline_member);
+                fetchBloodlineStatus(data.bloodline);
             } catch (err) {
                 card.style.display = "none"; 
                 document.getElementById("statusArea").style.display = "none";
