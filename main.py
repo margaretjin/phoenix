@@ -100,10 +100,10 @@ def search_user(name: str):
             return {
                 "status": "success",
                 "name": char_name,
-                "character_class": row[3].strip() if len(row) > 3 else "",  # D열: 직업
-                "skill": row[4].strip() if len(row) > 4 else "",            # E열: 기술
-                "bloodline": row[5].strip() if len(row) > 5 else "",         # F열: 혈맹
-                "bloodline_member": row[6].strip() if len(row) > 6 else ""         # g열: 공성혈
+                "character_class": row[3].strip() if len(row) > 3 else "",  # D열: 직업 (인덱스 3)
+                "skill": row[4].strip() if len(row) > 4 else "",            # E열: 기술 (인덱스 4)
+                "bloodline": row[5].strip() if len(row) > 5 else "",         # F열: 혈맹 (인덱스 5)
+                "blood_member": row[6].strip() if len(row) > 6 else ""       # G열: 공성혈 (인덱스 6)
             }
             
     raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
