@@ -133,6 +133,7 @@ def get_bloodlines():
         raise HTTPException(status_code=500, detail="혈 목록 로드 실패")
 
 # 특정 혈맹 구성원 조회
+# [main.py] 특정 혈맹 / 공성혈 구성원 조회
 @app.get("/members/{bloodline}")
 def get_bloodline_members(bloodline: str):
     if not bloodline or bloodline.lower() == "undefined":
@@ -145,19 +146,27 @@ def get_bloodline_members(bloodline: str):
         for row in rows[2:]:
             if len(row) <= 5:
                 continue
-            member_id = row[2].strip()   # C열: 아이디 (인덱스 2)
-            member_job = row[3].strip()  # D열: 직업 (인덱스 3)
+            
+            member_id = row[2].strip()             # C열: 아이디 (인덱스 2)
+            member_job = row[3].strip()            # D열: 직업 (인덱스 3)
             castle_val = row[4].strip().lower()    # E열: 혈맹 (인덱스 4)
             bloodline_val = row[5].strip().lower() # F열: 공성혈 (인덱스 5)
             
             if not member_id:
                 continue
-            if bloodline_val == target:
+                
+            # E열(혈맹) 또는 F열(공성혈) 이름이 검색 대상과 일치하면 포함
+            if castle_val == target or bloodline_val == target:
                 members.append({"id": member_id, "job": member_job})
 
-        job_order = {"군주": 0, "기사": 1, "요정": 2, "법사": 3 }
+        job_order = {"군주": 0, "기사": 1, "요정": 2, "법사": 3}
         members.sort(key=lambda item: (job_order.get(item.get("job", ""), 99), item.get("id", "").lower()))
-        return {"bloodline": bloodline, "remaining": 40 - len(members), "members": members}
+        
+        return {
+            "bloodline": bloodline, 
+            "remaining": 40 - len(members), 
+            "members": members
+        }
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="데이터 로드 실패")
