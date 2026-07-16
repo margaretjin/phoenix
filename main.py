@@ -102,7 +102,8 @@ def search_user(name: str):
                 "name": char_name,
                 "character_class": row[3].strip() if len(row) > 3 else "",  # D열: 직업
                 "skill": row[4].strip() if len(row) > 4 else "",            # E열: 기술
-                "bloodline": row[5].strip() if len(row) > 5 else ""         # F열: 혈맹
+                "bloodline": row[5].strip() if len(row) > 5 else "",         # F열: 혈맹
+                "bloodline_member": row[6].strip() if len(row) > 6 else ""         # g열: 공성혈
             }
             
     raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
@@ -146,7 +147,8 @@ def get_bloodline_members(bloodline: str):
                 continue
             member_id = row[2].strip()   # C열: 아이디 (인덱스 2)
             member_job = row[3].strip()  # D열: 직업 (인덱스 3)
-            bloodline_val = row[5].strip().lower() # F열: 혈맹 (인덱스 5)
+            castle_val = row[4].strip().lower()    # E열: 혈맹 (인덱스 4)
+            bloodline_val = row[5].strip().lower() # F열: 공성혈 (인덱스 5)
             
             if not member_id:
                 continue
