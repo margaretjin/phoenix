@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>피닉스 - 화둥</title>
+    <link rel="stylesheet" href="./static/style.css?v=20260715-2">
+    
+    <style>
+        /* --- [위치 정보 반응형 그리드 스타일] --- */
+        .location-grid-container {
+            margin-top: 20px;
+            padding: 10px 0;
+        }
+
+        .location-grid {
+            display: grid;
+            /* 기본(모바일): 1줄에 1개 배치 */
+            grid-template-columns: 2fr; 
+            gap: 10px;
+        }
+
+        /* 화면 너비가 600px 이상인 태블릿 및 PC: 1줄에 3개 배치 */
+        @media (min-width: 600px) {
+            .location-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* 개별 위치 카드 스타일 */
+        .location-card {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .location-card:hover {
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+        }
+
+    
+
+        /* 위치 설명 텍스트 */
+        .loc-name {
+            color: #334155;
+            font-weight: 700;
+            font-size: 14px;
+            word-break: keep-all; /* 단어 단위로 깔끔하게 줄바꿈 */
+            padding-right: 10px;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div class="container menu-container">
+        <div class="menu-buttons">
+            <a href="/" class="menu-btn home-btn">🏠 홈으로</a>
+            <a href="kurtz.html" class="menu-btn">커츠(말섬)</a>
+            <a href="fire.html" class="menu-btn active">화둥</a>
+            <a href="dragon.html" class="menu-btn">용계</a>
+        
+        </div>
+    </div>
+
+    <div class="gallery-container">
+        <div class="zone-section active">
+            <div class="zone-title">🔥 화둥</div>
+            <div class="single-image-wrapper">
+                <img src="./static/fire_1.png" alt="fire_1.png" class="map-img ">
+            </div>
+            
+            <div class="location-grid-container">
+                <div id="locationGrid" class="location-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* 1. 위치 정보 데이터 배열 (요청하신 0031 ~ 0043 데이터로 완벽 교체 완료) */
+        const locationData = [
+
+            { no: "0034", name: "화둥 다리" },
+            { no: "0035", name: "화둥 3시 끝" },
+            { no: "0036", name: "화둥 7시 서문 좌측길" },
+            { no: "0037", name: "화둥 9시 끝, 뼈" },
+            { no: "0038", name: "화둥 정상가는길 밑" },
+            { no: "0039", name: "화둥 6시 서문아래" },
+            { no: "0040", name: "하이네 도펠보스" },
+            { no: "0041", name: "화둥 다리위 동문앞" },
+            { no: "0042", name: "화둥 정상가는길 최단거리" },
+            { no: "0043", name: "화둥 3시 좌측 막힌방" }
+        ];
+
+        /* 2. 화면이 로드되면 그리드에 카드들을 자동 생성 */
+        document.addEventListener("DOMContentLoaded", () => {
+            const gridContainer = document.getElementById("locationGrid");
+            
+            /* 배열을 순회하며 HTML 요소를 동적으로 주입 */
+            gridContainer.innerHTML = locationData.map(item => `
+                <div class="location-card">
+                    <span class="loc-name">${item.no}</span>
+                    <span class="loc-name">${item.name}</span>
+                </div>
+            `).join("");
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>피닉스 - 커츠(말섬)</title>
+    <link rel="stylesheet" href="./static/style.css?v=20260715-2">
+</head>
+<body>
+
+    <!-- 🧭 상단 지역 선택 버튼 박스 -->
+    <div class="container menu-container">
+        <div class="menu-buttons">
+            <a href="/" class="menu-btn home-btn">🏠 홈으로</a>
+            <a href="kurtz.html" class="menu-btn active">커츠(말섬)</a>
+            <a href="fire.html" class="menu-btn">화둥</a>
+            <a href="dragon.html" class="menu-btn">용계</a>
+        
+        </div>
+    </div>
+
+    <!-- 🖼️ 갤러리 박스 -->
+    <div class="gallery-container">
+        <div class="zone-section active">
+            <div class="zone-title">🏝️ 말하는 섬 (커츠)</div>
+            
+            <!-- 사진 파일명이 버튼 이름으로 채워질 공간 -->
+            <div id="photoTabs" class="tab-buttons"></div>
+
+            <!-- 단 한 장의 사진만 최대 크기로 보여주는 공간 -->
+            <div class="desc-bar">
+                <button class="nav-btn prev-btn" onclick="moveSlide(-1)">❮</button>
+                    <div id="imageDesc" class="image-description"></div>
+                <button class="nav-btn next-btn" onclick="moveSlide(1)">❯</button>
+            </div>
+
+            <div class="viewer-container">
+                <div id="imageDisplay" class="image-display"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const kurtzImages = [
+            "kurtz_31.png", "kurtz_31_1.png", "kurtz_31_2.png", "kurtz_31_3.png", "kurtz_31_4.png",
+            "kurtz_32.png", "kurtz_32_1.png", "kurtz_32_2.png", "kurtz_32_3.png", "kurtz_32_4.png",
+            "kurtz_32_5.png", "kurtz_32_6.png", "kurtz_32_7.png", "kurtz_32_8.png", "kurtz_32_9.png",
+            "kurtz_33.png", "kurtz_33_1.png", "kurtz_33_2.png", "kurtz_33_3.png", "kurtz_33_4.png",
+            "kurtz_33_5.png", "kurtz_33_6.png", "kurtz_33_7.png", "kurtz_33_8.png"
+        ];
+        
+        const locationMap = {
+            "0031": "말섬 선착장",
+            "0031_1": "말섬 선착장 12시",
+            "0031_2": "말섬 선착장 11시",
+            "0031_3": "말섬 선착장 7시",
+            "0031_4": "말섬 선착장 다리",
+            "0032": "말섬 3시",
+            "0032_1": "말섬 5시",
+            "0032_2": "말섬 7시",
+            "0032_3": "말섬 8시",
+            "0032_4": "말섬 9시",
+            "0032_5": "말섬 3시 해변 먼곳(커츠 1번)",
+            "0032_6": "말섬 3시 해변 중간(커츠 2번)",
+            "0032_7": "말섬 3시 해변 가까움(커츠 3번)",
+            "0032_8": "말섬 4시 해변 (커츠 4번)",
+            "0032_9": "말섬 5시 해변 (커츠 5번)",
+            "0033": "말섬 수련장 컴뱃존",
+            "0033_1": "말섬 수련장 좌측",
+            "0033_2": "말섬 북섬 입구",
+            "0033_3": "말섬 북섬 3시",
+            "0033_4": "말섬 북섬 해변",
+            "0033_5": "말섬 돌",
+            "0033_6": "말섬 중앙 나무",
+            "0033_7": "말섬 펫관리인 10시",
+            "0033_8": "말섬 오크족상인 발심"
+        };
+        
+        let currentIndex = 0;
+
+        function initGallery() {
+            const tabsContainer = document.getElementById("photoTabs");
+            const displayContainer = document.getElementById("imageDisplay");
+            
+            if (!tabsContainer || !displayContainer) return;
+
+            kurtzImages.forEach((fileName, index) => {
+                let numName = fileName.replace("kurtz_", "00").replace(".png", "");
+                let buttonText = numName.replace("_", "-");
+
+                const btn = document.createElement("button");
+                btn.className = `tab-btn ${index === 0 ? 'active' : ''}`;
+                btn.innerText = buttonText;
+                btn.onclick = () => showSlide(index);
+                tabsContainer.appendChild(btn);
+
+                const img = document.createElement("img");
+                img.src = `./static/${fileName}`;
+                img.alt = fileName;
+                img.className = index === 0 ? 'active' : '';
+                displayContainer.appendChild(img);
+            });
+
+            updateDescription(0);
+        }
+
+        function updateDescription(index) {
+            const descContainer = document.getElementById("imageDesc");
+            if (!descContainer) return;
+
+            const currentFileName = kurtzImages[index];
+            if (currentFileName) {
+                let key = currentFileName.replace("kurtz_", "00").replace(".png", "");
+                let displayNum = key.replace("_", "-"); 
+                const locationText = locationMap[key];
+                
+                if (locationText) {
+                    descContainer.innerText = `${displayNum} ${locationText}`;
+                } else {
+                    descContainer.innerText = displayNum;
+                }
+            }
+        }
+
+        function showSlide(index) {
+            const images = document.querySelectorAll(".image-display img");
+            const tabs = document.querySelectorAll(".tab-btn");
+            
+            if (images.length === 0) return;
+
+            if (index >= images.length) currentIndex = 0;
+            else if (index < 0) currentIndex = images.length - 1;
+            else currentIndex = index;
+
+            images.forEach(img => img.classList.remove("active"));
+            tabs.forEach(tab => tab.classList.remove("active"));
+
+            images[currentIndex].classList.add("active");
+            tabs[currentIndex].classList.add("active");
+
+            updateDescription(currentIndex);
+        }
+
+        function moveSlide(direction) {
+            showSlide(currentIndex + direction);
+        }
+        
+        window.onload = function() {
+            initGallery();
+        };
+    </script>
+</body>
+</html>

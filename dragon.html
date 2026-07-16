@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>피닉스 - 용의 계곡</title>
+    <link rel="stylesheet" href="./static/style.css?v=20260715-2">
+    
+    <style>
+        /* --- [위치 정보 반응형 그리드 스타일] --- */
+        .location-grid-container {
+            margin-top: 20px;
+            padding: 10px 0;
+        }
+
+        .location-grid {
+            display: grid;
+            /* 기본(모바일): 1줄에 1개 배치 */
+            grid-template-columns: 2fr; 
+            gap: 10px;
+        }
+
+        /* 화면 너비가 600px 이상인 태블릿 및 PC: 1줄에 3개 배치 */
+        @media (min-width: 600px) {
+            .location-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* 개별 위치 카드 스타일 */
+        .location-card {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .location-card:hover {
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+        }
+
+    
+
+        /* 위치 설명 텍스트 */
+        .loc-name {
+            color: #334155;
+            font-weight: 700;
+            font-size: 14px;
+            word-break: keep-all; /* 단어 단위로 깔끔하게 줄바꿈 */
+            padding-right: 10px;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div class="container menu-container">
+        <div class="menu-buttons">
+            <a href="/" class="menu-btn home-btn">🏠 홈으로</a>
+            <a href="kurtz.html" class="menu-btn">커츠(말섬)</a>
+            <a href="fire.html" class="menu-btn">화둥</a>
+            <a href="dragon.html" class="menu-btn active">용계</a>
+   
+        </div>
+    </div>
+
+    <div class="gallery-container">
+        <div class="zone-section active">
+            <div class="zone-title">🐉 용의 계곡</div>
+            <div class="single-image-wrapper">
+                <img src="./static/dragon_1.jpg" alt="dragon_1.jpg" class="map-img">
+            </div>
+            
+            <div class="location-grid-container">
+                <div id="locationGrid" class="location-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* 1. 위치 정보 데이터 배열 (수정, 삭제, 추가가 매우 쉬워집니다) */
+        const locationData = [
+            { no: "0001", name: "용계 다리" },
+            { no: "0002", name: "용계 삼거리 우측해안" },
+            { no: "0003", name: "용계 삼거리 좌측기둥" },
+            { no: "0004", name: "용계 삼거리 작업장 좌측" },
+            { no: "0005", name: "용계 삼거리 아래해안" },
+            { no: "0006", name: "용계 입구 해안" },
+            { no: "0007", name: "작뼈 기둥" },
+            { no: "0008", name: "작뼈 6시아래" },
+            { no: "0009", name: "작뼈 6시아래 끝" },
+            { no: "0010", name: "용계 3기둥,3번작업" },
+            { no: "0011", name: "용계 2번입구" },
+            { no: "0012", name: "용계 2번입구 아래" },
+            { no: "0013", name: "용계 2번입구 언덕" },
+            { no: "0014", name: "큰뼈 6시아래" },
+            { no: "0015", name: "큰뼈 1시우측" },
+            { no: "0016", name: "큰뼈 9시좌측" },
+            { no: "0017", name: "큰뼈 좌측 기둥" },
+            { no: "0018", name: "용계 9시작업장" },
+            { no: "0019", name: "용계 외곽 10시" },
+            { no: "0020", name: "용계 외곽 9시" },
+            { no: "0021", name: "용계 외곽 7시" },
+            { no: "0022", name: "용계 외곽 12시, 꽃" },
+            { no: "0023", name: "용계 1번입구" },
+            { no: "0024", name: "용계 정상아래 막힌곳" },
+            { no: "0025", name: "용계 12시작업장,1번작업" },
+            { no: "0026", name: "용계 4번입구" },
+            { no: "0027", name: "용계 4번입구 좌측끝" },
+            { no: "0028", name: "용계 4번입구 6시아래" },
+            { no: "0029", name: "용계 3번입구 6시아래" },
+            { no: "0030", name: "용계 3번입구" }
+        ];
+
+        /* 2. 화면이 로드되면 그리드에 카드들을 자동 생성 */
+        document.addEventListener("DOMContentLoaded", () => {
+            const gridContainer = document.getElementById("locationGrid");
+            
+            /* 배열을 순회하며 HTML 요소를 동적으로 주입 */
+            gridContainer.innerHTML = locationData.map(item => `
+                <div class="location-card">
+                    <span class="loc-name">${item.no}</span>
+                    <span class="loc-name">${item.name}</span>
+                </div>
+            `).join("");
+        });
+    </script>
+</body>
+</html>
