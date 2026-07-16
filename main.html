@@ -36,10 +36,10 @@
         <div id="card" class="card search-result-card">
             <div class="item"><span class="label">아이디</span><span class="value" id="name"></span></div>
             <div class="item"><span class="label">직업</span><span class="value" id="job"></span></div>
+            <div class="item"><span class="label">기술</span><span class="value" id="skill"></span></div> <!-- 💥 추가된 부분 -->
             <div class="item"><span class="label">혈맹</span><span class="value" id="blood"></span></div>
             <div class="item"><span class="label">공성혈</span><span class="value" id="blood_member"></span></div>
         </div>
-        
         <div id="error" class="error-message"></div>
 
         <div id="statusArea" class="card status-area">
@@ -88,6 +88,7 @@
         loadBloodlineList();
 
         /* 🔍 유저 검색 함수 */
+       /* 🔍 유저 검색 함수 */
         async function searchUser() {
             const keyword = input.value.trim();
             if (keyword === "") { alert("아이디를 입력하세요."); return; }
@@ -102,9 +103,15 @@
                 
                 document.getElementById("name").innerText = data.name;
                 document.getElementById("job").innerText = data.character_class;
-                document.getElementById("blood").innerText = data.bloodline;
-                // undefined이거나 값이 없으면 빈 문자열("") 또는 "-"로 표시
-                document.getElementById("blood_member").innerText = (data.blood_member && data.blood_member !== "undefined") ? data.bloodline : "";
+                document.getElementById("skill").innerText = data.skill || "-"; // E열 기술 매핑
+                document.getElementById("blood").innerText = data.bloodline || "-"; // F열 혈맹 매핑
+                
+                // G열 공성혈 데이터 매핑 (값이 'undefined'이거나 없으면 빈 문자열 처리)
+                if (data.blood_member && data.blood_member !== "undefined") {
+                    document.getElementById("blood_member").innerText = data.blood_member;
+                } else {
+                    document.getElementById("blood_member").innerText = "-";
+                }
                 
                 card.style.display = "block"; 
                 error.style.display = "none";
