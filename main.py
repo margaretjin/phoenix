@@ -64,7 +64,7 @@ def get_all_rows():
 def read_index():
     return FileResponse(os.path.join(os.path.dirname(__file__), "main.html"))
 
-@app.get("/.well-known/appspecific/com.chrome.devtools.json")
+@app.get("//.well-known/appspecific/com.chrome.devtools.json")
 def chrome_devtools():
     return Response(status_code=204)
 
@@ -77,6 +77,7 @@ def fire(): return FileResponse("fire.html")
 @app.get("/dragon.html")
 def dragon(): return FileResponse("dragon.html")
 
+# --- 유저 검색 API (C열~G열 데이터 정밀 매핑) ---
 @app.get("/search/{name}")
 def search_user(name: str):
     rows = get_all_rows()
@@ -88,7 +89,7 @@ def search_user(name: str):
         if len(row) < 3: 
             continue
             
-        char_name = row[2].strip()  # C열: 아이디 (인덱스 2)
+        char_name = row[2].strip()  # C열(인덱스 2): 아이디
         if not char_name:
             continue
             
@@ -100,10 +101,10 @@ def search_user(name: str):
             return {
                 "status": "success",
                 "name": char_name,
-                "character_class": row[3].strip() if len(row) > 3 else "",  # D열: 직업 (인덱스 3)
-                "skill": row[4].strip() if len(row) > 4 else "",            # E열: 기술 (인덱스 4)
-                "bloodline": row[5].strip() if len(row) > 5 else "",         # F열: 혈맹 (인덱스 5)
-                "blood_member": row[6].strip() if len(row) > 6 else ""       # G열: 공성혈 (인덱스 6)
+                "character_class": row[3].strip() if len(row) > 3 else "",  # D열(인덱스 3): 직업
+                "skill": row[4].strip() if len(row) > 4 else "",            # E열(인덱스 4): 기술
+                "bloodline": row[5].strip() if len(row) > 5 else "",         # F열(인덱스 5): 혈맹
+                "blood_member": row[6].strip() if len(row) > 6 else ""       # G열(인덱스 6): 공성혈
             }
             
     raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
@@ -115,10 +116,9 @@ def get_bloodlines():
         bloodlines = []
         seen = set()
         for row in rows[2:]:
-            # M열(인덱스 12)까지 데이터가 존재하는지 안전하게 확인
             if len(row) <= 12:
                 continue
-            name = row[12].strip()  # [변경] M열(인덱스 12): 혈맹 목록
+            name = row[12].strip()  # M열(인덱스 12): 혈맹 목록
             if not name:
                 continue
             normalized = name.lower()
@@ -132,31 +132,30 @@ def get_bloodlines():
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="혈 목록 로드 실패")
 
-# 특정 혈맹 구성원 조회
-# [main.py] 특정 혈맹 / 공성혈 구성원 조회
+# --- 특정 혈맹/공성혈 구성원 조회 API (시트 인덱스 동기화 완료) ---
 @app.get("/members/{bloodline}")
 def get_bloodline_members(bloodline: str):
-    if not bloodline or bloodline.lower() == "undefined":
-        return {"bloodline": "없음", "remaining": 0, "members": []}
+    if not bloodline or bloodline.lower() in ["undefined", "없음", ""]:
+        return {"bloodline": "없음", "remaining": 40, "members": []}
 
     try:
         rows = get_all_rows()
         target = bloodline.strip().lower()
         members = []
         for row in rows[2:]:
-            if len(row) <= 5:
+            if len(row) <= 6:  # G열(인덱스 6)까지 데이터가 확보되어야 인덱스 접근 가능
                 continue
             
-            member_id = row[2].strip()             # C열: 아이디 (인덱스 2)
-            member_job = row[3].strip()            # D열: 직업 (인덱스 3)
-            castle_val = row[4].strip().lower()    # E열: 혈맹 (인덱스 4)
-            bloodline_val = row[5].strip().lower() # F열: 공성혈 (인덱스 5)
+            member_id = row[2].strip()             # C열(인덱스 2): 아이디
+            member_job = row[3].strip()            # D열(인덱스 3): 직업
+            bloodline_val = row[5].strip().lower() # F열(인덱스 5): 혈맹
+            castle_val = row[6].strip().lower()    # G열(인덱스 6): 공성혈
             
             if not member_id:
                 continue
                 
-            # E열(혈맹) 또는 F열(공성혈) 이름이 검색 대상과 일치하면 포함
-            if castle_val == target or bloodline_val == target:
+            # F열(혈맹) 또는 G열(공성혈) 이름이 검색 대상과 일치하면 명단에 추가
+            if bloodline_val == target or castle_val == target:
                 members.append({"id": member_id, "job": member_job})
 
         job_order = {"군주": 0, "기사": 1, "요정": 2, "법사": 3}
@@ -170,8 +169,6 @@ def get_bloodline_members(bloodline: str):
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="데이터 로드 실패")
-
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

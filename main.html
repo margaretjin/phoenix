@@ -6,8 +6,8 @@
     <title>피닉스 - 메인</title>
     <meta property="og:title" content="피닉스" />
     <meta property="og:description" content="혈맹원 정보를 검색해보세요." />
-    <meta property="og:image" content="https://phoenix-mmtl.onrender.com/static/phoenix.jpg" />
-    <meta property="og:url" content="https://phoenix-mmtl.onrender.com" />
+    <meta property="og:image" content="https://lineage-w1s3.onrender.com/static/sword_sword.png" />
+    <meta property="og:url" content="https://lineage-w1s3.onrender.com" />
     <link rel="stylesheet" href="./static/style.css?v=20260715-3">
 </head>
 <body>
@@ -17,7 +17,6 @@
             <a href="kurtz.html" class="menu-btn">커츠</a>
             <a href="fire.html" class="menu-btn">화둥</a>
             <a href="dragon.html" class="menu-btn">용계</a>
-         
         </div>
     </div>
 
@@ -29,20 +28,20 @@
         </div>
 
         <div class="bloodline-section">
-            <!-- 🤝 공통 클래스 card-grid 적용 -->
+            <!-- 공통 클래스 card-grid 적용 -->
             <div id="bloodlineList" class="card-grid"></div>
         </div>
      
-        <div id="card" class="card search-result-card">
+        <div id="card" class="card search-result-card" style="display: none;">
             <div class="item"><span class="label">아이디</span><span class="value" id="name"></span></div>
             <div class="item"><span class="label">직업</span><span class="value" id="job"></span></div>
-            <div class="item"><span class="label">기술</span><span class="value" id="skill"></span></div> <!-- 💥 추가된 부분 -->
             <div class="item"><span class="label">혈맹</span><span class="value" id="blood"></span></div>
             <div class="item"><span class="label">공성혈</span><span class="value" id="blood_member"></span></div>
         </div>
-        <div id="error" class="error-message"></div>
+        
+        <div id="error" class="error-message" style="display: none;"></div>
 
-        <div id="statusArea" class="card status-area">
+        <div id="statusArea" class="card status-area" style="display: none;">
             <div id="remainingText" class="remaining-text"></div>
             
             <div id="memberListBox" class="member-list-box">
@@ -57,14 +56,17 @@
 
         const input = document.getElementById("searchInput");
         
-        /* 👑 [수정] 군주 직업군 클래스 매핑 추가 */
+        /* 군주 직업군 클래스 매핑 */
         const memberJobClassMap = {
             "군주": "member-job-monarch",
             "기사": "member-job-knight",
             "요정": "member-job-elf",
             "법사": "member-job-mage"
         };
-        input.addEventListener("keydown", function(e) { if (e.key === "Enter") { searchUser(); } });
+        
+        input.addEventListener("keydown", function(e) { 
+            if (e.key === "Enter") { searchUser(); } 
+        });
 
         async function loadBloodlineList() {
             try {
@@ -74,7 +76,7 @@
                 if (!listEl) return;
 
                 const bloodlines = Array.isArray(data.bloodlines) ? data.bloodlines : [];
-                /* 🤝 공통 버튼 클래스 grid-card-btn 및 텍스트 span 클래스 grid-card-btn-name 적용 */
+                /* 공통 버튼 클래스 grid-card-btn 및 텍스트 span 클래스 grid-card-btn-name 적용 */
                 listEl.innerHTML = bloodlines.map(name => `
                     <button class="grid-card-btn" type="button" title="${name}" onclick="fetchBloodlineStatus('${name.replace(/'/g, "\\'")}')">
                         <span class="grid-card-btn-name">${name}</span>
@@ -88,7 +90,6 @@
         loadBloodlineList();
 
         /* 🔍 유저 검색 함수 */
-       /* 🔍 유저 검색 함수 */
         async function searchUser() {
             const keyword = input.value.trim();
             if (keyword === "") { alert("아이디를 입력하세요."); return; }
@@ -101,23 +102,22 @@
                 const data = await res.json();
                 if (!res.ok) { throw new Error(data.detail); }
                 
+                // 받아온 JSON 데이터를 알맞은 ID 영역에 렌더링
                 document.getElementById("name").innerText = data.name;
                 document.getElementById("job").innerText = data.character_class;
-                document.getElementById("skill").innerText = data.skill || "-"; // E열 기술 매핑
-                document.getElementById("blood").innerText = data.bloodline || "-"; // F열 혈맹 매핑
-                
-                // G열 공성혈 데이터 매핑 (값이 'undefined'이거나 없으면 빈 문자열 처리)
-                if (data.blood_member && data.blood_member !== "undefined") {
-                    document.getElementById("blood_member").innerText = data.blood_member;
-                } else {
-                    document.getElementById("blood_member").innerText = "-";
-                }
+                document.getElementById("blood").innerText = data.bloodline;         // F열 (혈맹)
+                document.getElementById("blood_member").innerText = data.blood_member; // G열 (공성혈)
                 
                 card.style.display = "block"; 
                 error.style.display = "none";
 
-                /* 검색 성공 시, 해당 유저의 소속 혈맹 이름을 바탕으로 하단 명단 현황 업데이트 */
-                fetchBloodlineStatus(data.bloodline);
+                /* 검색 성공 시 소속 혈맹(우선순위) 또는 공성혈 데이터를 바탕으로 하단 명단 현황 업데이트 */
+                const targetBloodline = data.bloodline || data.blood_member;
+                if (targetBloodline) {
+                    fetchBloodlineStatus(targetBloodline);
+                } else {
+                    document.getElementById("statusArea").style.display = "none";
+                }
             } catch (err) {
                 card.style.display = "none"; 
                 document.getElementById("statusArea").style.display = "none";
@@ -128,7 +128,7 @@
 
         /* 🔄 혈맹의 인원 현황 및 명단을 서버에서 로드하는 함수 */
         async function fetchBloodlineStatus(bloodlineName) {
-            if (!bloodlineName || bloodlineName === "undefined") return;
+            if (!bloodlineName || bloodlineName === "undefined" || bloodlineName === "없음") return;
             
             try {
                 const res = await fetch("/members/" + encodeURIComponent(bloodlineName));
@@ -138,7 +138,7 @@
                 const currentCount = window.currentBloodlineMembers.length;
                 const remaining = data.remaining;
                 
-                /* 텍스트 조건부 구성 (38명 꽉 찼을 때 vs 자리가 남았을 때) */
+                /* 텍스트 조건부 구성 (40명 꽉 찼을 때 vs 자리가 남았을 때) */
                 const titleEl = document.getElementById("remainingText");
                 if (remaining <= 0) {
                     titleEl.innerHTML = `📢 <span class="bloodline-name">[${data.bloodline}]</span> 혈맹 총 ${currentCount}명`;
@@ -148,19 +148,18 @@
                 
                 const contentEl = document.getElementById("memberListContent");
                 
-                /* 👑 [수정] 군주를 최상단 그룹으로 정렬 규칙에 추가 */
+                /* 군주를 최상단 정렬 규칙에 배치 */
                 const groups = [
-                    
+                    { label: "군주", members: window.currentBloodlineMembers.filter(m => (m.job || "").trim() === "군주") },
                     { label: "기사", members: window.currentBloodlineMembers.filter(m => (m.job || "").trim() === "기사") },
                     { label: "요정", members: window.currentBloodlineMembers.filter(m => (m.job || "").trim() === "요정") },
-                    { label: "법사", members: window.currentBloodlineMembers.filter(m => (m.job || "").trim() === "법사") },
-                    { label: "군주", members: window.currentBloodlineMembers.filter(m => (m.job || "").trim() === "군주") }
+                    { label: "법사", members: window.currentBloodlineMembers.filter(m => (m.job || "").trim() === "법사") }
                 ];
 
                 contentEl.innerHTML = groups.map(group => {
                     if (!group.members.length) return "";
                     
-                    /* 🤝 공통 클래스 grid-card-btn 및 자식 span 클래스 grid-card-btn-name 적용 */
+                    /* 공통 클래스 grid-card-btn 및 자식 span 클래스 grid-card-btn-name 적용 */
                     const cards = group.members.map(member => {
                         const fullName = member.id || member.name || "";
                         const truncated = fullName.length > 5 ? fullName.slice(0, 5) + "..." : fullName;
@@ -175,13 +174,13 @@
                     return `
                         <div class="member-group">
                             <div class="member-group-label">${group.label} <span class="member-group-count">(${group.members.length}명)</span></div>
-                            <!-- 🤝 공통 클래스 card-grid 적용 -->
+                            <!-- 공통 클래스 card-grid 적용 -->
                             <div class="card-grid">${cards}</div>
                         </div>
                     `;
                 }).join('');
 
-                /* 🤝 선택자 .grid-card-btn 및 .grid-card-btn-name으로 매핑 업데이트 */
+                /* 선택자 .grid-card-btn 및 .grid-card-btn-name으로 매핑 업데이트 */
                 contentEl.querySelectorAll('.grid-card-btn').forEach(item => {
                     item.addEventListener('click', () => {
                         const expanded = item.dataset.expanded === 'true';
