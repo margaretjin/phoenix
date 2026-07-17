@@ -17,6 +17,8 @@
             <a href="kurtz.html" class="menu-btn">커츠</a>
             <a href="fire.html" class="menu-btn">화둥</a>
             <a href="dragon.html" class="menu-btn">용계</a>
+            <!-- 📥 이미지 다운로드 버튼 추가 -->
+            <button onclick="downloadPhoenixImage()" class="menu-btn" style="background: none; border: none; cursor: pointer; font-family: inherit;">📥 이미지 다운로드</button>
         </div>
     </div>
 
@@ -195,6 +197,30 @@
                 document.getElementById("statusArea").style.display = "block";
             } catch (e) {
                 console.error("혈맹 정보 로드 실패", e);
+            }
+        }
+
+        /* 💾 이미지 강제 다운로드 처리 함수 */
+        async function downloadPhoenixImage() {
+            const imageUrl = "/static/phoenix.jpg";
+            try {
+                const response = await fetch(imageUrl);
+                if (!response.ok) throw new Error("이미지 파일을 불러올 수 없습니다.");
+                
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                
+                const link = document.createElement("a");
+                link.href = blobUrl;
+                link.download = "phoenix.jpg"; // 저장될 파일 이름
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                window.URL.revokeObjectURL(blobUrl);
+            } catch (error) {
+                console.error("다운로드 실패:", error);
+                alert("이미지 다운로드에 실패했습니다. 다시 시도해 주세요.");
             }
         }
     </script>
