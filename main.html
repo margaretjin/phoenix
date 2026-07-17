@@ -9,6 +9,54 @@
     <meta property="og:image" content="https://phoenix-mmtl.onrender.com/static/phoenix.jpg" />
     <meta property="og:url" content="https://phoenix-mmtl.onrender.com" />
     <link rel="stylesheet" href="./static/style.css?v=20260715-3">
+    
+    <style>
+        /* 📱 모바일용 이미지 저장 레이어 팝업 스타일 */
+        .download-modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #fff;
+            font-family: sans-serif;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .download-modal img {
+            max-width: 90%;
+            max-height: 70%;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+            margin-bottom: 20px;
+        }
+        .download-modal-text {
+            font-size: 15px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: #ccc;
+        }
+        .download-modal-text strong {
+            color: #ffca28;
+        }
+        .download-modal-close {
+            background: #e53935;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
     <div class="container menu-container">
@@ -17,7 +65,7 @@
             <a href="kurtz.html" class="menu-btn">커츠</a>
             <a href="fire.html" class="menu-btn">화둥</a>
             <a href="dragon.html" class="menu-btn">용계</a>
-            <!-- 📥 이미지 다운로드 버튼 추가 -->
+            <!-- 📥 이미지 다운로드 버튼 -->
             <button onclick="downloadPhoenixImage()" class="menu-btn" style="background: none; border: none; cursor: pointer; font-family: inherit;">📥 이미지 다운로드</button>
         </div>
     </div>
@@ -50,6 +98,17 @@
                 <div id="memberListContent" class="member-grid"></div>
             </div>
         </div>
+    </div>
+
+    <!-- 📱 모바일 이미지 저장 전용 모달 영역 -->
+    <div id="downloadModal" class="download-modal">
+        <p class="download-modal-text">
+            <strong>💡 사진첩 저장 안내</strong><br>
+            아래 이미지를 <strong>길게 꾹~ 누르신 후</strong><br>
+            [내 사진첩에 저장] 또는 [이미지 저장]을 선택해주세요!
+        </p>
+        <img src="/static/phoenix.jpg" alt="피닉스 이미지">
+        <button class="download-modal-close" onclick="closeDownloadModal()">닫기</button>
     </div>
 
     <script>
@@ -200,28 +259,43 @@
             }
         }
 
-        /* 💾 이미지 강제 다운로드 처리 함수 */
-        async function downloadPhoenixImage() {
-            const imageUrl = "/static/phoenix.jpg";
-            try {
-                const response = await fetch(imageUrl);
-                if (!response.ok) throw new Error("이미지 파일을 불러올 수 없습니다.");
-                
-                const blob = await response.blob();
-                const blobUrl = window.URL.createObjectURL(blob);
-                
-                const link = document.createElement("a");
-                link.href = blobUrl;
-                link.download = "phoenix.jpg"; // 저장될 파일 이름
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                window.URL.revokeObjectURL(blobUrl);
-            } catch (error) {
-                console.error("다운로드 실패:", error);
-                alert("이미지 다운로드에 실패했습니다. 다시 시도해 주세요.");
+        /* 💾 모바일 및 PC 대응 다운로드 처리 함수 */
+        function downloadPhoenixImage() {
+            // 모바일 장치 및 인앱 브라우저 여부 감지 (iOS, Android 등)
+            const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isKakaotalk = /KAKAOTALK/i.test(navigator.userAgent);
+            
+            if (isMobile || isKakaotalk) {
+                // 모바일 환경일 경우 직접 누르는 저장이 차단되기 쉬우므로 안내 모달창을 띄워줌
+                document.getElementById("downloadModal").style.display = "flex";
+            } else {
+                // 일반 PC 브라우저일 경우 강제 백그라운드 다운로드 실행
+                const imageUrl = "/static/phoenix.jpg";
+                fetch(imageUrl)
+                    .then(response => {
+                        if (!response.ok) throw new Error();
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = blobUrl;
+                        link.download = "phoenix.jpg";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(blobUrl);
+                    })
+                    .catch(() => {
+                        // 만약 PC 브라우저인데도 다운로드가 실패할 경우 차선책으로 모달창을 열어줌
+                        document.getElementById("downloadModal").style.display = "flex";
+                    });
             }
+        }
+
+        /* 모달 닫기 */
+        function closeDownloadModal() {
+            document.getElementById("downloadModal").style.display = "none";
         }
     </script>
 </body>
