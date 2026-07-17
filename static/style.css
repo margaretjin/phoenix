@@ -73,7 +73,7 @@ h1, .zone-title {
 }
 
 /* ==========================================
-   3. 상단 메뉴 UI (홈/커츠/화둥/용계/척살)
+   3. 상단 메뉴 UI (홈/커츠/화둥/용계/사진받기)
    ========================================== */
 .menu-buttons {
     display: grid;
@@ -97,6 +97,7 @@ h1, .zone-title {
     justify-content: center;
     white-space: nowrap;
     transition: all 0.2s ease-in-out;
+    cursor: pointer;
 }
 
 .menu-btn:hover {
@@ -504,6 +505,57 @@ button:hover {
 /* ==========================================
    6. 모바일 전용 반응형 스타일
    ========================================== */
+/* 📱 6-1. 모바일 이미지 저장 전용 모달 레이어 */
+.download-modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.95);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: #ffffff;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.download-modal img {
+    max-width: 90%;
+    max-height: 65vh;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15);
+    margin-bottom: 20px;
+    object-fit: contain;
+}
+
+.download-modal-text {
+    font-size: 15px;
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: 24px;
+    color: #cbd5e1;
+}
+
+.download-modal-text strong {
+    color: #f59e0b;
+}
+
+.download-modal-close {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    font-size: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);
+}
+
 .location-grid-container {
     margin-top: 20px;
     padding: 10px 0;
@@ -583,7 +635,6 @@ button:hover {
         margin: 8px 0 10px;
     }
 
-    /* 초소형 화면 공통 카드 레이아웃 맞춤 설정 */
     .card-grid {
         grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
         gap: 4px;
@@ -689,7 +740,6 @@ button:hover {
         max-height: 45vh;
     }
 
-    /* 일반 모바일 화면 공통 카드 레이아웃 맞춤 설정 */
     .card-grid {
         grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
         gap: 5px;
@@ -700,11 +750,12 @@ button:hover {
         padding: 2px 4px;
         font-size: 11px;
     }
-    /* 🎯 검색 대상 강조용 핑크색 바닥 효과 (기존 테두리는 그대로 유지) */
-.grid-card-btn.search-highlight {
-    background-color: #fce7f3 !important; /* 부드러운 핑크색 바닥 */
-    box-shadow: 0 0 12px 3px rgba(244, 114, 182, 0.4) !important; /* 핑크색 네온 광채 */
-    transform: scale(1.08) translateY(-2px); /* 살짝 솟아오르는 효과 */
-    transition: all 0.3s ease-in-out;
-}
+
+    /* 🎯 검색 대상 강조용 핑크색 바닥 효과 */
+    .grid-card-btn.search-highlight {
+        background-color: #fce7f3 !important; 
+        box-shadow: 0 0 12px 3px rgba(244, 114, 182, 0.4) !important; 
+        transform: scale(1.08) translateY(-2px); 
+        transition: all 0.3s ease-in-out;
+    }
 }
