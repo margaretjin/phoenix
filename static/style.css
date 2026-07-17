@@ -98,6 +98,8 @@ h1, .zone-title {
     white-space: nowrap;
     transition: all 0.2s ease-in-out;
     cursor: pointer;
+    margin: 0;
+      
 }
 
 .menu-btn:hover {
@@ -123,10 +125,7 @@ h1, .zone-title {
     background-color: #334155;
     border-color: #334155;
 }
-.target-text {
-    margin: 0 !important;   /* 바깥쪽 여백 제거 */
-    padding: 0 !important;  /* 안쪽 여백 제거 */
-}
+
 /* 🧩 사진 번호 선택 탭 버튼 */
 .tab-buttons {
     display: grid;
@@ -695,6 +694,7 @@ button:hover {
         font-size: 10px;
         height: 34px;
         padding: 0 2px;
+        margin: 0;
     }
 
     .tab-buttons {
