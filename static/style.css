@@ -98,7 +98,7 @@ h1, .zone-title {
     white-space: nowrap;
     transition: all 0.2s ease-in-out;
     cursor: pointer;
-    margin: 0;
+    margin: 0px;
       
 }
 
@@ -593,11 +593,6 @@ button:hover {
     padding-right: 10px;
 }
 
-@media (min-width: 600px) {
-    .location-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
 
 @media (max-width: 320px) {
     body {
@@ -631,6 +626,7 @@ button:hover {
         height: 42px;
         font-size: 13px;
         padding: 0 10px;
+        magin: 0px ;
     }
 
     .bloodline-section {
@@ -694,7 +690,7 @@ button:hover {
         font-size: 10px;
         height: 34px;
         padding: 0 2px;
-        margin: 0;
+        margin: 0px;
     }
 
     .tab-buttons {
