@@ -18,9 +18,7 @@
             <a href="kurtz.html" class="menu-btn">커츠</a>
             <a href="fire.html" class="menu-btn">화둥</a>
             <a href="dragon.html" class="menu-btn">용계</a>
-            <!-- 📥 이모티콘을 뺀 '사진받기' 텍스트 버튼 구성 -->
-            <button onclick="downloadPhoenixImage()" class="menu-btn">사진</button>
-        </div>
+            <a href="#" onclick="downloadPhoenixImage(); return false;" class="menu-btn">사진</a>
     </div>
 
     <div class="container">
@@ -35,13 +33,22 @@
             <div id="bloodlineList" class="card-grid"></div>
         </div>
      
+    <!-- 💡 검색 결과 카드 영역 (기여도 및 기간 점수 완벽 적용) -->
         <div id="card" class="card search-result-card" style="display: none;">
             <div class="item"><span class="label">아이디</span><span class="value" id="name"></span></div>
             <div class="item"><span class="label">직업</span><span class="value" id="job"></span></div>
             <div class="item"><span class="label">혈맹</span><span class="value" id="blood"></span></div>
             <div class="item"><span class="label">공성혈</span><span class="value" id="blood_member"></span></div>
+            
+            <hr style="border: 0; border-top: 1px dashed #555; margin: 14px 0;">
+            <div class="item"><span class="label" style="color: #00ff88;">💎 총 분배금</span><span class="value" id="total_dist_gold" style="color: #00ff88; font-weight: bold;">0 아데나</span></div>     
+            <div class="item"><span class="label" style="color: #4facfe;">📊 기여도</span><span class="value" id="contrib_rate" style="color: #4facfe; font-weight: bold;">0.00 %</span></div>
+            <div class="item"><span class="label" style="color: #ffd700;">💰 받을 분배금</span><span class="value" id="dist_gold" style="color: #ffd700; font-weight: bold;">0 아데나</span></div>
+            <div class="item"><span class="label">⚔️ 오늘 보스탐 참여횟수</span><span class="value" id="today_cnt">0 회</span></div>
+            <div class="item"><span class="label">⭐ 오늘 보스탐 참여점수</span><span class="value" id="today_pts">0 점</span></div>
+            <div class="item"><span class="label" id="label_d_period">📅 1주간 참여점수</span><span class="value" id="d_period_pts">0 점</span></div>
+            <div class="item"><span class="label" id="label_c_period">📅 2주간 참여점수</span><span class="value" id="c_period_pts">0 점</span></div>
         </div>
-        
         <div id="error" class="error-message" style="display: none;"></div>
 
         <div id="statusArea" class="card status-area" style="display: none;">
@@ -102,8 +109,7 @@
         }
 
         loadBloodlineList();
-
-        /* 🔍 유저 검색 함수 */
+/* 🔍 유저 검색 함수 (총 분배금 렌더링 추가) */
         async function searchUser() {
             const keyword = input.value.trim();
             if (keyword === "") { alert("아이디를 입력하세요."); return; }
@@ -116,16 +122,39 @@
                 const data = await res.json();
                 if (!res.ok) { throw new Error(data.detail); }
                 
-                // 받아온 JSON 데이터를 알맞은 ID 영역에 렌더링
+                // 1. 인적 정보 출력
                 document.getElementById("name").innerText = data.name;
                 document.getElementById("job").innerText = data.character_class;
-                document.getElementById("blood").innerText = data.bloodline;         // F열 (혈맹)
-                document.getElementById("blood_member").innerText = data.blood_member; // G열 (공성혈)
+                document.getElementById("blood").innerText = data.bloodline;
+                document.getElementById("blood_member").innerText = data.blood_member;
+                
+                // 2. 서버에서 산출한 통계 및 분배금 출력
+                const stats = data.attendance_stats || {};
+                
+                // 💡 [추가됨] 총 분배금 출력
+                document.getElementById("total_dist_gold").innerText = (stats.total_distribution_gold || 0).toLocaleString() + " 아데나";
+                document.getElementById("contrib_rate").innerText = (stats.contribution_rate || 0).toFixed(2) + " %";
+                document.getElementById("dist_gold").innerText = (stats.distribution_gold || 0).toLocaleString() + " 아데나";
+                
+                document.getElementById("today_cnt").innerText = (stats.today_count || 0) + " 회";
+                document.getElementById("today_pts").innerText = (stats.today_points || 0) + " 점";
+                
+                // D2~D3 날짜 라벨 및 점수
+                if (stats.d_period_label) {
+                    document.getElementById("label_d_period").innerText = `${stats.d_period_label} 일까지의 참여점수`;
+                }
+                document.getElementById("d_period_pts").innerText = (stats.d_period_points || 0) + " 점";
+                
+                // C2~C3 날짜 라벨 및 점수
+                if (stats.c_period_label) {
+                    document.getElementById("label_c_period").innerText = `${stats.c_period_label} 일까지의 참여점수`;
+                }
+                document.getElementById("c_period_pts").innerText = (stats.c_period_points || 0) + " 점";
                 
                 card.style.display = "block"; 
                 error.style.display = "none";
 
-                /* 검색 성공 시 소속 혈맹(우선순위) 또는 공성혈 데이터를 바탕으로 하단 명단 현황 업데이트 */
+                /* 하단 명단 현황 업데이트 */
                 const targetBloodline = data.bloodline || data.blood_member;
                 if (targetBloodline) {
                     fetchBloodlineStatus(targetBloodline);
@@ -139,7 +168,6 @@
                 error.innerText = err.message;
             }
         }
-
         /* 🔄 혈맹의 인원 현황 및 명단을 서버에서 로드하는 함수 */
         async function fetchBloodlineStatus(bloodlineName) {
             if (!bloodlineName || bloodlineName === "undefined" || bloodlineName === "없음") return;
