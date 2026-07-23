@@ -267,17 +267,22 @@ def search_user(name: str):
     for row in rows[2:]:
         if len(row) < 2: continue
         
-        char_name = row[1].strip()  # B열: 아이디
-        if not char_name: continue
+        char_name_b = row[1].strip()  # B열: 검색 비교용 키값
+        if not char_name_b: continue
             
-        clean_name = clean_id_string(char_name)
+        clean_name = clean_id_string(char_name_b)
+        
+        # B열 기준으로 유저 검색
         if clean_name == search or search in clean_name:
             matched_stats = next((item for item in data_list if clean_id_string(item["name"]) == clean_name), {})
             
+            # C열의 실제 아이디 텍스트 추출
+            real_id_c = row[2].strip() if len(row) > 2 else char_name_b
+            
             return {
                 "status": "success",
-                "name": char_name,
-                "character_class": row[2].strip() if len(row) > 2 else "",  # C열: 클래스
+                "name": real_id_c,
+                "character_class": row[3].strip() if len(row) > 3 else "",  # D열: 클래스
                 "skill": row[4].strip() if len(row) > 4 else "",            # E열
                 "bloodline": row[5].strip() if len(row) > 5 else "",        # F열
                 "blood_member": row[6].strip() if len(row) > 6 else "",     # G열
