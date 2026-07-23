@@ -155,11 +155,6 @@ def get_adena_summary():
         d_start, d_end = min(d_start, d_end), max(d_start, d_end)
         c_start, c_end = min(c_start, c_end), max(c_start, c_end)
 
-        print(f"\n==================== [정산 연산 시작] ====================")
-        print(f"📅 C기간(2주): {c_start} ~ {c_end}")
-        print(f"📅 D기간(1주): {d_start} ~ {d_end}")
-        print(f"📅 오늘 날짜  : {today_str}")
-        print(f"📅 어제 날짜  : {yesterday_str}")
 
         headers = {
             "apikey": SUPABASE_KEY,
