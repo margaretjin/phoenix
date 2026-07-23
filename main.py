@@ -277,7 +277,7 @@ def search_user(name: str):
             return {
                 "status": "success",
                 "name": char_name,
-                "character_class": row[3].strip() if len(row) > 3 else "",  # D열: 클래스
+                "character_class": row[2].strip() if len(row) > 2 else "",  # C열: 클래스
                 "skill": row[4].strip() if len(row) > 4 else "",            # E열
                 "bloodline": row[5].strip() if len(row) > 5 else "",        # F열
                 "blood_member": row[6].strip() if len(row) > 6 else "",     # G열
