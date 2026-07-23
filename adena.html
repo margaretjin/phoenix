@@ -9,7 +9,6 @@
     <meta property="og:image" content="https://phoenix-mmtl.onrender.com/static/phoenix.jpg" />
     <meta property="og:url" content="https://phoenix-mmtl.onrender.com" />
     
-    <!-- 외부 공통 스타일시트 연결 -->
     <link rel="stylesheet" href="./static/style.css?v=20260718-2">
     <style>
         .header-date-sub {
@@ -23,7 +22,6 @@
 </head>
 <body>
     <div class="container menu-container">
-        <!-- 상단 공통 메뉴 영역 -->
         <div class="menu-buttons">
             <a href="/" class="menu-btn">🏠 홈</a>
             <a href="kurtz.html" class="menu-btn">커츠</a>
@@ -36,7 +34,6 @@
         <div class="container" style="margin-top: 15px; margin-bottom: 0;">
             <h1>💰 전체 분배금 정산표</h1>
 
-            <!-- 상단 분배금 요약 정보 카드 -->
             <div class="card" style="display: block; margin-top: 10px; margin-bottom: 20px;">
                 <div class="item" style="border-bottom: none;">
                     <span class="label" style="color: #00ff88; font-weight: bold;">💎 총분배금</span>
@@ -44,7 +41,6 @@
                 </div>
             </div>
 
-            <!-- 정산 테이블 -->
             <div class="member-list-box" style="max-height: 550px; border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff;">
                 <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; white-space: nowrap;">
                     <thead style="background: #1e293b; color: #ffffff; position: sticky; top: 0; z-index: 1;">
@@ -52,19 +48,16 @@
                             <th onclick="sortTable('name')" style="padding: 12px 8px; cursor: pointer;">아이디 ⇳</th>
                             <th onclick="sortTable('character_class')" style="padding: 12px 8px; cursor: pointer;">클래스 ⇳</th>
                             
-                            <!-- 💡 1. 합산점수 (두 줄 표기) -->
                             <th onclick="sortTable('c_period_points')" style="padding: 8px 8px; cursor: pointer;">
                                 <div>합산점수 ⇳</div>
                                 <div id="cPeriodSub" class="header-date-sub">-<br>-</div>
                             </th>
                             
-                            <!-- 💡 2. 이번총점수 (두 줄 표기) -->
                             <th onclick="sortTable('d_period_points')" style="padding: 8px 8px; cursor: pointer;">
                                 <div>이번총점수 ⇳</div>
                                 <div id="dPeriodSub" class="header-date-sub">-<br>-</div>
                             </th>
                             
-                            <!-- 💡 3. 오늘점수 -->
                             <th onclick="sortTable('today_points')" style="padding: 8px 8px; cursor: pointer;">
                                 <div>오늘점수 ⇳</div>
                                 <div id="todayDateSub" class="header-date-sub" style="margin-top: 8px;">-</div>
@@ -84,7 +77,6 @@
         </div>
     </div>
 
-    <!-- 📱 모바일 이미지 저장 전용 모달 영역 -->
     <div id="downloadModal" class="download-modal" style="display: none;">
         <p class="download-modal-text">
             <strong>💡 사진첩 저장 안내</strong><br>
@@ -109,10 +101,8 @@
                 }
                 const result = await res.json();
 
-                // 1. 총분배금 출력
                 document.getElementById("totalPool").innerText = (result.total_dist_gold || 0).toLocaleString() + " 아데나";
                 
-                // 2. 합산점수 아래 C2 ~ C3 기간 (두 줄 출력)
                 if (document.getElementById("cPeriodSub") && result.c_period_label) {
                     const cDates = result.c_period_label.split("~");
                     if (cDates.length === 2) {
@@ -122,7 +112,6 @@
                     }
                 }
                 
-                // 3. 이번총점수 아래 D2 ~ D3 기간 (두 줄 출력)
                 if (document.getElementById("dPeriodSub") && result.d_period_label) {
                     const dDates = result.d_period_label.split("~");
                     if (dDates.length === 2) {
@@ -132,7 +121,6 @@
                     }
                 }
                 
-                // 4. 오늘점수 아래 오늘 날짜
                 if (document.getElementById("todayDateSub")) {
                     document.getElementById("todayDateSub").innerText = result.today_date || '';
                 }
