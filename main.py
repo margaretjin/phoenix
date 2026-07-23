@@ -327,5 +327,107 @@ def get_bloodline_members(bloodline: str):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="데이터 로드 실패")
 
+
+# --- [분배금 정산 전체 표 API] ---
+@app.get("/api/adena-summary")
+def get_adena_summary():
+    """
+    '인원' 시트에 등록된 전체 유저의 정보와 
+    Supabase DB의 참여 점수, 기여도, 분배금을 계산하여 전체 리스트로 반환합니다.
+    """
+    try:
+        rows = get_all_rows()
+        config = get_distribution_config()
+        f3_total_gold = config["f3_total_gold"]
+        
+        tz_kst = datetime.timezone(datetime.timedelta(hours=9))
+        now_kst = datetime.datetime.now(tz_kst)
+        today_str = now_kst.strftime("%Y-%m-%d")
+        
+        d_start = config["d_start"] or (now_kst - datetime.timedelta(days=6)).strftime("%Y-%m-%d")
+        d_end = config["d_end"] or today_str
+        c_start = config["c_start"] or (now_kst - datetime.timedelta(days=13)).strftime("%Y-%m-%d")
+        c_end = config["c_end"] or today_str
+        
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}"
+        }
+
+        # 1. 혈맹 전체 D2~D3 (1주간) 총점 구하기
+        total_guild_d_points = 0.0
+        all_url = f"{SUPABASE_URL}/rest/v1/boss_attendance?select=points&attendance_date=gte.{d_start}&attendance_date=lte.{d_end}"
+        res_all = requests.get(all_url, headers=headers, timeout=5)
+        if res_all.status_code == 200:
+            for r in res_all.json():
+                total_guild_d_points += float(r.get("points", 0) or 0)
+
+        # 2. 개인별 점수 조회
+        user_db_map = {}
+        user_url = f"{SUPABASE_URL}/rest/v1/boss_attendance?select=user_id,attendance_date,points&attendance_date=gte.{c_start}&attendance_date=lte.{max(c_end, today_str)}"
+        res_user = requests.get(user_url, headers=headers, timeout=5)
+        if res_user.status_code == 200:
+            for r in res_user.json():
+                u_id = str(r.get("user_id", "")).strip().lower()
+                r_date = r.get("attendance_date", "")
+                pts = float(r.get("points", 0) or 0)
+
+                if u_id not in user_db_map:
+                    user_db_map[u_id] = {"c_pts": 0.0, "d_pts": 0.0, "today_pts": 0.0}
+
+                if c_start <= r_date <= c_end:
+                    user_db_map[u_id]["c_pts"] += pts
+                if d_start <= r_date <= d_end:
+                    user_db_map[u_id]["d_pts"] += pts
+                if r_date == today_str:
+                    user_db_map[u_id]["today_pts"] += pts
+
+        # 3. 유저 명단 매핑
+        summary_list = []
+        for row in rows[2:]:
+            if len(row) < 3:
+                continue
+            char_name = row[2].strip()
+            if not char_name:
+                continue
+
+            char_class = row[3].strip() if len(row) > 3 else ""
+            clean_id = char_name.split("(")[0].strip()
+            lookup_key = clean_id.lower()
+
+            user_pts = user_db_map.get(lookup_key, {"c_pts": 0.0, "d_pts": 0.0, "today_pts": 0.0})
+            
+            d_pts = user_pts["d_pts"]
+            c_pts = user_pts["c_pts"]
+            today_pts = user_pts["today_pts"]
+
+            contrib_rate = 0.0
+            dist_gold = 0
+            if total_guild_d_points > 0 and d_pts > 0:
+                contrib_rate = round((d_pts / total_guild_d_points) * 100, 2)
+                dist_gold = int(f3_total_gold * (contrib_rate / 100))
+
+            summary_list.append({
+                "name": char_name,
+                "character_class": char_class,
+                "c_period_points": c_pts,
+                "d_period_points": d_pts,
+                "today_points": today_pts,
+                "contribution_rate": contrib_rate,
+                "distribution_gold": dist_gold
+            })
+
+        return {
+            "status": "success",
+            "total_dist_gold": int(f3_total_gold),
+            "c_period_label": f"{c_start} ~ {c_end}",  # C2 ~ C3
+            "d_period_label": f"{d_start} ~ {d_end}",  # 💡 D2 ~ D3
+            "today_date": today_str,                    # 💡 오늘 날짜
+            "data": summary_list
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"분배금 요약 로드 실패: {str(e)}")
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

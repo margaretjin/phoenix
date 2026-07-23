@@ -3,23 +3,231 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>피닉스 - 메인</title>
+    <title>피닉스 - 분배금 정산</title>
     <meta property="og:title" content="피닉스" />
-    <meta property="og:description" content="혈맹원 정보를 검색해보세요." />
+    <meta property="og:description" content="전체 분배금 정산표를 확인하세요." />
     <meta property="og:image" content="https://phoenix-mmtl.onrender.com/static/phoenix.jpg" />
     <meta property="og:url" content="https://phoenix-mmtl.onrender.com" />
-    <!-- 외부 스타일시트 연결 -->
-    <link rel="stylesheet" href="./static/style.css?v=20260718-1">
+    
+    <!-- 외부 공통 스타일시트 연결 -->
+    <link rel="stylesheet" href="./static/style.css?v=20260718-2">
+    <style>
+        .header-date-sub {
+            font-size: 10px;
+            font-weight: normal;
+            color: #94a3b8;
+            margin-top: 3px;
+            line-height: 1.2;
+        }
+    </style>
 </head>
 <body>
     <div class="container menu-container">
+        <!-- 상단 공통 메뉴 영역 -->
         <div class="menu-buttons">
-            <a href="/" class="menu-btn home-btn active">🏠 홈</a>
+            <a href="/" class="menu-btn">🏠 홈</a>
             <a href="kurtz.html" class="menu-btn">커츠</a>
             <a href="fire.html" class="menu-btn">화둥</a>
             <a href="dragon.html" class="menu-btn">용계</a>
-            <a href="adena.html" class="menu-btn">💰분배금</a>
+            <a href="adena.html" class="menu-btn active" style="color: #ffd700; font-weight: bold;">💰 분배금</a>
             <a href="#" onclick="downloadPhoenixImage(); return false;" class="menu-btn">사진</a>
         </div>
+
+        <div class="container" style="margin-top: 15px; margin-bottom: 0;">
+            <h1>💰 전체 분배금 정산표</h1>
+
+            <!-- 상단 분배금 요약 정보 카드 -->
+            <div class="card" style="display: block; margin-top: 10px; margin-bottom: 20px;">
+                <div class="item" style="border-bottom: none;">
+                    <span class="label" style="color: #00ff88; font-weight: bold;">💎 총분배금</span>
+                    <span class="value" id="totalPool" style="color: #00ff88; font-weight: bold;">0 아데나</span>
+                </div>
+            </div>
+
+            <!-- 정산 테이블 -->
+            <div class="member-list-box" style="max-height: 550px; border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff;">
+                <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; white-space: nowrap;">
+                    <thead style="background: #1e293b; color: #ffffff; position: sticky; top: 0; z-index: 1;">
+                        <tr>
+                            <th onclick="sortTable('name')" style="padding: 12px 8px; cursor: pointer;">아이디 ⇳</th>
+                            <th onclick="sortTable('character_class')" style="padding: 12px 8px; cursor: pointer;">클래스 ⇳</th>
+                            
+                            <!-- 💡 1. 합산점수 (두 줄 표기) -->
+                            <th onclick="sortTable('c_period_points')" style="padding: 8px 8px; cursor: pointer;">
+                                <div>합산점수 ⇳</div>
+                                <div id="cPeriodSub" class="header-date-sub">-<br>-</div>
+                            </th>
+                            
+                            <!-- 💡 2. 이번총점수 (두 줄 표기) -->
+                            <th onclick="sortTable('d_period_points')" style="padding: 8px 8px; cursor: pointer;">
+                                <div>이번총점수 ⇳</div>
+                                <div id="dPeriodSub" class="header-date-sub">-<br>-</div>
+                            </th>
+                            
+                            <!-- 💡 3. 오늘점수 -->
+                            <th onclick="sortTable('today_points')" style="padding: 8px 8px; cursor: pointer;">
+                                <div>오늘점수 ⇳</div>
+                                <div id="todayDateSub" class="header-date-sub" style="margin-top: 8px;">-</div>
+                            </th>
+                            
+                            <th onclick="sortTable('contribution_rate')" style="padding: 12px 8px; cursor: pointer;">기여도 ⇳</th>
+                            <th onclick="sortTable('distribution_gold')" style="padding: 12px 8px; cursor: pointer;">분배금액 ⇳</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adenaTableBody">
+                        <tr>
+                            <td colspan="7" style="padding: 24px; color: #64748b; font-weight: 600;">데이터를 조회하는 중입니다...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
+
+    <!-- 📱 모바일 이미지 저장 전용 모달 영역 -->
+    <div id="downloadModal" class="download-modal" style="display: none;">
+        <p class="download-modal-text">
+            <strong>💡 사진첩 저장 안내</strong><br>
+            아래 이미지를 <strong>길게 꾹~ 누르신 후</strong><br>
+            [내 사진첩에 저장] 또는 [이미지 저장]을 선택해주세요!
+        </p>
+        <img src="/static/phoenix.jpg" alt="피닉스 이미지">
+        <button class="download-modal-close" onclick="closeDownloadModal()">닫기</button>
+    </div>
+
+    <script>
+        let rawData = [];
+        let currentSortCol = 'distribution_gold';
+        let isAsc = false;
+
+        async function loadSummaryData() {
+            try {
+                const res = await fetch("/api/adena-summary");
+                if (!res.ok) {
+                    document.getElementById("adenaTableBody").innerHTML = `<tr><td colspan="7" style="padding: 20px; color: #94a3b8;">데이터를 준비하는 중입니다.</td></tr>`;
+                    return;
+                }
+                const result = await res.json();
+
+                // 1. 총분배금 출력
+                document.getElementById("totalPool").innerText = (result.total_dist_gold || 0).toLocaleString() + " 아데나";
+                
+                // 2. 합산점수 아래 C2 ~ C3 기간 (두 줄 출력)
+                if (document.getElementById("cPeriodSub") && result.c_period_label) {
+                    const cDates = result.c_period_label.split("~");
+                    if (cDates.length === 2) {
+                        document.getElementById("cPeriodSub").innerHTML = `${cDates[0].trim()}<br>~ ${cDates[1].trim()}`;
+                    } else {
+                        document.getElementById("cPeriodSub").innerText = result.c_period_label;
+                    }
+                }
+                
+                // 3. 이번총점수 아래 D2 ~ D3 기간 (두 줄 출력)
+                if (document.getElementById("dPeriodSub") && result.d_period_label) {
+                    const dDates = result.d_period_label.split("~");
+                    if (dDates.length === 2) {
+                        document.getElementById("dPeriodSub").innerHTML = `${dDates[0].trim()}<br>~ ${dDates[1].trim()}`;
+                    } else {
+                        document.getElementById("dPeriodSub").innerText = result.d_period_label;
+                    }
+                }
+                
+                // 4. 오늘점수 아래 오늘 날짜
+                if (document.getElementById("todayDateSub")) {
+                    document.getElementById("todayDateSub").innerText = result.today_date || '';
+                }
+
+                rawData = result.data || [];
+                sortTable(currentSortCol, false);
+            } catch (e) {
+                document.getElementById("adenaTableBody").innerHTML = `<tr><td colspan="7" style="padding: 20px; color: #94a3b8;">데이터를 불러오는 중입니다.</td></tr>`;
+            }
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById("adenaTableBody");
+            if (!data.length) {
+                tbody.innerHTML = `<tr><td colspan="7" style="padding: 20px; color: #64748b;">등록된 데이터가 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.map(row => `
+                <tr style="border-bottom: 1px solid #e2e8f0; transition: background-color 0.15s ease;" onmouseover="this.style.backgroundColor='#f1f5f9'" onmouseout="this.style.backgroundColor='transparent'">
+                    <td style="padding: 12px 8px; color: #0f172a; font-weight: 700;">${row.name}</td>
+                    <td style="padding: 12px 8px; color: #334155; font-weight: 600;">${row.character_class}</td>
+                    <td style="padding: 12px 8px; color: #334155;">${row.c_period_points} 점</td>
+                    <td style="padding: 12px 8px; color: #334155;">${row.d_period_points} 점</td>
+                    <td style="padding: 12px 8px; color: #334155;">${row.today_points} 점</td>
+                    <td style="padding: 12px 8px; color: #4facfe; font-weight: bold;">${row.contribution_rate.toFixed(2)} %</td>
+                    <td style="padding: 12px 8px; color: #ffd700; font-weight: bold; background: rgba(0,0,0,0.02);">${row.distribution_gold.toLocaleString()} 아데나</td>
+                </tr>
+            `).join('');
+        }
+
+        function sortTable(column, toggle = true) {
+            if (toggle) {
+                if (currentSortCol === column) {
+                    isAsc = !isAsc;
+                } else {
+                    currentSortCol = column;
+                    isAsc = false;
+                }
+            }
+
+            rawData.sort((a, b) => {
+                let valA = a[column];
+                let valB = b[column];
+
+                if (typeof valA === 'string') {
+                    return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                } else {
+                    return isAsc ? valA - valB : valB - valA;
+                }
+            });
+
+            renderTable(rawData);
+        }
+
+        function downloadPhoenixImage() {
+            const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isKakaotalk = /KAKAOTALK/i.test(navigator.userAgent);
+            
+            if (isMobile || isKakaotalk) {
+                if (document.getElementById("downloadModal")) {
+                    document.getElementById("downloadModal").style.display = "flex";
+                }
+            } else {
+                const imageUrl = "/static/phoenix.jpg";
+                fetch(imageUrl)
+                    .then(response => {
+                        if (!response.ok) throw new Error();
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = blobUrl;
+                        link.download = "phoenix.jpg";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(blobUrl);
+                    })
+                    .catch(() => {
+                        if (document.getElementById("downloadModal")) {
+                            document.getElementById("downloadModal").style.display = "flex";
+                        }
+                    });
+            }
+        }
+
+        function closeDownloadModal() {
+            if (document.getElementById("downloadModal")) {
+                document.getElementById("downloadModal").style.display = "none";
+            }
+        }
+
+        window.onload = loadSummaryData;
+    </script>
 </body>
+</html>
