@@ -45,13 +45,24 @@
                 <div class="item"><span class="label">📊 이번주 기여도</span><span class="value" id="contrib_rate">0.00 %</span></div>
                 <div class="item"><span class="label">💰 분배금</span><span class="value" id="dist_gold">0 아데나</span></div>
 
+                <!-- 오늘 보스탐 -->
                 <div class="item" style="flex-direction: column; align-items: flex-start;">
                     <div style="display: flex; justify-content: space-between; width: 100%;">
                         <span class="label">⭐ 오늘 보스탐 참여점수</span>
                         <span class="value" id="today_pts">0 점</span>
                     </div>
-                    <!-- 🎯 보스탐 동그라미 (참여: 핑크, 미참여: 회색) -->
+                    <!-- 🎯 오늘 보스탐 동그라미 -->
                     <div id="timeBadgeContainer" class="time-badge-container" style="width: 100%; box-sizing: border-box; margin-top: 8px;"></div>
+                </div>
+
+                <!-- 어제 보스탐 (추가됨) -->
+                <div class="item" style="flex-direction: column; align-items: flex-start;">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <span class="label">🌙 어제 보스탐 참여점수</span>
+                        <span class="value" id="yesterday_pts">0 점</span>
+                    </div>
+                    <!-- 🎯 어제 보스탐 동그라미 -->
+                    <div id="yesterdayTimeBadgeContainer" class="time-badge-container" style="width: 100%; box-sizing: border-box; margin-top: 8px;"></div>
                 </div>
 
                 <div class="item"><span class="label" id="label_d_period">📅 1주간 참여점수</span><span class="value" id="d_period_pts">0 점</span></div>
@@ -147,6 +158,8 @@
                 if (document.getElementById("dist_gold")) {
                     document.getElementById("dist_gold").innerText = (stats.distribution_gold || 0).toLocaleString() + " 아데나";
                 }
+                
+                // 오늘 보스탐 데이터 연동
                 if (document.getElementById("today_pts")) {
                     document.getElementById("today_pts").innerText = (stats.today_points || 0) + " 점";
                 }
@@ -156,6 +169,20 @@
                 if (badgeContainer) {
                     badgeContainer.innerHTML = targetHours.map(hour => {
                         const isAttended = attendedHours.includes(hour);
+                        return `<div class="time-badge ${isAttended ? 'attended' : 'absent'}">${hour}</div>`;
+                    }).join('');
+                }
+
+                // 어제 보스탐 데이터 연동 (추가됨)
+                if (document.getElementById("yesterday_pts")) {
+                    document.getElementById("yesterday_pts").innerText = (stats.yesterday_points || 0) + " 점";
+                }
+
+                const yesterdayAttendedHours = stats.yesterday_hours || [];
+                const yesterdayBadgeContainer = document.getElementById("yesterdayTimeBadgeContainer");
+                if (yesterdayBadgeContainer) {
+                    yesterdayBadgeContainer.innerHTML = targetHours.map(hour => {
+                        const isAttended = yesterdayAttendedHours.includes(hour);
                         return `<div class="time-badge ${isAttended ? 'attended' : 'absent'}">${hour}</div>`;
                     }).join('');
                 }
