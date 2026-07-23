@@ -73,11 +73,11 @@ h1, .zone-title {
 }
 
 /* ==========================================
-   3. 상단 메뉴 UI (홈/커츠/화둥/용계/사진받기)
+   3. 상단 메뉴 UI (홈/커츠/화둥/용계/분배금/사진)
    ========================================== */
 .menu-buttons {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 6px;
     width: 100%;
 }
@@ -98,8 +98,7 @@ h1, .zone-title {
     white-space: nowrap;
     transition: all 0.2s ease-in-out;
     cursor: pointer;
-    margin: 0px;
-      
+    margin: 0;
 }
 
 .menu-btn:hover {
@@ -257,13 +256,53 @@ h1, .zone-title {
 }
 
 /* ==========================================
-   5. [통합 및 최적화] 메인 검색/공통 그리드 카드 스타일
+   5. 메인 검색/공통 그리드 카드 스타일
    ========================================== */
 .search {
     display: flex;
     gap: 8px;
     margin-top: 8px;
     width: 100%;
+}
+
+input {
+    flex: 1;
+    min-width: 0;
+    height: 50px;
+    padding: 0 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 15px;
+    color: #1e293b;
+    background-color: #f8fafc;
+    outline: none;
+    transition: all 0.2s ease-in-out;
+}
+
+input:focus {
+    border-color: #3b82f6;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+button {
+    min-width: 80px;
+    height: 50px;
+    border: none;
+    border-radius: 12px;
+    background: #3b82f6;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
+}
+
+button:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
 }
 
 .bloodline-section {
@@ -321,7 +360,7 @@ h1, .zone-title {
     word-break: break-word;
 }
 
-/* 텍스트가 확장되었을 때의 스타일 */
+/* 텍스트 확장 시 */
 .grid-card-btn[data-expanded='true'] .grid-card-btn-name {
     white-space: normal;
     overflow: visible;
@@ -329,7 +368,7 @@ h1, .zone-title {
     word-break: break-all;
 }
 
-/* 직업별 고유 테두리 및 배경색 처리 */
+/* 직업별 테두리 및 배경색 처리 */
 .grid-card-btn.member-job-knight {
     border-color: #111827;
     background: #f9fafb;
@@ -346,11 +385,121 @@ h1, .zone-title {
 }
 
 .grid-card-btn.member-job-monarch {
-    border-color: #ea580c;  /* 군주 테마에 맞춘 진한 주황색 테두리 */
-    background: #fff7ed;   /* 연한 주황색 배경색 */
+    border-color: #ea580c;
+    background: #fff7ed;
 }
 
-/* 혈맹 리스트 및 명단 영역 */
+/* 검색 대상 강조용 핑크 색상 효과 */
+.grid-card-btn.search-highlight {
+    background-color: #fce7f3 !important; 
+    box-shadow: 0 0 12px 3px rgba(244, 114, 182, 0.4) !important; 
+    transform: scale(1.08) translateY(-2px); 
+    transition: all 0.3s ease-in-out;
+}
+
+/* ==========================================
+   6. 검색 결과 카드 & 오늘 보스탐 배지
+   ========================================== */
+.card {
+    display: none;
+    margin-top: 24px;
+    background: #f8fafc;
+    padding: 8px 14px;
+    border-radius: 14px;
+    border: 1px solid #edf2f7;
+}
+
+.search-result-card {
+    margin-bottom: 20px;
+}
+
+.item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+    font-size: 15px;
+    border-bottom: 1px dashed #e2e8f0;
+}
+
+.item:last-child { 
+    border-bottom: none; 
+}
+
+.item .label { 
+    color: #64748b; 
+    font-weight: 600; 
+}
+
+.item .value { 
+    color: #0f172a; 
+    font-weight: 700; 
+}
+
+/* 🎯 보스탐 시간대 동그라미 배지 컨테이너 및 아이템 */
+.time-badge-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 10px 8px;
+    background: #e2e8f0;
+    border-radius: 10px;
+    justify-content: center;
+    align-items: center;
+}
+
+.time-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+    color: #ffffff;
+    transition: all 0.2s ease-in-out;
+}
+
+/* 미참여: 회색 */
+.time-badge.absent {
+    background-color: #94a3b8;
+    color: #ffffff;
+}
+
+/* 참여: 핑크색 */
+.time-badge.attended {
+    background-color: #ff4081;
+    box-shadow: 0 0 8px rgba(255, 64, 129, 0.6);
+    color: #ffffff;
+    transform: scale(1.05);
+}
+
+/* ==========================================
+   7. 혈맹 리스트 및 명단 영역
+   ========================================== */
+.status-area {
+    display: none;
+    margin-top: 0;
+}
+
+.remaining-text {
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 2px solid #cbd5e1;
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+    color: #334155;
+    word-break: keep-all;
+}
+
+.member-list-box {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
 .member-grid {
     display: flex;
     flex-direction: column;
@@ -378,9 +527,9 @@ h1, .zone-title {
     margin-left: 2px;
 }
 
-.search-result-card {
-    margin-bottom: 20px;
-}
+.bloodline-name { color: #2563eb; }
+.status-success { color: #10b981; }
+.status-danger { color: #dc2626; }
 
 .error-message {
     display: none;
@@ -396,118 +545,47 @@ h1, .zone-title {
     font-weight: 600;
 }
 
-.status-area {
-    display: none;
-    margin-top: 0;
-}
-
-.remaining-text {
-    padding-bottom: 12px;
-    margin-bottom: 12px;
-    border-bottom: 2px solid #cbd5e1;
-    font-size: 16px;
-    font-weight: 800;
-    text-align: center;
-    color: #334155;
-    word-break: keep-all;
-}
-
-.member-list-box {
-    max-height: 380px;
-    overflow-y: auto;
-}
-
-.bloodline-name {
-    color: #2563eb;
-}
-
-.status-success {
-    color: #10b981;
-}
-
-.status-danger {
-    color: #dc2626;
-}
-
-input {
-    flex: 1;
-    min-width: 0;
-    height: 50px;
-    padding: 0 16px;
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    font-size: 15px;
-    color: #1e293b;
-    background-color: #f8fafc;
-    outline: none;
-    transition: all 0.2s ease-in-out;
-}
-
-input:focus {
-    border-color: #3b82f6;
-    background-color: #ffffff;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-}
-
-button {
-    min-width: 80px;
-    height: 50px;
-    border: none;
-    border-radius: 12px;
-    background: #3b82f6;
-    color: #ffffff;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.2s ease-in-out;
-    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
-}
-
-button:hover {
-    background: #2563eb;
-    transform: translateY(-1px);
-}
-
-.card {
-    display: none;
-    margin-top: 24px;
-    background: #f8fafc;
-    padding: 8px ;
-    border-radius: 14px;
-    border: 1px solid #edf2f7;
-}
-
-.item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 0;
-    font-size: 15px;
-    border-bottom: 1px dashed #e2e8f0;
-}
-
-.item:last-child { border-bottom: none; }
-.item .label { color: #64748b; font-weight: 600; }
-.item .value { color: #0f172a; font-weight: 700; }
-
-#error {
-    display: none;
+/* ==========================================
+   8. 지도/장소 카드 관련
+   ========================================== */
+.location-grid-container {
     margin-top: 20px;
-    padding: 14px;
-    background-color: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 12px;
-    color: #dc2626;
+    padding: 10px 0;
+}
+
+.location-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.location-card {
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.location-card:hover {
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+}
+
+.loc-name {
+    color: #334155;
+    font-weight: 700;
     font-size: 14px;
-    text-align: center;
-    font-weight: 600;
+    word-break: keep-all;
+    padding-right: 10px;
 }
 
 /* ==========================================
-   6. 모바일 전용 반응형 스타일
+   9. 모바일 이미지 저장 전용 모달 레이어
    ========================================== */
-/* 📱 6-1. 모바일 이미지 저장 전용 모달 레이어 */
 .download-modal {
     display: none;
     position: fixed;
@@ -558,42 +636,10 @@ button:hover {
     box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);
 }
 
-.location-grid-container {
-    margin-top: 20px;
-    padding: 10px 0;
-}
-
-.location-grid {
-    display: grid;
-    grid-template-columns: 2fr;
-    gap: 10px;
-}
-
-.location-card {
-    display: flex;
-    align-items: center;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 12px 16px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    transition: transform 0.15s ease, border-color 0.15s ease;
-}
-
-.location-card:hover {
-    border-color: #3b82f6;
-    transform: translateY(-2px);
-}
-
-.loc-name {
-    color: #334155;
-    font-weight: 700;
-    font-size: 14px;
-    word-break: keep-all;
-    padding-right: 10px;
-}
-
-
+/* ==========================================
+   10. 모바일 반응형 미디어 쿼리
+   ========================================== */
+/* 📱 10-1. 초소형 기기 (width ≤ 320px) */
 @media (max-width: 320px) {
     body {
         padding: 8px 3px;
@@ -605,28 +651,22 @@ button:hover {
     }
 
     .search {
-        display: flex;
         flex-direction: row;
         align-items: center;
         gap: 6px;
     }
 
     input {
-        flex: 1 1 auto;
-        width: auto;
-        min-width: 0;
         height: 42px;
         font-size: 13px;
     }
 
     button {
-        flex: 0 0 auto;
-        width: auto;
         min-width: 72px;
         height: 42px;
         font-size: 13px;
         padding: 0 10px;
-        magin: 0px ;
+        margin: 0;
     }
 
     .bloodline-section {
@@ -643,6 +683,17 @@ button:hover {
         padding: 4px;
         font-size: 10px;
         border-radius: 6px;
+    }
+
+    .time-badge {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
+
+    .time-badge-container {
+        gap: 4px;
+        padding: 6px 4px;
     }
 
     .status-area {
@@ -670,6 +721,7 @@ button:hover {
     }
 }
 
+/* 📱 10-2. 모바일/스마트폰 일반 (321px ≤ width ≤ 500px) */
 @media (max-width: 500px) and (min-width: 321px) {
     body {
         padding: 10px 4px;
@@ -682,7 +734,7 @@ button:hover {
     }
 
     .menu-buttons {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 3px;
     }
 
@@ -690,7 +742,7 @@ button:hover {
         font-size: 10px;
         height: 34px;
         padding: 0 2px;
-        margin: 0px;
+        margin: 0;
     }
 
     .tab-buttons {
@@ -708,7 +760,7 @@ button:hover {
 
     .desc-bar {
         padding: 4px 6px;
-        margin: 24px 0;
+        margin: 16px 0;
         gap: 6px;
         min-height: 44px;
     }
@@ -726,7 +778,7 @@ button:hover {
     }
 
     .nav-btn {
-        width: 24px;
+        width: 28px;
         height: 36px;
         padding: 0;
         min-width: 0;
@@ -750,11 +802,14 @@ button:hover {
         font-size: 11px;
     }
 
-    /* 🎯 검색 대상 강조용 핑크색 바닥 효과 */
-    .grid-card-btn.search-highlight {
-        background-color: #fce7f3 !important; 
-        box-shadow: 0 0 12px 3px rgba(244, 114, 182, 0.4) !important; 
-        transform: scale(1.08) translateY(-2px); 
-        transition: all 0.3s ease-in-out;
+    .time-badge {
+        width: 26px;
+        height: 26px;
+        font-size: 10px;
+    }
+
+    .time-badge-container {
+        gap: 5px;
+        padding: 8px 4px;
     }
 }

@@ -8,8 +8,9 @@
     <meta property="og:description" content="혈맹원 정보를 검색해보세요." />
     <meta property="og:image" content="https://phoenix-mmtl.onrender.com/static/phoenix.jpg" />
     <meta property="og:url" content="https://phoenix-mmtl.onrender.com" />
+    
     <!-- 외부 스타일시트 연결 -->
-    <link rel="stylesheet" href="./static/style.css?v=20260718-1">
+    <link rel="stylesheet" href="./static/style.css?v=20260718-2">
 </head>
 <body>
     <div class="container menu-container">
@@ -30,28 +31,37 @@
             </div>
 
             <div class="bloodline-section">
-                <!-- 공통 클래스 card-grid 적용 -->
+                <!-- 상단 혈맹 버튼 목록 -->
                 <div id="bloodlineList" class="card-grid"></div>
             </div>
       
-            <!-- 💡 검색 결과 카드 영역 (참여횟수 제외 완벽 적용) -->
+            <!-- 💡 검색 결과 카드 영역 (개인 조회 정보만 출력) -->
             <div id="card" class="card search-result-card" style="display: none;">
                 <div class="item"><span class="label">아이디</span><span class="value" id="name"></span></div>
                 <div class="item"><span class="label">직업</span><span class="value" id="job"></span></div>
                 <div class="item"><span class="label">혈맹</span><span class="value" id="blood"></span></div>
                 <div class="item"><span class="label">공성혈</span><span class="value" id="blood_member"></span></div>
                 
-                <div class="item"><span class="label" style="color: #00ff88;">💎 총 분배금</span><span class="value" id="total_dist_gold" style="color: #00ff88; font-weight: bold;">0 아데나</span></div>     
-                <div class="item"><span class="label" style="color: #4facfe;">📊 이번주 기여도</span><span class="value" id="contrib_rate" style="color: #4facfe; font-weight: bold;">0.00 %</span></div>
-                <div class="item"><span class="label" style="color: #ffd700;">💰 분배금</span><span class="value" id="dist_gold" style="color: #ffd700; font-weight: bold;">0 아데나</span></div>
+                <div class="item"><span class="label">💎 총 분배금</span><span class="value" id="total_dist_gold">0 아데나</span></div>     
+                <div class="item"><span class="label">📊 이번주 기여도</span><span class="value" id="contrib_rate">0.00 %</span></div>
+                <div class="item"><span class="label">💰 분배금</span><span class="value" id="dist_gold">0 아데나</span></div>
 
-                <div class="item"><span class="label">⭐ 오늘 보스탐 참여점수</span><span class="value" id="today_pts">0 점</span ></div>
+                <div class="item" style="flex-direction: column; align-items: flex-start;">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <span class="label">⭐ 오늘 보스탐 참여점수</span>
+                        <span class="value" id="today_pts">0 점</span>
+                    </div>
+                    <!-- 🎯 시간대별 동그라미(핑크/회색) 표시 영역 -->
+                    <div id="timeBadgeContainer" class="time-badge-container" style="width: 100%; box-sizing: border-box;"></div>
+                </div>
+
                 <div class="item"><span class="label" id="label_d_period">📅 1주간 참여점수</span><span class="value" id="d_period_pts">0 점</span></div>
                 <div class="item"><span class="label" id="label_c_period">📅 2주간 참여점수</span><span class="value" id="c_period_pts">0 점</span></div>
             </div>
             
             <div id="error" class="error-message" style="display: none;"></div>
 
+            <!-- 상단 혈맹 버튼 클릭시에만 노출되는 전체 명단 영역 -->
             <div id="statusArea" class="card status-area" style="display: none;">
                 <div id="remainingText" class="remaining-text"></div>
                 <div id="memberListBox" class="member-list-box">
@@ -73,12 +83,12 @@
     </div>
 
     <script>
-        /* 전역 변수 설정 (조회된 혈맹원 명단 저장용) */
         window.currentBloodlineMembers = []; 
-
         const input = document.getElementById("searchInput");
         
-        /* 군주 직업군 클래스 매핑 */
+        // 보스탐 표시 대상 시각 (16개)
+        const targetHours = [1, 3, 5, 6, 7, 9, 11, 12, 13, 15, 17, 18, 19, 21, 23, 24];
+
         const memberJobClassMap = {
             "군주": "member-job-monarch",
             "기사": "member-job-knight",
@@ -110,7 +120,7 @@
 
         loadBloodlineList();
 
-        /* 🔍 유저 검색 함수 (참여횟수 제외 및 Null 안전장치 적용) */
+        /* 🔍 개인 검색 함수 */
         async function searchUser() {
             const keyword = input.value.trim();
             if (keyword === "") { alert("아이디를 입력하세요."); return; }
@@ -119,18 +129,19 @@
             const error = document.getElementById("error");
             const statusArea = document.getElementById("statusArea");
             
+            // 💡 엔터/검색 시 하단 전체 혈맹원 명단은 숨김 처리
+            if (statusArea) statusArea.style.display = "none";
+            
             try {
                 const res = await fetch("/search/" + encodeURIComponent(keyword));
                 const data = await res.json();
                 if (!res.ok) { throw new Error(data.detail || "유저를 찾을 수 없습니다."); }
                 
-                // 1. 인적 정보 안전 출력
                 if (document.getElementById("name")) document.getElementById("name").innerText = data.name || "";
                 if (document.getElementById("job")) document.getElementById("job").innerText = data.character_class || "";
                 if (document.getElementById("blood")) document.getElementById("blood").innerText = data.bloodline || "";
                 if (document.getElementById("blood_member")) document.getElementById("blood_member").innerText = data.blood_member || "";
                 
-                // 2. 서버에서 산출한 통계 및 분배금 출력 (Null Check 포함)
                 const stats = data.attendance_stats || {};
                 
                 if (document.getElementById("total_dist_gold")) {
@@ -146,7 +157,16 @@
                     document.getElementById("today_pts").innerText = (stats.today_points || 0) + " 점";
                 }
                 
-                // D2~D3 날짜 라벨 및 점수
+                // 🎯 시간대별 동그라미 (참여: 핑크, 미참여: 회색) 생성
+                const attendedHours = stats.today_hours || [];
+                const badgeContainer = document.getElementById("timeBadgeContainer");
+                if (badgeContainer) {
+                    badgeContainer.innerHTML = targetHours.map(hour => {
+                        const isAttended = attendedHours.includes(hour);
+                        return `<div class="time-badge ${isAttended ? 'attended' : 'absent'}">${hour}</div>`;
+                    }).join('');
+                }
+
                 if (stats.d_period_label && document.getElementById("label_d_period")) {
                     document.getElementById("label_d_period").innerText = `${stats.d_period_label} 참여점수`;
                 }
@@ -154,7 +174,6 @@
                     document.getElementById("d_period_pts").innerText = (stats.d_period_points || 0) + " 점";
                 }
                 
-                // C2~C3 날짜 라벨 및 점수
                 if (stats.c_period_label && document.getElementById("label_c_period")) {
                     document.getElementById("label_c_period").innerText = `${stats.c_period_label} 참여점수`;
                 }
@@ -165,16 +184,8 @@
                 if (card) card.style.display = "block"; 
                 if (error) error.style.display = "none";
 
-                /* 하단 명단 현황 업데이트 */
-                const targetBloodline = data.bloodline || data.blood_member;
-                if (targetBloodline) {
-                    fetchBloodlineStatus(targetBloodline);
-                } else if (statusArea) {
-                    statusArea.style.display = "none";
-                }
             } catch (err) {
                 if (card) card.style.display = "none"; 
-                if (statusArea) statusArea.style.display = "none";
                 if (error) {
                     error.style.display = "block"; 
                     error.innerText = err.message;
@@ -182,10 +193,14 @@
             }
         }
 
-        /* 🔄 혈맹의 인원 현황 및 명단을 서버에서 로드하는 함수 */
+        /* 🔄 상단 혈맹명 버튼 클릭 시 전체 명단 로드 */
         async function fetchBloodlineStatus(bloodlineName) {
             if (!bloodlineName || bloodlineName === "undefined" || bloodlineName === "없음") return;
             
+            // 검색 개인 카드 닫기
+            const card = document.getElementById("card");
+            if (card) card.style.display = "none";
+
             try {
                 const res = await fetch("/members/" + encodeURIComponent(bloodlineName));
                 const data = await res.json();
@@ -253,7 +268,6 @@
             }
         }
 
-        /* 💾 모바일 및 PC 대응 다운로드 처리 함수 */
         function downloadPhoenixImage() {
             const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const isKakaotalk = /KAKAOTALK/i.test(navigator.userAgent);
@@ -287,7 +301,6 @@
             }
         }
 
-        /* 모달 닫기 */
         function closeDownloadModal() {
             if (document.getElementById("downloadModal")) {
                 document.getElementById("downloadModal").style.display = "none";
