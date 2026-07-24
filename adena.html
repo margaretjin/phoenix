@@ -23,7 +23,7 @@
 <body>
     <div class="container menu-container">
         <div class="menu-buttons">
-            <a href="/" class="menu-btn home-btn ">🏠 홈</a>
+            <a href="/" class="menu-btn home-btn">🏠 홈</a>
             <a href="adena.html" class="menu-btn active">💰 분배금</a>
             <a href="kurtz.html" class="menu-btn">커츠</a>
             <a href="fire.html" class="menu-btn">화둥</a>
@@ -34,9 +34,19 @@
             <h1>💰 전체 분배금 정산표</h1>
 
             <div class="card" style="display: block; margin-top: 10px; margin-bottom: 20px;">
-                <div class="item" style="border-bottom: none;">
+                <div class="item">
                     <span class="label" style="color: #00ff88; font-weight: bold;">💎 총분배금</span>
                     <span class="value" id="totalPool" style="color: #00ff88; font-weight: bold;">0 아데나</span>
+                </div>
+                <!-- 🎯 [추가됨] 이번주 참여 1위 표시 영역 -->
+                <div class="item">
+                    <span class="label" style="color: #3b82f6; font-weight: bold;">🏆 이번주 참여 1위</span>
+                    <span class="value" id="weekTopRanker" style="color: #3b82f6; font-weight: bold;">집계 중...</span>
+                </div>
+                <!-- 🎯 오늘 참여 1위 표시 영역 -->
+                <div class="item" style="border-bottom: none;">
+                    <span class="label" style="color: #ff4081; font-weight: bold;">⭐ 오늘 참여 1위</span>
+                    <span class="value" id="todayTopRanker" style="color: #ff4081; font-weight: bold;">집계 중...</span>
                 </div>
             </div>
 
@@ -74,16 +84,6 @@
                 </table>
             </div>
         </div>
-    </div>
-
-    <div id="downloadModal" class="download-modal" style="display: none;">
-        <p class="download-modal-text">
-            <strong>💡 사진첩 저장 안내</strong><br>
-            아래 이미지를 <strong>길게 꾹~ 누르신 후</strong><br>
-            [내 사진첩에 저장] 또는 [이미지 저장]을 선택해주세요!
-        </p>
-        <img src="/static/phoenix.jpg" alt="피닉스 이미지">
-        <button class="download-modal-close" onclick="closeDownloadModal()">닫기</button>
     </div>
 
     <script>
@@ -125,10 +125,71 @@
                 }
 
                 rawData = result.data || [];
+
+                // 🎯 이번주 참여율 1위 및 오늘 참여율 1위 계산 및 출력
+                updateWeekTopRanker(rawData);
+                updateTodayTopRanker(rawData);
+
                 sortTable(currentSortCol, false);
             } catch (e) {
                 document.getElementById("adenaTableBody").innerHTML = `<tr><td colspan="7" style="padding: 20px; color: #94a3b8;">데이터를 불러오는 중입니다.</td></tr>`;
             }
+        }
+
+        // 🎯 이번주 참여율 1위 산출 함수 (d_period_points 기준)
+        function updateWeekTopRanker(data) {
+            const rankerEl = document.getElementById("weekTopRanker");
+            if (!rankerEl) return;
+
+            if (!data || data.length === 0) {
+                rankerEl.innerText = "기록 없음";
+                return;
+            }
+
+            let maxPts = 0;
+            data.forEach(item => {
+                const pts = Number(item.d_period_points) || 0;
+                if (pts > maxPts) maxPts = pts;
+            });
+
+            if (maxPts <= 0) {
+                rankerEl.innerText = "이번주 참여 기록 없음";
+                return;
+            }
+
+            const topUsers = data
+                .filter(item => (Number(item.d_period_points) || 0) === maxPts)
+                .map(item => item.name);
+
+            rankerEl.innerText = `${topUsers.join(", ")} (${maxPts}점)`;
+        }
+
+        // 🎯 오늘 참여율 1위 산출 함수 (today_points 기준)
+        function updateTodayTopRanker(data) {
+            const rankerEl = document.getElementById("todayTopRanker");
+            if (!rankerEl) return;
+
+            if (!data || data.length === 0) {
+                rankerEl.innerText = "기록 없음";
+                return;
+            }
+
+            let maxPts = 0;
+            data.forEach(item => {
+                const pts = Number(item.today_points) || 0;
+                if (pts > maxPts) maxPts = pts;
+            });
+
+            if (maxPts <= 0) {
+                rankerEl.innerText = "오늘 참여 기록 없음";
+                return;
+            }
+
+            const topUsers = data
+                .filter(item => (Number(item.today_points) || 0) === maxPts)
+                .map(item => item.name);
+
+            rankerEl.innerText = `${topUsers.join(", ")} (${maxPts}점)`;
         }
 
         function renderTable(data) {
@@ -173,45 +234,6 @@
             });
 
             renderTable(rawData);
-        }
-
-        function downloadPhoenixImage() {
-            const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const isKakaotalk = /KAKAOTALK/i.test(navigator.userAgent);
-            
-            if (isMobile || isKakaotalk) {
-                if (document.getElementById("downloadModal")) {
-                    document.getElementById("downloadModal").style.display = "flex";
-                }
-            } else {
-                const imageUrl = "/static/phoenix.jpg";
-                fetch(imageUrl)
-                    .then(response => {
-                        if (!response.ok) throw new Error();
-                        return response.blob();
-                    })
-                    .then(blob => {
-                        const blobUrl = window.URL.createObjectURL(blob);
-                        const link = document.createElement("a");
-                        link.href = blobUrl;
-                        link.download = "phoenix.jpg";
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        window.URL.revokeObjectURL(blobUrl);
-                    })
-                    .catch(() => {
-                        if (document.getElementById("downloadModal")) {
-                            document.getElementById("downloadModal").style.display = "flex";
-                        }
-                    });
-            }
-        }
-
-        function closeDownloadModal() {
-            if (document.getElementById("downloadModal")) {
-                document.getElementById("downloadModal").style.display = "none";
-            }
         }
 
         window.onload = loadSummaryData;
