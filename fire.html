@@ -15,19 +15,16 @@
 
         .location-grid {
             display: grid;
-            /* 기본(모바일): 1줄에 1개 배치 */
-            grid-template-columns: 2fr; 
+            grid-template-columns: 1fr; 
             gap: 10px;
         }
 
-        /* 화면 너비가 600px 이상인 태블릿 및 PC: 1줄에 3개 배치 */
         @media (min-width: 600px) {
             .location-grid {
                 grid-template-columns: repeat(3, 1fr);
             }
         }
 
-        /* 개별 위치 카드 스타일 */
         .location-card {
             display: flex;
             align-items: center;
@@ -44,29 +41,29 @@
             transform: translateY(-2px);
         }
 
-    
-
-        /* 위치 설명 텍스트 */
         .loc-name {
             color: #334155;
             font-weight: 700;
             font-size: 14px;
-            word-break: keep-all; /* 단어 단위로 깔끔하게 줄바꿈 */
+            word-break: keep-all;
             padding-right: 10px;
         }
         
+        .phoenix-btn-wrapper {
+            margin-top: 15px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 
     <div class="container menu-container">
         <div class="menu-buttons">
-            <a href="/" class="menu-btn home-btn">🏠 홈으로</a>
-            <a href="kurtz.html" class="menu-btn">커츠(말섬)</a>
+            <a href="/" class="menu-btn home-btn">🏠 홈</a>
+            <a href="adena.html" class="menu-btn">💰 분배금</a>
+            <a href="kurtz.html" class="menu-btn">커츠</a>
             <a href="fire.html" class="menu-btn active">화둥</a>
             <a href="dragon.html" class="menu-btn">용계</a>
-            <a href="adena.html" class="menu-btn">💰 분배금</a>
-            <a href="#" onclick="downloadPhoenixImage(); return false;" class="menu-btn">사진</a>
         </div>
     </div>
 
@@ -74,19 +71,34 @@
         <div class="zone-section active">
             <div class="zone-title">🔥 화둥</div>
             <div class="single-image-wrapper">
-                <img src="./static/fire_1.png" alt="fire_1.png" class="map-img ">
+                <img src="./static/fire_1.png" alt="fire_1.png" class="map-img" style="width: 100%; border-radius: 8px;">
             </div>
             
             <div class="location-grid-container">
                 <div id="locationGrid" class="location-grid"></div>
             </div>
+
+            <!-- 📸 디코 사진 다운로드 버튼 -->
+            <div class="phoenix-btn-wrapper">
+                <a href="#" onclick="downloadPhoenixImage(); return false;" class="menu-btn" style="display: inline-flex; padding: 0 20px;">피닉스 디코 사진</a>
+            </div>
         </div>
     </div>
 
-    <script>
-        /* 1. 위치 정보 데이터 배열 (요청하신 0031 ~ 0043 데이터로 완벽 교체 완료) */
-        const locationData = [
+    <!-- 📸 이미지 저장 모달 레이어 -->
+    <div id="downloadModal" class="download-modal" style="display: none;">
+        <p class="download-modal-text">
+            <strong>💡 사진첩 저장 안내</strong><br>
+            아래 이미지를 <strong>길게 꾹~ 누르신 후</strong><br>
+            [내 사진첩에 저장] 또는 [이미지 저장]을 선택해주세요!
+        </p>
+        <img src="/static/phoenix.jpg" alt="피닉스 이미지">
+        <button class="download-modal-close" onclick="closeDownloadModal()">닫기</button>
+    </div>
 
+    <script>
+        /* 1. 화둥 위치 데이터 */
+        const locationData = [
             { no: "0034", name: "화둥 다리" },
             { no: "0035", name: "화둥 3시 끝" },
             { no: "0036", name: "화둥 7시 서문 좌측길" },
@@ -99,18 +111,55 @@
             { no: "0043", name: "화둥 3시 좌측 막힌방" }
         ];
 
-        /* 2. 화면이 로드되면 그리드에 카드들을 자동 생성 */
+        /* 2. 화면 로드 시 그리드 카드 생성 */
         document.addEventListener("DOMContentLoaded", () => {
             const gridContainer = document.getElementById("locationGrid");
-            
-            /* 배열을 순회하며 HTML 요소를 동적으로 주입 */
-            gridContainer.innerHTML = locationData.map(item => `
-                <div class="location-card">
-                    <span class="loc-name">${item.no}</span>
-                    <span class="loc-name">${item.name}</span>
-                </div>
-            `).join("");
+            if (gridContainer) {
+                gridContainer.innerHTML = locationData.map(item => `
+                    <div class="location-card">
+                        <span class="loc-name" style="color: #2563eb;">${item.no}</span>
+                        <span class="loc-name">${item.name}</span>
+                    </div>
+                `).join("");
+            }
         });
+
+        /* 3. 디코 사진 다운로드 & 모달 자바스크립트 */
+        function downloadPhoenixImage() {
+            const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isKakaotalk = /KAKAOTALK/i.test(navigator.userAgent);
+            
+            if (isMobile || isKakaotalk) {
+                const modal = document.getElementById("downloadModal");
+                if (modal) modal.style.display = "flex";
+            } else {
+                const imageUrl = "/static/phoenix.jpg";
+                fetch(imageUrl)
+                    .then(response => {
+                        if (!response.ok) throw new Error();
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = blobUrl;
+                        link.download = "phoenix.jpg";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(blobUrl);
+                    })
+                    .catch(() => {
+                        const modal = document.getElementById("downloadModal");
+                        if (modal) modal.style.display = "flex";
+                    });
+            }
+        }
+
+        function closeDownloadModal() {
+            const modal = document.getElementById("downloadModal");
+            if (modal) modal.style.display = "none";
+        }
     </script>
 </body>
 </html>

@@ -10,21 +10,76 @@
     <meta property="og:url" content="https://phoenix-mmtl.onrender.com" />
     
     <link rel="stylesheet" href="./static/style.css?v=20260718-2">
+    <style>
+        /* 🎯 style.css 컨벤션에 맞춘 로딩 스피너 UI */
+        .loading-container {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px;
+            margin-top: 12px;
+            background-color: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 22px;
+            height: 22px;
+            border: 3px solid #cbd5e1;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+
+        .loading-text {
+            color: #475569;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 500px) {
+            .loading-container {
+                padding: 10px;
+                gap: 8px;
+            }
+            .loading-spinner {
+                width: 18px;
+                height: 18px;
+                border-width: 2.5px;
+            }
+            .loading-text {
+                font-size: 12px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container menu-container">
         <div class="menu-buttons">
             <a href="/" class="menu-btn home-btn active">🏠 홈</a>
+            <a href="adena.html" class="menu-btn">💰 분배금</a>
             <a href="kurtz.html" class="menu-btn">커츠</a>
             <a href="fire.html" class="menu-btn">화둥</a>
             <a href="dragon.html" class="menu-btn">용계</a>
-            <a href="adena.html" class="menu-btn" style="color: #ffd700; font-weight: bold;">💰 분배금</a>
-            <a href="#" onclick="downloadPhoenixImage(); return false;" class="menu-btn">사진</a>
         </div>
 
         <div class="container">
             <h1>린델 피닉스</h1>
-            <a>서버가 느려요! 쪼금만 기다려주세욧</a>
+            
+            <!-- 🎯 데이터를 불러오는 중일 때 표시되는 로딩 표시 영역 -->
+            <div id="loadingIndicator" class="loading-container">
+                <div class="loading-spinner"></div>
+                <span class="loading-text">데이터를 불러오는 중입니다. 잠시만 기다려주세요...</span>
+            </div>
+
             <div class="search">
                 <input id="searchInput" type="text" placeholder="아이디를 입력하세요">
                 <button onclick="searchUser()">검색</button>
@@ -51,17 +106,17 @@
                         <span class="label">⭐ 오늘 보스탐 참여점수</span>
                         <span class="value" id="today_pts">0 점</span>
                     </div>
-                    <!-- 🎯 오늘 보스탐 동그라미 -->
+                    <!-- 오늘 보스탐 동그라미 -->
                     <div id="timeBadgeContainer" class="time-badge-container" style="width: 100%; box-sizing: border-box; margin-top: 8px;"></div>
                 </div>
 
-                <!-- 어제 보스탐 (추가됨) -->
+                <!-- 어제 보스탐 -->
                 <div class="item" style="flex-direction: column; align-items: flex-start;">
                     <div style="display: flex; justify-content: space-between; width: 100%;">
                         <span class="label">🌙 어제 보스탐 참여점수</span>
                         <span class="value" id="yesterday_pts">0 점</span>
                     </div>
-                    <!-- 🎯 어제 보스탐 동그라미 -->
+                    <!-- 어제 보스탐 동그라미 -->
                     <div id="yesterdayTimeBadgeContainer" class="time-badge-container" style="width: 100%; box-sizing: border-box; margin-top: 8px;"></div>
                 </div>
 
@@ -80,19 +135,10 @@
         </div>
     </div>
 
-    <div id="downloadModal" class="download-modal" style="display: none;">
-        <p class="download-modal-text">
-            <strong>💡 사진첩 저장 안내</strong><br>
-            아래 이미지를 <strong>길게 꾹~ 누르신 후</strong><br>
-            [내 사진첩에 저장] 또는 [이미지 저장]을 선택해주세요!
-        </p>
-        <img src="/static/phoenix.jpg" alt="피닉스 이미지">
-        <button class="download-modal-close" onclick="closeDownloadModal()">닫기</button>
-    </div>
-
     <script>
         window.currentBloodlineMembers = []; 
         const input = document.getElementById("searchInput");
+        const loadingIndicator = document.getElementById("loadingIndicator");
         
         const targetHours = [1, 3, 5, 6, 7, 9, 11, 12, 13, 15, 17, 18, 19, 21, 23, 24];
 
@@ -106,6 +152,14 @@
         input.addEventListener("keydown", function(e) { 
             if (e.key === "Enter") { searchUser(); } 
         });
+
+        function showLoading() {
+            if (loadingIndicator) loadingIndicator.style.display = "flex";
+        }
+
+        function hideLoading() {
+            if (loadingIndicator) loadingIndicator.style.display = "none";
+        }
 
         async function loadBloodlineList() {
             try {
@@ -136,7 +190,11 @@
             const statusArea = document.getElementById("statusArea");
             
             if (statusArea) statusArea.style.display = "none";
+            if (card) card.style.display = "none";
+            if (error) error.style.display = "none";
             
+            showLoading();
+
             try {
                 const res = await fetch("/search/" + encodeURIComponent(keyword));
                 const data = await res.json();
@@ -173,7 +231,7 @@
                     }).join('');
                 }
 
-                // 어제 보스탐 데이터 연동 (추가됨)
+                // 어제 보스탐 데이터 연동
                 if (document.getElementById("yesterday_pts")) {
                     document.getElementById("yesterday_pts").innerText = (stats.yesterday_points || 0) + " 점";
                 }
@@ -202,7 +260,6 @@
                 }
                 
                 if (card) card.style.display = "block"; 
-                if (error) error.style.display = "none";
 
             } catch (err) {
                 if (card) card.style.display = "none"; 
@@ -210,6 +267,8 @@
                     error.style.display = "block"; 
                     error.innerText = err.message;
                 }
+            } finally {
+                hideLoading();
             }
         }
 
@@ -217,7 +276,12 @@
             if (!bloodlineName || bloodlineName === "undefined" || bloodlineName === "없음") return;
             
             const card = document.getElementById("card");
+            const statusArea = document.getElementById("statusArea");
+            
             if (card) card.style.display = "none";
+            if (statusArea) statusArea.style.display = "none";
+
+            showLoading();
 
             try {
                 const res = await fetch("/members/" + encodeURIComponent(bloodlineName));
@@ -278,50 +342,12 @@
                     });
                 });
                 
-                if (document.getElementById("statusArea")) {
-                    document.getElementById("statusArea").style.display = "block";
-                }
+                if (statusArea) statusArea.style.display = "block";
+
             } catch (e) {
                 console.error("혈맹 정보 로드 실패", e);
-            }
-        }
-
-        function downloadPhoenixImage() {
-            const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const isKakaotalk = /KAKAOTALK/i.test(navigator.userAgent);
-            
-            if (isMobile || isKakaotalk) {
-                if (document.getElementById("downloadModal")) {
-                    document.getElementById("downloadModal").style.display = "flex";
-                }
-            } else {
-                const imageUrl = "/static/phoenix.jpg";
-                fetch(imageUrl)
-                    .then(response => {
-                        if (!response.ok) throw new Error();
-                        return response.blob();
-                    })
-                    .then(blob => {
-                        const blobUrl = window.URL.createObjectURL(blob);
-                        const link = document.createElement("a");
-                        link.href = blobUrl;
-                        link.download = "phoenix.jpg";
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        window.URL.revokeObjectURL(blobUrl);
-                    })
-                    .catch(() => {
-                        if (document.getElementById("downloadModal")) {
-                            document.getElementById("downloadModal").style.display = "flex";
-                        }
-                    });
-            }
-        }
-
-        function closeDownloadModal() {
-            if (document.getElementById("downloadModal")) {
-                document.getElementById("downloadModal").style.display = "none";
+            } finally {
+                hideLoading();
             }
         }
     </script>
