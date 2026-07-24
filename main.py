@@ -127,7 +127,7 @@ def dragon(): return FileResponse("dragon.html")
 @app.get("/adena.html")
 def adena(): return FileResponse("adena.html")
 
-# --- 💰 전체 분배금 정산 API (어제 날짜 데이터 연동 추가) ---
+# --- 💰 전체 분배금 정산 API (출석 1건당 1포인트로 연산) ---
 @app.get("/api/adena-summary")
 def get_adena_summary():
     try:
@@ -155,17 +155,16 @@ def get_adena_summary():
         d_start, d_end = min(d_start, d_end), max(d_start, d_end)
         c_start, c_end = min(c_start, c_end), max(c_start, c_end)
 
-
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}"
         }
 
-        # 어제 날짜도 커버될 수 있도록 query_start 계산 시 yesterday_str 포함
         query_start = min(c_start, d_start, yesterday_str)
         query_end = max(c_end, d_end, today_str)
         
-        user_url = f"{SUPABASE_URL}/rest/v1/boss_attendance?select=user_id,attendance_date,attendance_hour,points&attendance_date=gte.{query_start}&attendance_date=lte.{query_end}&order=attendance_date.desc&limit=5000"
+        # 💡 points 컬럼 대신 레코드 수만 세기 위해 query 항목 변경
+        user_url = f"{SUPABASE_URL}/rest/v1/boss_attendance?select=user_id,attendance_date,attendance_hour&attendance_date=gte.{query_start}&attendance_date=lte.{query_end}&order=attendance_date.desc&limit=5000"
         res_user = requests.get(user_url, headers=headers, timeout=8)
         
         user_db_map = {}
@@ -181,7 +180,9 @@ def get_adena_summary():
                 
                 raw_date = str(r.get("attendance_date", "")).strip()
                 r_date = raw_date.split("T")[0].split(" ")[0].replace(".", "-").replace("/", "-")
-                pts = float(r.get("points", 0) or 0)
+                
+                # 🎯 [핵심 변경] DB의 points 값 대신 레코드 1건당 1포인트 부여
+                pts = 1.0 
                 
                 try:
                     att_hour = int(r.get("attendance_hour", 0))
@@ -211,7 +212,7 @@ def get_adena_summary():
                         if att_hour not in user_db_map[u_id]["today_hours"]:
                             user_db_map[u_id]["today_hours"].append(att_hour)
 
-                # 🌟 어제 보스탐 데이터 집계 추가
+                # 어제 보스탐 데이터
                 if r_date == yesterday_str:
                     user_db_map[u_id]["yesterday_pts"] += pts
                     if att_hour is not None and att_hour > 0:
@@ -257,8 +258,8 @@ def get_adena_summary():
                 "d_period_points": d_pts,
                 "today_points": pts_dict["today_pts"],
                 "today_hours": pts_dict["today_hours"],
-                "yesterday_points": pts_dict["yesterday_pts"],       # 🌟 어제 점수 추가
-                "yesterday_hours": pts_dict["yesterday_hours"],     # 🌟 어제 타임 추가
+                "yesterday_points": pts_dict["yesterday_pts"],
+                "yesterday_hours": pts_dict["yesterday_hours"],
                 "contribution_rate": contrib_rate,
                 "distribution_gold": dist_gold
             })
@@ -315,8 +316,8 @@ def search_user(name: str):
                     "distribution_gold": matched_stats.get("distribution_gold", 0),
                     "today_points": matched_stats.get("today_points", 0.0),
                     "today_hours": matched_stats.get("today_hours", []),
-                    "yesterday_points": matched_stats.get("yesterday_points", 0.0), # 🌟 어제 점수 전달
-                    "yesterday_hours": matched_stats.get("yesterday_hours", []),   # 🌟 어제 타임 전달
+                    "yesterday_points": matched_stats.get("yesterday_points", 0.0),
+                    "yesterday_hours": matched_stats.get("yesterday_hours", []),
                     "d_period_points": matched_stats.get("d_period_points", 0.0),
                     "c_period_points": matched_stats.get("c_period_points", 0.0),
                     "d_period_label": summary_data.get("d_period_label", ""),
@@ -358,7 +359,7 @@ def get_bloodline_members(bloodline: str):
         for row in rows[2:]:
             if len(row) <= 5: continue
             
-            member_id = row[1].strip()                                # B열: 아이디
+            member_id = row[1].strip()                                 # B열: 아이디
             member_job = row[3].strip() if len(row) > 3 else ""       # D열: 클래스
             bloodline_val = row[5].strip().lower() if len(row) > 5 else ""
             castle_val = row[6].strip().lower() if len(row) > 6 else ""
