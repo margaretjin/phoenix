@@ -11,7 +11,6 @@
     
     <link rel="stylesheet" href="./static/style.css?v=20260718-2">
     <style>
-        /* 🎯 style.css 컨벤션에 맞춘 로딩 스피너 UI */
         .loading-container {
             display: none;
             align-items: center;
@@ -45,7 +44,6 @@
             to { transform: rotate(360deg); }
         }
 
-        /* 🎯 20시(8시) 공성 텍스트 표기 스타일 */
         .time-badge-wrapper {
             position: relative;
             display: inline-flex;
@@ -56,7 +54,7 @@
         .siege-label {
             font-size: 9px;
             font-weight: 800;
-            color: #ef4444; /* 강조 Red */
+            color: #ef4444;
             line-height: 1;
             margin-bottom: 2px;
         }
@@ -93,7 +91,6 @@
         <div class="container">
             <h1>린델 피닉스</h1>
             
-            <!-- 🎯 데이터를 불러오는 중일 때 표시되는 로딩 표시 영역 -->
             <div id="loadingIndicator" class="loading-container">
                 <div class="loading-spinner"></div>
                 <span class="loading-text">데이터를 불러오는 중입니다. 잠시만 기다려주세요...</span>
@@ -117,7 +114,6 @@
                 
                 <div class="item"><span class="label">💎 총 분배금</span><span class="value" id="total_dist_gold">0 아데나</span></div>     
                 <div class="item"><span class="label">📊 이번주 기여도</span><span class="value" id="contrib_rate">0.00 %</span></div>
-                <div class="item"><span class="label">💰 분배금</span><span class="value" id="dist_gold">0 아데나</span></div>
 
                 <!-- 오늘 보스탐 -->
                 <div class="item" style="flex-direction: column; align-items: flex-start;">
@@ -125,7 +121,6 @@
                         <span class="label">⭐ 오늘 보스탐 참여점수</span>
                         <span class="value" id="today_pts">0 점</span>
                     </div>
-                    <!-- 오늘 보스탐 동그라미 -->
                     <div id="timeBadgeContainer" class="time-badge-container" style="width: 100%; box-sizing: border-box; margin-top: 8px;"></div>
                 </div>
 
@@ -135,7 +130,6 @@
                         <span class="label">🌙 어제 보스탐 참여점수</span>
                         <span class="value" id="yesterday_pts">0 점</span>
                     </div>
-                    <!-- 어제 보스탐 동그라미 -->
                     <div id="yesterdayTimeBadgeContainer" class="time-badge-container" style="width: 100%; box-sizing: border-box; margin-top: 8px;"></div>
                 </div>
 
@@ -159,8 +153,8 @@
         const input = document.getElementById("searchInput");
         const loadingIndicator = document.getElementById("loadingIndicator");
         
-        // 🎯 21시 대신 20시(8시)로 지정
-        const targetHours = [1, 3, 5, 6, 7, 9, 11, 12, 13, 15, 17, 18, 19, 20, 23, 24];
+        // 🎯 평일 기본 보스탐 타임 목록 (20시 없음)
+        const baseHours = [1, 3, 5, 6, 7, 9, 11, 12, 13, 15, 17, 18, 19, 21, 23, 24];
 
         const memberJobClassMap = {
             "군주": "member-job-monarch",
@@ -226,30 +220,37 @@
                 if (document.getElementById("blood_member")) document.getElementById("blood_member").innerText = data.blood_member || "";
                 
                 const stats = data.attendance_stats || {};
-                
+                const distGold = stats.distribution_gold || 0;
+
                 if (document.getElementById("total_dist_gold")) {
                     document.getElementById("total_dist_gold").innerText = (stats.total_distribution_gold || 0).toLocaleString() + " 아데나";
                 }
                 if (document.getElementById("contrib_rate")) {
                     document.getElementById("contrib_rate").innerText = (stats.contribution_rate || 0).toFixed(2) + " %";
                 }
-                if (document.getElementById("dist_gold")) {
-                    document.getElementById("dist_gold").innerText = (stats.distribution_gold || 0).toLocaleString() + " 아데나";
-                }
+
                 
-// 오늘 보스탐 데이터 연동
+                // 🌟 오늘 보스탐 연동
                 if (document.getElementById("today_pts")) {
                     document.getElementById("today_pts").innerText = (stats.today_points || 0) + " 점";
                 }
                 
                 const attendedHours = stats.today_hours || [];
-                const isTodaySunday = stats.is_today_sunday || false;
+                const isTodaySunday = (stats.is_today_sunday !== undefined) ? stats.is_today_sunday : (new Date().getDay() === 0);
+                
+                // 🎯 일요일이면 21시 제거하고 20시 추가 후 정렬
+                let todayHoursList = [...baseHours];
+                if (isTodaySunday) {
+                    todayHoursList = todayHoursList.filter(h => h !== 21); // 21시 제거
+                    todayHoursList.push(20);                               // 20시 추가
+                    todayHoursList.sort((a, b) => a - b);
+                }
+
                 const badgeContainer = document.getElementById("timeBadgeContainer");
                 if (badgeContainer) {
-                    badgeContainer.innerHTML = targetHours.map(hour => {
+                    badgeContainer.innerHTML = todayHoursList.map(hour => {
                         const isAttended = attendedHours.includes(hour);
-                        // 🎯 오늘이 일요일이고 20시일 때만 "공성" 표시
-                        const isSiege = isTodaySunday && hour === 20;
+                        const isSiege = (hour === 20);
                         return `
                             <div class="time-badge-wrapper">
                                 ${isSiege ? '<span class="siege-label">공성</span>' : ''}
@@ -259,19 +260,30 @@
                     }).join('');
                 }
 
-                // 어제 보스탐 데이터 연동
+                // 🌟 어제 보스탐 연동
                 if (document.getElementById("yesterday_pts")) {
                     document.getElementById("yesterday_pts").innerText = (stats.yesterday_points || 0) + " 점";
                 }
 
                 const yesterdayAttendedHours = stats.yesterday_hours || [];
-                const isYesterdaySunday = stats.is_yesterday_sunday || false;
+                
+                const yesterdayObj = new Date();
+                yesterdayObj.setDate(yesterdayObj.getDate() - 1);
+                const isYesterdaySunday = (stats.is_yesterday_sunday !== undefined) ? stats.is_yesterday_sunday : (yesterdayObj.getDay() === 0);
+
+                // 🎯 어제가 일요일이면 21시 제거하고 20시 추가
+                let yesterdayHoursList = [...baseHours];
+                if (isYesterdaySunday) {
+                    yesterdayHoursList = yesterdayHoursList.filter(h => h !== 21); // 21시 제거
+                    yesterdayHoursList.push(20);                                   // 20시 추가
+                    yesterdayHoursList.sort((a, b) => a - b);
+                }
+
                 const yesterdayBadgeContainer = document.getElementById("yesterdayTimeBadgeContainer");
                 if (yesterdayBadgeContainer) {
-                    yesterdayBadgeContainer.innerHTML = targetHours.map(hour => {
+                    yesterdayBadgeContainer.innerHTML = yesterdayHoursList.map(hour => {
                         const isAttended = yesterdayAttendedHours.includes(hour);
-                        // 🎯 어제가 일요일이고 20시일 때만 "공성" 표시
-                        const isSiege = isYesterdaySunday && hour === 20;
+                        const isSiege = (hour === 20);
                         return `
                             <div class="time-badge-wrapper">
                                 ${isSiege ? '<span class="siege-label">공성</span>' : ''}
@@ -281,11 +293,12 @@
                     }).join('');
                 }
 
+                // 1주간 / 2주간 참여점수 및 분배금 표기
                 if (stats.d_period_label && document.getElementById("label_d_period")) {
-                    document.getElementById("label_d_period").innerText = `📅 ${stats.d_period_label} 참여점수`;
+                    document.getElementById("label_d_period").innerText = `📅 ${stats.d_period_label} 참여점수 및 분배금`;
                 }
                 if (document.getElementById("d_period_pts")) {
-                    document.getElementById("d_period_pts").innerText = (stats.d_period_points || 0) + " 점";
+                    document.getElementById("d_period_pts").innerText = `${stats.d_period_points || 0} 점 [ ${distGold.toLocaleString()} 아데나 ]`;
                 }
                 
                 if (stats.c_period_label && document.getElementById("label_c_period")) {
@@ -386,6 +399,6 @@
                 hideLoading();
             }
         }
-    </script>
+</script>
 </body>
 </html>

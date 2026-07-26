@@ -178,29 +178,41 @@ def get_adena_summary():
                 u_id = clean_id_string(raw_u_id)
                 
                 raw_date = str(r.get("attendance_date", "")).strip()
-                r_date = raw_date.split("T")[0].split(" ")[0].replace(".", "-").replace("/", "-")
                 
+                # 🎯 [수정] ISO 타임스탬프 또는 날짜 문자열을 KST 기준으로 정확히 datetime 변환
+                dt_obj = None
+                try:
+                    if "T" in raw_date:
+                        # ISO 8601 형식 파싱 (시간대 보정)
+                        dt_utc = datetime.datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+                        dt_obj = dt_utc.astimezone(tz_kst)
+                    else:
+                        clean_d_str = raw_date.split(" ")[0].replace(".", "-").replace("/", "-")
+                        dt_obj = datetime.datetime.strptime(clean_d_str, "%Y-%m-%d")
+                except Exception:
+                    dt_obj = None
+
+                if dt_obj:
+                    r_date = dt_obj.strftime("%Y-%m-%d")
+                    is_sunday = (dt_obj.weekday() == 6) # 0:월, 1:화, ..., 5:토, 6:일
+                else:
+                    r_date = raw_date.split("T")[0].split(" ")[0].replace(".", "-").replace("/", "-")
+                    is_sunday = False
+
                 try:
                     raw_att_hour = int(r.get("attendance_hour", 0))
                 except (ValueError, TypeError):
                     raw_att_hour = None
 
-                # 🎯 [핵심 규칙 반영]
-                # 1. 요일 확인 (0: 월, 1: 화, ..., 6: 일요일)
-                try:
-                    dt_obj = datetime.datetime.strptime(r_date, "%Y-%m-%d")
-                    is_sunday = (dt_obj.weekday() == 6)
-                except Exception:
-                    is_sunday = False
-
-                # 2. 오직 [일요일 + DB 21시] 데이터만 10점 부여 및 HTML 표기용 20시 변환
+                # 🎯 오직 [한국 시간 기준 실제 일요일 + DB 21시]일 때만 20시로 변경 및 10점 부과
                 if is_sunday and raw_att_hour == 21:
                     pts = 10.0
-                    display_hour = 20  # HTML에는 20시로 표시
+                    display_hour = 20  # 일요일 21시만 HTML 표기용 20시 변환
                 else:
-                    pts = 1.0          # 평일 21시 포함, 그 외 모든 조건은 1점
-                    display_hour = raw_att_hour # 원래 시간값 그대로 유지 (평일 21시는 21시로 유지)
+                    pts = 1.0          # 토요일 21시 포함 나머지 모든 요일/시간은 그대로 유지
+                    display_hour = raw_att_hour
 
+                    
                 if u_id not in user_db_map:
                     user_db_map[u_id] = {
                         "c_pts": 0.0, 
