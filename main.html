@@ -44,7 +44,13 @@
                 <div class="item"><span class="label">직업</span><span class="value" id="job"></span></div>
                 <div class="item"><span class="label">혈맹</span><span class="value" id="blood"></span></div>
                 <div class="item"><span class="label">공성혈</span><span class="value" id="blood_member"></span></div>
-                 
+                
+                <div class="item">
+                    <span class="label" id="label_total_dist_gold">💎 총 분배금 <span class="unit-small">(단위 : 아덴)</span></span>
+                    <span class="value" id="total_dist_gold">0</span>
+                </div>     
+                <div class="item"><span class="label">📊 이번주 기여도</span><span class="value" id="contrib_rate">0.00 %</span></div>
+
                 <!-- 오늘 보스탐 -->
                 <div class="item" style="flex-direction: column; align-items: flex-start;">
                     <div style="display: flex; justify-content: space-between; width: 100%;">
@@ -62,16 +68,10 @@
                     </div>
                     <div id="yesterdayTimeBadgeContainer" class="time-badge-container" style="width: 100%; box-sizing: border-box; margin-top: 8px;"></div>
                 </div>
-                
-                <div class="item">
-                    <span class="label" id="label_total_dist_gold">💎 총 분배금</span>
-                    <span class="value" id="total_dist_gold">0<span class="label-sub"> 아덴</span></span>
-                </div>    
-                   <div class="item"><span class="label">📊 이번주 기여도</span><span class="value" id="contrib_rate">0.00 %</span></div>
 
                 <div class="item">
-                    <span class="label" id="label_d_period">📅 참여점수 및 분배금<br><span class="label-sub">(1주간)</span></span>
-                    <span class="value" id="d_period_pts" style="text-align: right;">0 점<br>0<span class="label-sub"> 아덴</span></span>
+                    <span class="label" id="label_d_period">📅 참여점수 및 분배금 <span class="unit-small">(단위 : 아덴)</span><br><span class="label-sub">(1주간)</span></span>
+                    <span class="value" id="d_period_pts" style="text-align: right;">0 점<br>0</span>
                 </div>
                 <div class="item">
                     <span class="label" id="label_c_period">📅 참여점수<br><span class="label-sub">(2주간)</span></span>
@@ -164,14 +164,14 @@
                 const stats = data.attendance_stats || {};
                 const distGold = stats.distribution_gold || 0;
 
-                // 💎 총 분배금 (위: 항목명 / 아래: 기간)
+                // 💎 총 분배금 (위: 항목명 + 단위 / 아래: 기간) - 우측 아덴 글자 삭제
                 if (document.getElementById("label_total_dist_gold")) {
                     const periodSub = stats.d_period_label ? `<br><span class="label-sub">(${stats.d_period_label})</span>` : "";
-                    document.getElementById("label_total_dist_gold").innerHTML = `💎 총 분배금${periodSub}`;
+                    document.getElementById("label_total_dist_gold").innerHTML = `💎 총 분배금 <span class="unit-small">(단위 : 아덴)</span>${periodSub}`;
                 }
 
                 if (document.getElementById("total_dist_gold")) {
-                    document.getElementById("total_dist_gold").innerHTML = (stats.total_distribution_gold || 0).toLocaleString() + '<span class="label-sub"> 아덴</span>';
+                    document.getElementById("total_dist_gold").innerHTML = (stats.total_distribution_gold || 0).toLocaleString();
                 }
                 if (document.getElementById("contrib_rate")) {
                     document.getElementById("contrib_rate").innerText = (stats.contribution_rate || 0).toFixed(2) + " %";
@@ -241,12 +241,12 @@
                     }).join('');
                 }
 
-                // 📅 1주간 / 2주간 라벨 (위: 항목명 / 아래: 기간)
+                // 📅 1주간 / 2주간 라벨 (위: 항목명 + 단위 / 아래: 기간) - 우측 아덴 글자 삭제
                 if (stats.d_period_label && document.getElementById("label_d_period")) {
-                    document.getElementById("label_d_period").innerHTML = `📅 참여점수 및 분배금<br><span class="label-sub">(${stats.d_period_label})</span>`;
+                    document.getElementById("label_d_period").innerHTML = `📅 참여점수 및 분배금 <span class="unit-small">(단위 : 아덴)</span><br><span class="label-sub">(${stats.d_period_label})</span>`;
                 }
                 if (document.getElementById("d_period_pts")) {
-                    document.getElementById("d_period_pts").innerHTML = `${stats.d_period_points || 0} 점<br>${distGold.toLocaleString()}<span class="label-sub"> 아덴</span>`;
+                    document.getElementById("d_period_pts").innerHTML = `${stats.d_period_points || 0} 점<br>${distGold.toLocaleString()}`;
                 }
                 
                 if (stats.c_period_label && document.getElementById("label_c_period")) {

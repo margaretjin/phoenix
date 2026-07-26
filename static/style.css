@@ -436,6 +436,23 @@ button:hover {
     font-weight: 700; 
 }
 
+/* 🎯 10px 작은 글씨 (단위 : 아덴) 전용 스타일 (전역 적용) */
+.unit-small {
+    font-size: 10px !important;
+    font-weight: 500;
+    color: #94a3b8;
+    display: inline;
+}
+
+/* 🎯 기간 표기용 (1주간, 2주간 등 - 12px) 전역 적용 */
+.label-sub {
+    font-size: 12px;
+    font-weight: 500;
+    color: #94a3b8;
+    display: inline-block;
+    margin-top: 1px;
+}
+
 /* 🎯 보스탐 시간대 동그라미 배지 컨테이너 및 아이템 */
 .time-badge-container {
     display: flex;
@@ -495,23 +512,25 @@ button:hover {
    7. 로딩 인디케이터
    ========================================== */
 .loading-container {
-    display: none;
+    display: none;                  /* 기본 숨김 (JS로 flex 변경) */
     align-items: center;
     justify-content: center;
     gap: 10px;
-    padding: 14px;
-    margin-top: 12px;
-    background-color: #f8fafc;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
+    padding: 14px 18px;
+    margin-top: 14px;
+    margin-bottom: 10px;
+    background-color: #f8fafc;       /* 배경색 */
+    border: 1.5px solid #e2e8f0;    /* 연한 회색 테두리 */
+    border-radius: 12px;            /* 둥근 모서리 */
     text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .loading-spinner {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     border: 3px solid #cbd5e1;
-    border-top-color: #3b82f6;
+    border-top-color: #3b82f6;      /* 파란색 로딩 바 */
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     flex-shrink: 0;
@@ -521,6 +540,7 @@ button:hover {
     color: #475569;
     font-size: 14px;
     font-weight: 700;
+    line-height: 1.4;
 }
 
 @keyframes spin {
@@ -900,19 +920,5 @@ button:hover {
 
     .siege-label {
         font-size: 8px;
-    }
-    /* 기존 .item 및 .label 스타일 하단에 추가 */
-    .item .label { 
-    color: #64748b; 
-    font-weight: 600; 
-    }
-
-    /* 🎯 기간 표기용 소형 서브 스타일 추가 */
-    .label-sub {
-    font-size: 12px;
-    font-weight: 500;
-    color: #94a3b8;
-    display: inline-block;
-    margin-top: 1px;
     }
 }
