@@ -127,7 +127,7 @@ def dragon(): return FileResponse("dragon.html")
 @app.get("/adena.html")
 def adena(): return FileResponse("adena.html")
 
-# --- 💰 전체 분배금 정산 API (출석 1건당 1포인트로 연산) ---
+# --- 💰 전체 분배금 정산 API (출석 1건당 기본 1포인트, 일요일 공성 8시는 10포인트) ---
 @app.get("/api/adena-summary")
 def get_adena_summary():
     try:
@@ -163,7 +163,6 @@ def get_adena_summary():
         query_start = min(c_start, d_start, yesterday_str)
         query_end = max(c_end, d_end, today_str)
         
-        # 💡 points 컬럼 대신 레코드 수만 세기 위해 query 항목 변경
         user_url = f"{SUPABASE_URL}/rest/v1/boss_attendance?select=user_id,attendance_date,attendance_hour&attendance_date=gte.{query_start}&attendance_date=lte.{query_end}&order=attendance_date.desc&limit=5000"
         res_user = requests.get(user_url, headers=headers, timeout=8)
         
@@ -181,13 +180,23 @@ def get_adena_summary():
                 raw_date = str(r.get("attendance_date", "")).strip()
                 r_date = raw_date.split("T")[0].split(" ")[0].replace(".", "-").replace("/", "-")
                 
-                # 🎯 [핵심 변경] DB의 points 값 대신 레코드 1건당 1포인트 부여
-                pts = 1.0 
-                
                 try:
                     att_hour = int(r.get("attendance_hour", 0))
                 except (ValueError, TypeError):
                     att_hour = None
+
+                # 🎯 [핵심 변경] 기본 점수 1점, 일요일 21시/9시 데이터를 20시(8시)로 보정하고 10점 부여
+                pts = 1.0
+                try:
+                    dt_obj = datetime.datetime.strptime(r_date, "%Y-%m-%d")
+                    # dt_obj.weekday() == 6 -> 일요일
+                    if dt_obj.weekday() == 6 and att_hour in (21, 9):
+                        att_hour = 20
+                        pts = 10.0
+                    elif dt_obj.weekday() == 6 and att_hour == 20:
+                        pts = 10.0
+                except ValueError:
+                    pass
 
                 if u_id not in user_db_map:
                     user_db_map[u_id] = {
