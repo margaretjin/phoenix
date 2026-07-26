@@ -449,6 +449,13 @@ button:hover {
     align-items: center;
 }
 
+.time-badge-wrapper {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 .time-badge {
     width: 28px;
     height: 28px;
@@ -476,8 +483,52 @@ button:hover {
     transform: scale(1.05);
 }
 
+.siege-label {
+    font-size: 9px;
+    font-weight: 800;
+    color: #ef4444;
+    line-height: 1;
+    margin-top: 2px;
+}
+
 /* ==========================================
-   7. 혈맹 리스트 및 명단 영역
+   7. 로딩 인디케이터
+   ========================================== */
+.loading-container {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px;
+    margin-top: 12px;
+    background-color: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 22px;
+    height: 22px;
+    border: 3px solid #cbd5e1;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+.loading-text {
+    color: #475569;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================
+   8. 혈맹 리스트 및 명단 영역
    ========================================== */
 .status-area {
     display: none;
@@ -546,7 +597,7 @@ button:hover {
 }
 
 /* ==========================================
-   8. 지도/장소 카드 관련
+   9. 지도/장소 카드 관련
    ========================================== */
 .location-grid-container {
     margin-top: 20px;
@@ -584,7 +635,7 @@ button:hover {
 }
 
 /* ==========================================
-   9. 모바일 이미지 저장 전용 모달 레이어
+   10. 모바일 이미지 저장 전용 모달 레이어
    ========================================== */
 .download-modal {
     display: none;
@@ -637,9 +688,9 @@ button:hover {
 }
 
 /* ==========================================
-   10. 모바일 반응형 미디어 쿼리
+   11. 모바일 반응형 미디어 쿼리
    ========================================== */
-/* 📱 10-1. 초소형 기기 (width ≤ 320px) */
+/* 📱 11-1. 초소형 기기 (width ≤ 320px) */
 @media (max-width: 320px) {
     body {
         padding: 8px 3px;
@@ -719,9 +770,28 @@ button:hover {
         font-size: 11px;
         margin-bottom: 2px;
     }
+
+    .loading-container {
+        padding: 10px;
+        gap: 8px;
+    }
+
+    .loading-spinner {
+        width: 18px;
+        height: 18px;
+        border-width: 2.5px;
+    }
+
+    .loading-text {
+        font-size: 12px;
+    }
+
+    .siege-label {
+        font-size: 8px;
+    }
 }
 
-/* 📱 10-2. 모바일/스마트폰 일반 (321px ≤ width ≤ 500px) */
+/* 📱 11-2. 모바일/스마트폰 일반 (321px ≤ width ≤ 500px) */
 @media (max-width: 500px) and (min-width: 321px) {
     body {
         padding: 10px 4px;
@@ -811,5 +881,24 @@ button:hover {
     .time-badge-container {
         gap: 5px;
         padding: 8px 4px;
+    }
+
+    .loading-container {
+        padding: 10px;
+        gap: 8px;
+    }
+
+    .loading-spinner {
+        width: 18px;
+        height: 18px;
+        border-width: 2.5px;
+    }
+
+    .loading-text {
+        font-size: 12px;
+    }
+
+    .siege-label {
+        font-size: 8px;
     }
 }

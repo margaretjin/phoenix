@@ -10,73 +10,6 @@
     <meta property="og:url" content="https://phoenix-mmtl.onrender.com" />
     
     <link rel="stylesheet" href="./static/style.css?v=20260718-2">
-    <style>
-        .loading-container {
-            display: none;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 14px;
-            margin-top: 12px;
-            background-color: #f8fafc;
-            border: 1.5px solid #e2e8f0;
-            border-radius: 12px;
-            text-align: center;
-        }
-
-        .loading-spinner {
-            width: 22px;
-            height: 22px;
-            border: 3px solid #cbd5e1;
-            border-top-color: #3b82f6;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            flex-shrink: 0;
-        }
-
-        .loading-text {
-            color: #475569;
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .time-badge-wrapper {
-            position: relative;
-            display: inline-flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .siege-label {
-            font-size: 9px;
-            font-weight: 800;
-            color: #ef4444;
-            line-height: 1;
-            margin-bottom: 2px;
-        }
-
-        @media (max-width: 500px) {
-            .loading-container {
-                padding: 10px;
-                gap: 8px;
-            }
-            .loading-spinner {
-                width: 18px;
-                height: 18px;
-                border-width: 2.5px;
-            }
-            .loading-text {
-                font-size: 12px;
-            }
-            .siege-label {
-                font-size: 8px;
-            }
-        }
-    </style>
 </head>
 <body>
     <div class="container menu-container">
@@ -112,9 +45,16 @@
                 <div class="item"><span class="label">혈맹</span><span class="value" id="blood"></span></div>
                 <div class="item"><span class="label">공성혈</span><span class="value" id="blood_member"></span></div>
                 
-                <div class="item"><span class="label">💎 총 분배금</span><span class="value" id="total_dist_gold">0 아데나</span></div>     
+                <div class="item"><span class="label" id="label_total_dist_gold">💎 이번주 분배금</span><span class="value" id="total_dist_gold">0 아데나</span></div>     
                 <div class="item"><span class="label">📊 이번주 기여도</span><span class="value" id="contrib_rate">0.00 %</span></div>
-
+                <div class="item">
+                    <span class="label" id="label_d_period">📅 1주간<br>참여점수 및 분배금</span>
+                    <span class="value" id="d_period_pts" style="text-align: right;">0 점<br>0 아데나</span>
+                </div>
+                <div class="item">
+                    <span class="label" id="label_c_period">📅 2주간<br>참여점수</span>
+                    <span class="value" id="c_period_pts" style="text-align: right;">0 점</span>
+                </div>
                 <!-- 오늘 보스탐 -->
                 <div class="item" style="flex-direction: column; align-items: flex-start;">
                     <div style="display: flex; justify-content: space-between; width: 100%;">
@@ -133,8 +73,7 @@
                     <div id="yesterdayTimeBadgeContainer" class="time-badge-container" style="width: 100%; box-sizing: border-box; margin-top: 8px;"></div>
                 </div>
 
-                <div class="item"><span class="label" id="label_d_period">📅 1주간 참여점수</span><span class="value" id="d_period_pts">0 점</span></div>
-                <div class="item"><span class="label" id="label_c_period">📅 2주간 참여점수</span><span class="value" id="c_period_pts">0 점</span></div>
+               
             </div>
             
             <div id="error" class="error-message" style="display: none;"></div>
@@ -222,6 +161,12 @@
                 const stats = data.attendance_stats || {};
                 const distGold = stats.distribution_gold || 0;
 
+                // 💎 총 분배금 라벨에 기간 표기 연동
+                if (document.getElementById("label_total_dist_gold")) {
+                    const periodText = stats.d_period_label ? ` ${stats.d_period_label}` : "";
+                    document.getElementById("label_total_dist_gold").innerText = `💎${periodText} 총 분배금`;
+                }
+
                 if (document.getElementById("total_dist_gold")) {
                     document.getElementById("total_dist_gold").innerText = (stats.total_distribution_gold || 0).toLocaleString() + " 아데나";
                 }
@@ -253,8 +198,8 @@
                         const isSiege = (hour === 20);
                         return `
                             <div class="time-badge-wrapper">
-                                ${isSiege ? '<span class="siege-label">공성</span>' : ''}
                                 <div class="time-badge ${isAttended ? 'attended' : 'absent'}">${hour}</div>
+                                ${isSiege ? '<span class="siege-label">공성</span>' : ''}
                             </div>
                         `;
                     }).join('');
@@ -286,26 +231,26 @@
                         const isSiege = (hour === 20);
                         return `
                             <div class="time-badge-wrapper">
-                                ${isSiege ? '<span class="siege-label">공성</span>' : ''}
                                 <div class="time-badge ${isAttended ? 'attended' : 'absent'}">${hour}</div>
+                                ${isSiege ? '<span class="siege-label">공성</span>' : ''}
                             </div>
                         `;
                     }).join('');
                 }
 
-                // 1주간 / 2주간 참여점수 및 분배금 표기
+                // 1주간 / 2주간 참여점수 및 분배금 표기 (줄바꿈 적용)
                 if (stats.d_period_label && document.getElementById("label_d_period")) {
-                    document.getElementById("label_d_period").innerText = `📅 ${stats.d_period_label} 참여점수 및 분배금`;
+                    document.getElementById("label_d_period").innerHTML = `📅 ${stats.d_period_label}<br>참여점수 및 분배금`;
                 }
                 if (document.getElementById("d_period_pts")) {
-                    document.getElementById("d_period_pts").innerText = `${stats.d_period_points || 0} 점 [ ${distGold.toLocaleString()} 아데나 ]`;
+                    document.getElementById("d_period_pts").innerHTML = `${stats.d_period_points || 0} 점<br>${distGold.toLocaleString()} 아데나`;
                 }
                 
                 if (stats.c_period_label && document.getElementById("label_c_period")) {
-                    document.getElementById("label_c_period").innerText = `📅 ${stats.c_period_label} 참여점수`;
+                    document.getElementById("label_c_period").innerHTML = `📅 ${stats.c_period_label}<br>참여점수`;
                 }
                 if (document.getElementById("c_period_pts")) {
-                    document.getElementById("c_period_pts").innerText = (stats.c_period_points || 0) + " 점";
+                    document.getElementById("c_period_pts").innerHTML = `${stats.c_period_points || 0} 점`;
                 }
                 
                 if (card) card.style.display = "block"; 
