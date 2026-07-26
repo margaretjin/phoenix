@@ -901,4 +901,18 @@ button:hover {
     .siege-label {
         font-size: 8px;
     }
+    /* 기존 .item 및 .label 스타일 하단에 추가 */
+    .item .label { 
+    color: #64748b; 
+    font-weight: 600; 
+    }
+
+    /* 🎯 기간 표기용 소형 서브 스타일 추가 */
+    .label-sub {
+    font-size: 12px;
+    font-weight: 500;
+    color: #94a3b8;
+    display: inline-block;
+    margin-top: 1px;
+    }
 }
