@@ -61,6 +61,7 @@ _dist_cache = {
     "timestamp": 0
 }
 
+# 💡 아이디 정제 함수 (괄호 및 내부 텍스트, 공백 제거 후 소문자 변환)
 def clean_id_string(text: str) -> str:
     if not text:
         return ""
@@ -136,19 +137,14 @@ def get_adena_summary():
         
         tz_kst = datetime.timezone(datetime.timedelta(hours=9))
         now_kst = datetime.datetime.now(tz_kst)
-        today_date_obj = now_kst.date()
-        yesterday_date_obj = today_date_obj - datetime.timedelta(days=1)
-
-        today_str = today_date_obj.strftime("%Y-%m-%d")
-        yesterday_str = yesterday_date_obj.strftime("%Y-%m-%d")
+        today_str = now_kst.strftime("%Y-%m-%d")
         
-        # 오늘/어제 요일 확인 (weekday(): 월=0, ..., 일=6)
-        is_today_sunday = (today_date_obj.weekday() == 6)
-        is_yesterday_sunday = (yesterday_date_obj.weekday() == 6)
-
-        raw_d_start = config["d_start"] or (today_date_obj - datetime.timedelta(days=6)).strftime("%Y-%m-%d")
+        # 🌟 어제 날짜 계산 (KST 기준)
+        yesterday_str = (now_kst - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+        
+        raw_d_start = config["d_start"] or (now_kst - datetime.timedelta(days=6)).strftime("%Y-%m-%d")
         raw_d_end = config["d_end"] or today_str
-        raw_c_start = config["c_start"] or (today_date_obj - datetime.timedelta(days=13)).strftime("%Y-%m-%d")
+        raw_c_start = config["c_start"] or (now_kst - datetime.timedelta(days=13)).strftime("%Y-%m-%d")
         raw_c_end = config["c_end"] or today_str
 
         d_start = raw_d_start.replace(".", "-").replace("/", "-")
@@ -175,6 +171,7 @@ def get_adena_summary():
 
         if res_user.status_code == 200:
             records = res_user.json()
+            print(f"📥 Supabase 응답 데이터: 총 {len(records)}건")
             
             for r in records:
                 raw_u_id = str(r.get("user_id", "")).strip()
@@ -184,20 +181,25 @@ def get_adena_summary():
                 r_date = raw_date.split("T")[0].split(" ")[0].replace(".", "-").replace("/", "-")
                 
                 try:
-                    att_hour = int(r.get("attendance_hour", 0))
+                    raw_att_hour = int(r.get("attendance_hour", 0))
                 except (ValueError, TypeError):
-                    att_hour = None
+                    raw_att_hour = None
 
-                pts = 1.0
+                # 🎯 [핵심 규칙 반영]
+                # 1. 요일 확인 (0: 월, 1: 화, ..., 6: 일요일)
                 try:
                     dt_obj = datetime.datetime.strptime(r_date, "%Y-%m-%d")
-                    # 🎯 일요일(weekday == 6)일 때만 21시/9시를 20시로 변환하고 10점 부여
-                    if dt_obj.weekday() == 6:
-                        if att_hour in (21, 9, 20):
-                            att_hour = 20
-                            pts = 10.0
-                except ValueError:
-                    pass
+                    is_sunday = (dt_obj.weekday() == 6)
+                except Exception:
+                    is_sunday = False
+
+                # 2. 오직 [일요일 + DB 21시] 데이터만 10점 부여 및 HTML 표기용 20시 변환
+                if is_sunday and raw_att_hour == 21:
+                    pts = 10.0
+                    display_hour = 20  # HTML에는 20시로 표시
+                else:
+                    pts = 1.0          # 평일 21시 포함, 그 외 모든 조건은 1점
+                    display_hour = raw_att_hour # 원래 시간값 그대로 유지 (평일 21시는 21시로 유지)
 
                 if u_id not in user_db_map:
                     user_db_map[u_id] = {
@@ -218,26 +220,28 @@ def get_adena_summary():
                 # 오늘 보스탐 데이터
                 if r_date == today_str:
                     user_db_map[u_id]["today_pts"] += pts
-                    if att_hour is not None and att_hour > 0:
-                        if att_hour not in user_db_map[u_id]["today_hours"]:
-                            user_db_map[u_id]["today_hours"].append(att_hour)
+                    if display_hour is not None and display_hour > 0:
+                        if display_hour not in user_db_map[u_id]["today_hours"]:
+                            user_db_map[u_id]["today_hours"].append(display_hour)
 
                 # 어제 보스탐 데이터
                 if r_date == yesterday_str:
                     user_db_map[u_id]["yesterday_pts"] += pts
-                    if att_hour is not None and att_hour > 0:
-                        if att_hour not in user_db_map[u_id]["yesterday_hours"]:
-                            user_db_map[u_id]["yesterday_hours"].append(att_hour)
+                    if display_hour is not None and display_hour > 0:
+                        if display_hour not in user_db_map[u_id]["yesterday_hours"]:
+                            user_db_map[u_id]["yesterday_hours"].append(display_hour)
+
+            print(f"💎 혈맹 전체 D기간 총 점수: {total_guild_d_points} 점")
 
         # 구글 시트 B열 매칭
         summary_list = []
         for row in rows[2:]:
             if len(row) < 2: continue
             
-            char_name = row[1].strip()
+            char_name = row[1].strip()  # B열: 아이디
             if not char_name: continue
 
-            char_class = row[3].strip() if len(row) > 3 else ""
+            char_class = row[3].strip() if len(row) > 3 else ""  # D열: 클래스
             clean_id = clean_id_string(char_name)
 
             user_pts = user_db_map.get(clean_id, None)
@@ -272,6 +276,8 @@ def get_adena_summary():
                 "distribution_gold": dist_gold
             })
 
+        print(f"==================== [정산 연산 완료] ====================\n")
+
         return {
             "status": "success",
             "total_dist_gold": int(f3_total_gold),
@@ -279,8 +285,6 @@ def get_adena_summary():
             "d_period_label": f"{d_start} ~ {d_end}",
             "today_date": today_str,
             "yesterday_date": yesterday_str,
-            "is_today_sunday": is_today_sunday,
-            "is_yesterday_sunday": is_yesterday_sunday,
             "data": summary_list
         }
     except Exception as e:
@@ -299,22 +303,25 @@ def search_user(name: str):
     for row in rows[2:]:
         if len(row) < 2: continue
         
-        char_name_b = row[1].strip()
+        char_name_b = row[1].strip()  # B열: 검색 비교용 키값
         if not char_name_b: continue
             
         clean_name = clean_id_string(char_name_b)
         
+        # B열 기준으로 유저 검색
         if clean_name == search or search in clean_name:
             matched_stats = next((item for item in data_list if clean_id_string(item["name"]) == clean_name), {})
+            
+            # C열의 실제 아이디 텍스트 추출
             real_id_c = row[2].strip() if len(row) > 2 else char_name_b
             
             return {
                 "status": "success",
                 "name": real_id_c,
-                "character_class": row[3].strip() if len(row) > 3 else "",
-                "skill": row[4].strip() if len(row) > 4 else "",
-                "bloodline": row[5].strip() if len(row) > 5 else "",
-                "blood_member": row[6].strip() if len(row) > 6 else "",
+                "character_class": row[3].strip() if len(row) > 3 else "",  # D열: 클래스
+                "skill": row[4].strip() if len(row) > 4 else "",            # E열
+                "bloodline": row[5].strip() if len(row) > 5 else "",        # F열
+                "blood_member": row[6].strip() if len(row) > 6 else "",     # G열
                 "attendance_stats": {
                     "total_distribution_gold": summary_data.get("total_dist_gold", 0),
                     "contribution_rate": matched_stats.get("contribution_rate", 0.0),
@@ -326,9 +333,7 @@ def search_user(name: str):
                     "d_period_points": matched_stats.get("d_period_points", 0.0),
                     "c_period_points": matched_stats.get("c_period_points", 0.0),
                     "d_period_label": summary_data.get("d_period_label", ""),
-                    "c_period_label": summary_data.get("c_period_label", ""),
-                    "is_today_sunday": summary_data.get("is_today_sunday", False),
-                    "is_yesterday_sunday": summary_data.get("is_yesterday_sunday", False)
+                    "c_period_label": summary_data.get("c_period_label", "")
                 }
             }
             
@@ -366,8 +371,8 @@ def get_bloodline_members(bloodline: str):
         for row in rows[2:]:
             if len(row) <= 5: continue
             
-            member_id = row[1].strip()
-            member_job = row[3].strip() if len(row) > 3 else ""
+            member_id = row[1].strip()                                 # B열: 아이디
+            member_job = row[3].strip() if len(row) > 3 else ""       # D열: 클래스
             bloodline_val = row[5].strip().lower() if len(row) > 5 else ""
             castle_val = row[6].strip().lower() if len(row) > 6 else ""
             
