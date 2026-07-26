@@ -237,17 +237,19 @@
                     document.getElementById("dist_gold").innerText = (stats.distribution_gold || 0).toLocaleString() + " 아데나";
                 }
                 
-                // 오늘 보스탐 데이터 연동
+// 오늘 보스탐 데이터 연동
                 if (document.getElementById("today_pts")) {
                     document.getElementById("today_pts").innerText = (stats.today_points || 0) + " 점";
                 }
                 
                 const attendedHours = stats.today_hours || [];
+                const isTodaySunday = stats.is_today_sunday || false;
                 const badgeContainer = document.getElementById("timeBadgeContainer");
                 if (badgeContainer) {
                     badgeContainer.innerHTML = targetHours.map(hour => {
                         const isAttended = attendedHours.includes(hour);
-                        const isSiege = hour === 20; // 20시일 때 공성 라벨 추가
+                        // 🎯 오늘이 일요일이고 20시일 때만 "공성" 표시
+                        const isSiege = isTodaySunday && hour === 20;
                         return `
                             <div class="time-badge-wrapper">
                                 ${isSiege ? '<span class="siege-label">공성</span>' : ''}
@@ -263,11 +265,13 @@
                 }
 
                 const yesterdayAttendedHours = stats.yesterday_hours || [];
+                const isYesterdaySunday = stats.is_yesterday_sunday || false;
                 const yesterdayBadgeContainer = document.getElementById("yesterdayTimeBadgeContainer");
                 if (yesterdayBadgeContainer) {
                     yesterdayBadgeContainer.innerHTML = targetHours.map(hour => {
                         const isAttended = yesterdayAttendedHours.includes(hour);
-                        const isSiege = hour === 20; // 20시일 때 공성 라벨 추가
+                        // 🎯 어제가 일요일이고 20시일 때만 "공성" 표시
+                        const isSiege = isYesterdaySunday && hour === 20;
                         return `
                             <div class="time-badge-wrapper">
                                 ${isSiege ? '<span class="siege-label">공성</span>' : ''}
