@@ -102,16 +102,16 @@ def refresh_all_data():
         traceback.print_exc()
 
 def compute_summary(rows, config):
-    f3_total_gold = config["f3_total_gold"]
+    f3_total_gold = config.get("f3_total_gold", 0.0)
     tz_kst = datetime.timezone(datetime.timedelta(hours=9))
     now_kst = datetime.datetime.now(tz_kst)
     today_str = now_kst.strftime("%Y-%m-%d")
     yesterday_str = (now_kst - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
 
-    raw_d_start = config["d_start"] or (now_kst - datetime.timedelta(days=6)).strftime("%Y-%m-%d")
-    raw_d_end = config["d_end"] or today_str
-    raw_c_start = config["c_start"] or (now_kst - datetime.timedelta(days=13)).strftime("%Y-%m-%d")
-    raw_c_end = config["c_end"] or today_str
+    raw_d_start = config.get("d_start") or (now_kst - datetime.timedelta(days=6)).strftime("%Y-%m-%d")
+    raw_d_end = config.get("d_end") or today_str
+    raw_c_start = config.get("c_start") or (now_kst - datetime.timedelta(days=13)).strftime("%Y-%m-%d")
+    raw_c_end = config.get("c_end") or today_str
 
     d_start, d_end = min(raw_d_start, raw_d_end), max(raw_d_start, raw_d_end)
     c_start, c_end = min(raw_c_start, raw_c_end), max(raw_c_start, raw_c_end)
@@ -121,65 +121,79 @@ def compute_summary(rows, config):
     query_end = max(c_end, d_end, today_str)
 
     user_url = f"{SUPABASE_URL}/rest/v1/boss_attendance?select=user_id,attendance_date,attendance_hour&attendance_date=gte.{query_start}&attendance_date=lte.{query_end}&order=attendance_date.desc&limit=5000"
-    res_user = requests.get(user_url, headers=headers, timeout=8)
-
+    
     user_db_map = {}
     total_guild_d_points = 0.0
 
-    if res_user.status_code == 200:
-        records = res_user.json()
-        for r in records:
-            u_id = clean_id_string(r.get("user_id", ""))
-            raw_date = str(r.get("attendance_date", "")).strip()
+    try:
+        res_user = requests.get(user_url, headers=headers, timeout=8)
+        if res_user.status_code == 200:
+            records = res_user.json()
+            for r in records:
+                raw_u_id = str(r.get("user_id", "")).strip()
+                u_id = clean_id_string(raw_u_id)
+                if not u_id:
+                    continue
 
-            try:
-                if "T" in raw_date:
-                    dt_obj = datetime.datetime.fromisoformat(raw_date.replace("Z", "+00:00")).astimezone(tz_kst)
-                else:
-                    clean_d_str = raw_date.split(" ")[0].replace(".", "-").replace("/", "-")
-                    dt_obj = datetime.datetime.strptime(clean_d_str, "%Y-%m-%d")
-            except Exception:
+                raw_date = str(r.get("attendance_date", "")).strip()
                 dt_obj = None
 
-            if dt_obj:
-                r_date = dt_obj.strftime("%Y-%m-%d")
-                is_sunday = (dt_obj.weekday() == 6)
-            else:
-                r_date = raw_date.split("T")[0].split(" ")[0].replace(".", "-").replace("/", "-")
-                is_sunday = False
+                try:
+                    if "T" in raw_date:
+                        dt_obj = datetime.datetime.fromisoformat(raw_date.replace("Z", "+00:00")).astimezone(tz_kst)
+                    elif raw_date:
+                        clean_d_str = raw_date.split(" ")[0].replace(".", "-").replace("/", "-")
+                        dt_obj = datetime.datetime.strptime(clean_d_str, "%Y-%m-%d")
+                except Exception:
+                    dt_obj = None
 
-            try:
-                raw_att_hour = int(r.get("attendance_hour", 0))
-            except (ValueError, TypeError):
-                raw_att_hour = None
+                if dt_obj:
+                    r_date = dt_obj.strftime("%Y-%m-%d")
+                    is_sunday = (dt_obj.weekday() == 6)
+                else:
+                    r_date = raw_date.split("T")[0].split(" ")[0].replace(".", "-").replace("/", "-")
+                    is_sunday = False
 
-            if is_sunday and raw_att_hour == 21:
-                pts, display_hour = 10.0, 20
-            else:
-                pts, display_hour = 1.0, raw_att_hour
+                # 🎯 보스탐 시간 및 점수 계산 안전화
+                try:
+                    raw_att_hour = int(r.get("attendance_hour")) if r.get("attendance_hour") is not None else None
+                except (ValueError, TypeError):
+                    raw_att_hour = None
 
-            if u_id not in user_db_map:
-                user_db_map[u_id] = {
-                    "c_pts": 0.0, "d_pts": 0.0,
-                    "today_pts": 0.0, "today_hours": [],
-                    "yesterday_pts": 0.0, "yesterday_hours": []
-                }
+                if is_sunday and raw_att_hour == 21:
+                    pts = 10.0
+                    display_hour = 20
+                else:
+                    pts = 1.0
+                    display_hour = raw_att_hour
 
-            if c_start <= r_date <= c_end:
-                user_db_map[u_id]["c_pts"] += pts
-            if d_start <= r_date <= d_end:
-                user_db_map[u_id]["d_pts"] += pts
-                total_guild_d_points += pts
+                if u_id not in user_db_map:
+                    user_db_map[u_id] = {
+                        "c_pts": 0.0, "d_pts": 0.0,
+                        "today_pts": 0.0, "today_hours": [],
+                        "yesterday_pts": 0.0, "yesterday_hours": []
+                    }
 
-            if r_date == today_str:
-                user_db_map[u_id]["today_pts"] += pts
-                if display_hour is not None and display_hour > 0 and display_hour not in user_db_map[u_id]["today_hours"]:
-                    user_db_map[u_id]["today_hours"].append(display_hour)
+                # 점수 합산
+                if c_start <= r_date <= c_end:
+                    user_db_map[u_id]["c_pts"] += pts
+                if d_start <= r_date <= d_end:
+                    user_db_map[u_id]["d_pts"] += pts
+                    total_guild_d_points += pts
 
-            if r_date == yesterday_str:
-                user_db_map[u_id]["yesterday_pts"] += pts
-                if display_hour is not None and display_hour > 0 and display_hour not in user_db_map[u_id]["yesterday_hours"]:
-                    user_db_map[u_id]["yesterday_hours"].append(display_hour)
+                if r_date == today_str:
+                    user_db_map[u_id]["today_pts"] += pts
+                    if display_hour is not None and display_hour > 0 and display_hour not in user_db_map[u_id]["today_hours"]:
+                        user_db_map[u_id]["today_hours"].append(display_hour)
+
+                if r_date == yesterday_str:
+                    user_db_map[u_id]["yesterday_pts"] += pts
+                    if display_hour is not None and display_hour > 0 and display_hour not in user_db_map[u_id]["yesterday_hours"]:
+                        user_db_map[u_id]["yesterday_hours"].append(display_hour)
+
+    except Exception as e:
+        print(f"❌ Supabase 데이터 연산 중 오류 발생: {str(e)}")
+        traceback.print_exc()
 
     summary_list = []
     for row in rows[2:]:
@@ -190,10 +204,16 @@ def compute_summary(rows, config):
         clean_id = clean_id_string(char_name)
 
         user_pts = user_db_map.get(clean_id, {
-            "c_pts": 0.0, "d_pts": 0.0, "today_pts": 0.0, "today_hours": [], "yesterday_pts": 0.0, "yesterday_hours": []
+            "c_pts": 0.0, "d_pts": 0.0,
+            "today_pts": 0.0, "today_hours": [],
+            "yesterday_pts": 0.0, "yesterday_hours": []
         })
 
-        d_pts = user_pts["d_pts"]
+        d_pts = float(user_pts.get("d_pts", 0.0))
+        c_pts = float(user_pts.get("c_pts", 0.0))
+        today_pts = float(user_pts.get("today_pts", 0.0))
+        yesterday_pts = float(user_pts.get("yesterday_pts", 0.0))
+
         contrib_rate = 0.0
         dist_gold = 0
         if total_guild_d_points > 0 and d_pts > 0:
@@ -203,12 +223,12 @@ def compute_summary(rows, config):
         summary_list.append({
             "name": char_name,
             "character_class": char_class,
-            "c_period_points": user_pts["c_pts"],
+            "c_period_points": c_pts,
             "d_period_points": d_pts,
-            "today_points": user_pts["today_pts"],
-            "today_hours": user_pts["today_hours"],
-            "yesterday_points": user_pts["yesterday_pts"],
-            "yesterday_hours": user_pts["yesterday_hours"],
+            "today_points": today_pts,
+            "today_hours": user_pts.get("today_hours", []),
+            "yesterday_points": yesterday_pts,
+            "yesterday_hours": user_pts.get("yesterday_hours", []),
             "contribution_rate": contrib_rate,
             "distribution_gold": dist_gold
         })
