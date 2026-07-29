@@ -47,7 +47,6 @@ SUPABASE_KEY = creds_info.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
 _global_cache = {
     "rows": None,
     "dist_config": {
-        "f3_total_gold": 0.0,
         "c_total_gold": 0.0,
         "d_total_gold": 0.0,
         "c_start": "", "c_end": "",
@@ -74,28 +73,28 @@ def refresh_all_data():
         sheet = doc.worksheet(SHEET_NAME)
         rows = sheet.get_all_values()
         
-        # 2. 분배금정산 시트 로드 (C2:F3 영역)
+        # 2. 분배금정산 시트 로드 (C1:D3 영역 한 번에 조회)
         doc_dist = client.open_by_key(DIST_SPREADSHEET_ID)
         sheet_dist = doc_dist.worksheet(DIST_SHEET_NAME)
-        val = sheet_dist.get("C2:F3")
+        val = sheet_dist.get("C1:D3")
 
-        c_start = val[0][0].strip() if len(val) > 0 and len(val[0]) > 0 else ""
-        d_start = val[0][1].strip() if len(val) > 0 and len(val[0]) > 1 else ""
-        c_end   = val[1][0].strip() if len(val) > 1 and len(val[1]) > 0 else ""
-        d_end   = val[1][1].strip() if len(val) > 1 and len(val[1]) > 1 else ""
-        
-        # C3(저번주 분배금) / F3 or D3(이번주 분배금)
-        c_f3_str = str(val[1][2]) if len(val) > 1 and len(val[1]) > 2 else "0"
-        d_f3_str = str(val[1][3]) if len(val) > 1 and len(val[1]) > 3 else "0"
+        # 🎯 C1(저번주 총 분배금), D1(이번주 총 분배금)
+        c_f1_str = str(val[0][0]) if len(val) > 0 and len(val[0]) > 0 else "0"
+        d_f1_str = str(val[0][1]) if len(val) > 0 and len(val[0]) > 1 else "0"
 
-        clean_c_f3 = "".join(c for c in c_f3_str if c.isdigit() or c == '.')
-        clean_d_f3 = "".join(c for c in d_f3_str if c.isdigit() or c == '.')
+        # 🎯 C2~C3(저번주 기간), D2~D3(이번주 기간)
+        c_start = val[1][0].strip() if len(val) > 1 and len(val[1]) > 0 else ""
+        d_start = val[1][1].strip() if len(val) > 1 and len(val[1]) > 1 else ""
+        c_end   = val[2][0].strip() if len(val) > 2 and len(val[2]) > 0 else ""
+        d_end   = val[2][1].strip() if len(val) > 2 and len(val[2]) > 1 else ""
+
+        clean_c_f1 = "".join(c for c in c_f1_str if c.isdigit() or c == '.')
+        clean_d_f1 = "".join(c for c in d_f1_str if c.isdigit() or c == '.')
         
-        c_total_gold = float(clean_c_f3) if clean_c_f3 else 0.0
-        d_total_gold = float(clean_d_f3) if clean_d_f3 else 0.0
+        c_total_gold = float(clean_c_f1) if clean_c_f1 else 0.0
+        d_total_gold = float(clean_d_f1) if clean_d_f1 else 0.0
 
         dist_config = {
-            "f3_total_gold": d_total_gold,
             "c_total_gold": c_total_gold,
             "d_total_gold": d_total_gold,
             "c_start": c_start, "c_end": c_end,
@@ -380,7 +379,7 @@ def search_user(name: str):
                 "bloodline": row[5].strip() if len(row) > 5 else "",
                 "blood_member": row[6].strip() if len(row) > 6 else "",
                 "attendance_stats": {
-                    "total_distribution_gold": summary_data.get("total_dist_gold", 0),
+                    "total_distribution_gold": summary_data.get("d_dist_gold", 0),
                     "c_dist_gold": summary_data.get("c_dist_gold", 0),
                     "d_dist_gold": summary_data.get("d_dist_gold", 0),
                     
@@ -447,7 +446,7 @@ def get_bloodline_members(bloodline: str):
             continue
         member_id = row[1].strip()
         member_job = row[3].strip() if len(row) > 3 else ""
-        bloodline_val = row[5].strip().lower() if len(row) > 6 else ""
+        bloodline_val = row[5].strip().lower() if len(row) > 5 else ""
         castle_val = row[6].strip().lower() if len(row) > 6 else ""
 
         if bloodline_val == target or castle_val == target:
