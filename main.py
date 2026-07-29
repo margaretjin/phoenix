@@ -46,7 +46,13 @@ SUPABASE_KEY = creds_info.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
 # 🌟 전역 캐시 저장소
 _global_cache = {
     "rows": None,
-    "dist_config": {"f3_total_gold": 0.0, "c_start": "", "c_end": "", "d_start": "", "d_end": ""},
+    "dist_config": {
+        "f3_total_gold": 0.0,
+        "c_total_gold": 0.0,
+        "d_total_gold": 0.0,
+        "c_start": "", "c_end": "",
+        "d_start": "", "d_end": ""
+    },
     "summary_data": None,
     "last_updated": 0
 }
@@ -68,7 +74,7 @@ def refresh_all_data():
         sheet = doc.worksheet(SHEET_NAME)
         rows = sheet.get_all_values()
         
-        # 2. 분배금정산 시트 로드
+        # 2. 분배금정산 시트 로드 (C2:F3 영역)
         doc_dist = client.open_by_key(DIST_SPREADSHEET_ID)
         sheet_dist = doc_dist.worksheet(DIST_SHEET_NAME)
         val = sheet_dist.get("C2:F3")
@@ -77,13 +83,21 @@ def refresh_all_data():
         d_start = val[0][1].strip() if len(val) > 0 and len(val[0]) > 1 else ""
         c_end   = val[1][0].strip() if len(val) > 1 and len(val[1]) > 0 else ""
         d_end   = val[1][1].strip() if len(val) > 1 and len(val[1]) > 1 else ""
-        f3_str  = str(val[1][3]) if len(val) > 1 and len(val[1]) > 3 else "0"
+        
+        # C3(저번주 분배금) / F3 or D3(이번주 분배금)
+        c_f3_str = str(val[1][2]) if len(val) > 1 and len(val[1]) > 2 else "0"
+        d_f3_str = str(val[1][3]) if len(val) > 1 and len(val[1]) > 3 else "0"
 
-        clean_f3 = "".join(c for c in f3_str if c.isdigit() or c == '.')
-        f3_total_gold = float(clean_f3) if clean_f3 else 0.0
+        clean_c_f3 = "".join(c for c in c_f3_str if c.isdigit() or c == '.')
+        clean_d_f3 = "".join(c for c in d_f3_str if c.isdigit() or c == '.')
+        
+        c_total_gold = float(clean_c_f3) if clean_c_f3 else 0.0
+        d_total_gold = float(clean_d_f3) if clean_d_f3 else 0.0
 
         dist_config = {
-            "f3_total_gold": f3_total_gold,
+            "f3_total_gold": d_total_gold,
+            "c_total_gold": c_total_gold,
+            "d_total_gold": d_total_gold,
             "c_start": c_start, "c_end": c_end,
             "d_start": d_start, "d_end": d_end
         }
@@ -102,7 +116,9 @@ def refresh_all_data():
         traceback.print_exc()
 
 def compute_summary(rows, config):
-    f3_total_gold = config.get("f3_total_gold", 0.0)
+    c_total_gold = config.get("c_total_gold", 0.0)
+    d_total_gold = config.get("d_total_gold", 0.0)
+    
     tz_kst = datetime.timezone(datetime.timedelta(hours=9))
     now_kst = datetime.datetime.now(tz_kst)
     today_str = now_kst.strftime("%Y-%m-%d")
@@ -115,14 +131,16 @@ def compute_summary(rows, config):
 
     d_start, d_end = min(raw_d_start, raw_d_end), max(raw_d_start, raw_d_end)
     c_start, c_end = min(raw_c_start, raw_c_end), max(raw_c_start, raw_c_end)
+    b_start, b_end = min(c_start, d_start), max(c_end, d_end)
 
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
-    query_start = min(c_start, d_start, yesterday_str)
-    query_end = max(c_end, d_end, today_str)
+    query_start = min(b_start, yesterday_str)
+    query_end = max(b_end, today_str)
 
     user_url = f"{SUPABASE_URL}/rest/v1/boss_attendance?select=user_id,attendance_date,attendance_hour&attendance_date=gte.{query_start}&attendance_date=lte.{query_end}&order=attendance_date.desc&limit=5000"
     
     user_db_map = {}
+    total_guild_c_points = 0.0
     total_guild_d_points = 0.0
 
     try:
@@ -149,12 +167,13 @@ def compute_summary(rows, config):
 
                 if dt_obj:
                     r_date = dt_obj.strftime("%Y-%m-%d")
-                    is_sunday = (dt_obj.weekday() == 6)
+                    weekday_idx = dt_obj.weekday()  # 0: 월, 1: 화, ..., 6: 일
+                    is_sunday = (weekday_idx == 6)
                 else:
                     r_date = raw_date.split("T")[0].split(" ")[0].replace(".", "-").replace("/", "-")
+                    weekday_idx = None
                     is_sunday = False
 
-                # 🎯 보스탐 시간 및 점수 계산 안전화
                 try:
                     raw_att_hour = int(r.get("attendance_hour")) if r.get("attendance_hour") is not None else None
                 except (ValueError, TypeError):
@@ -169,17 +188,30 @@ def compute_summary(rows, config):
 
                 if u_id not in user_db_map:
                     user_db_map[u_id] = {
-                        "c_pts": 0.0, "d_pts": 0.0,
+                        "c_pts": 0.0, "d_pts": 0.0, "b_pts": 0.0,
                         "today_pts": 0.0, "today_hours": [],
-                        "yesterday_pts": 0.0, "yesterday_hours": []
+                        "yesterday_pts": 0.0, "yesterday_hours": [],
+                        "c_daily_points": [0.0] * 7,
+                        "d_daily_points": [0.0] * 7
                     }
 
-                # 점수 합산
+                # B기간 (통합)
+                if b_start <= r_date <= b_end:
+                    user_db_map[u_id]["b_pts"] += pts
+
+                # C기간 (저번주)
                 if c_start <= r_date <= c_end:
                     user_db_map[u_id]["c_pts"] += pts
+                    total_guild_c_points += pts
+                    if weekday_idx is not None:
+                        user_db_map[u_id]["c_daily_points"][weekday_idx] += pts
+
+                # D기간 (이번주)
                 if d_start <= r_date <= d_end:
                     user_db_map[u_id]["d_pts"] += pts
                     total_guild_d_points += pts
+                    if weekday_idx is not None:
+                        user_db_map[u_id]["d_daily_points"][weekday_idx] += pts
 
                 if r_date == today_str:
                     user_db_map[u_id]["today_pts"] += pts
@@ -204,38 +236,62 @@ def compute_summary(rows, config):
         clean_id = clean_id_string(char_name)
 
         user_pts = user_db_map.get(clean_id, {
-            "c_pts": 0.0, "d_pts": 0.0,
+            "c_pts": 0.0, "d_pts": 0.0, "b_pts": 0.0,
             "today_pts": 0.0, "today_hours": [],
-            "yesterday_pts": 0.0, "yesterday_hours": []
+            "yesterday_pts": 0.0, "yesterday_hours": [],
+            "c_daily_points": [0.0] * 7,
+            "d_daily_points": [0.0] * 7
         })
 
-        d_pts = float(user_pts.get("d_pts", 0.0))
+        b_pts = float(user_pts.get("b_pts", 0.0))
         c_pts = float(user_pts.get("c_pts", 0.0))
+        d_pts = float(user_pts.get("d_pts", 0.0))
         today_pts = float(user_pts.get("today_pts", 0.0))
         yesterday_pts = float(user_pts.get("yesterday_pts", 0.0))
 
-        contrib_rate = 0.0
-        dist_gold = 0
+        # 기여도 및 분배금 연산 (C기간/D기간 각자)
+        c_contrib_rate = 0.0
+        c_dist_gold = 0
+        if total_guild_c_points > 0 and c_pts > 0:
+            c_contrib_rate = round((c_pts / total_guild_c_points) * 100, 2)
+            c_dist_gold = int(c_total_gold * (c_contrib_rate / 100))
+
+        d_contrib_rate = 0.0
+        d_dist_gold = 0
         if total_guild_d_points > 0 and d_pts > 0:
-            contrib_rate = round((d_pts / total_guild_d_points) * 100, 2)
-            dist_gold = int(f3_total_gold * (contrib_rate / 100))
+            d_contrib_rate = round((d_pts / total_guild_d_points) * 100, 2)
+            d_dist_gold = int(d_total_gold * (d_contrib_rate / 100))
 
         summary_list.append({
             "name": char_name,
             "character_class": char_class,
+            "b_period_points": b_pts,
             "c_period_points": c_pts,
             "d_period_points": d_pts,
             "today_points": today_pts,
             "today_hours": user_pts.get("today_hours", []),
             "yesterday_points": yesterday_pts,
             "yesterday_hours": user_pts.get("yesterday_hours", []),
-            "contribution_rate": contrib_rate,
-            "distribution_gold": dist_gold
+            "c_daily_points": user_pts.get("c_daily_points", [0.0] * 7),
+            "d_daily_points": user_pts.get("d_daily_points", [0.0] * 7),
+            
+            # 이번주 (D기간)
+            "d_contribution_rate": d_contrib_rate,
+            "d_distribution_gold": d_dist_gold,
+            "contribution_rate": d_contrib_rate,
+            "distribution_gold": d_dist_gold,
+
+            # 저번주 (C기간)
+            "c_contribution_rate": c_contrib_rate,
+            "c_distribution_gold": c_dist_gold
         })
 
     return {
         "status": "success",
-        "total_dist_gold": int(f3_total_gold),
+        "total_dist_gold": int(d_total_gold),
+        "c_dist_gold": int(c_total_gold),
+        "d_dist_gold": int(d_total_gold),
+        "b_period_label": f"{b_start} ~ {b_end}",
         "c_period_label": f"{c_start} ~ {c_end}",
         "d_period_label": f"{d_start} ~ {d_end}",
         "today_date": today_str,
@@ -250,7 +306,7 @@ async def auto_refresh_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 🌟 앱 시작 시 즉시 최초 1회 동기화
+    # 앱 시작 시 즉시 최초 1회 동기화
     await asyncio.to_thread(refresh_all_data)
     # 이후 백그라운드 60초 주기 갱신
     asyncio.create_task(auto_refresh_loop())
@@ -268,7 +324,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 📄 라우팅 (HTML 파일 연결)
+# 📄 라우터 (HTML 페이지 이동)
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_index():
     return FileResponse(os.path.join(os.path.dirname(__file__), "main.html"))
@@ -325,14 +381,30 @@ def search_user(name: str):
                 "blood_member": row[6].strip() if len(row) > 6 else "",
                 "attendance_stats": {
                     "total_distribution_gold": summary_data.get("total_dist_gold", 0),
-                    "contribution_rate": matched_stats.get("contribution_rate", 0.0),
-                    "distribution_gold": matched_stats.get("distribution_gold", 0),
+                    "c_dist_gold": summary_data.get("c_dist_gold", 0),
+                    "d_dist_gold": summary_data.get("d_dist_gold", 0),
+                    
+                    "contribution_rate": matched_stats.get("d_contribution_rate", 0.0),
+                    "distribution_gold": matched_stats.get("d_distribution_gold", 0),
+                    
+                    "d_contribution_rate": matched_stats.get("d_contribution_rate", 0.0),
+                    "d_distribution_gold": matched_stats.get("d_distribution_gold", 0),
+                    "c_contribution_rate": matched_stats.get("c_contribution_rate", 0.0),
+                    "c_distribution_gold": matched_stats.get("c_distribution_gold", 0),
+
                     "today_points": matched_stats.get("today_points", 0.0),
                     "today_hours": matched_stats.get("today_hours", []),
                     "yesterday_points": matched_stats.get("yesterday_points", 0.0),
                     "yesterday_hours": matched_stats.get("yesterday_hours", []),
+                    
+                    "b_period_points": matched_stats.get("b_period_points", 0.0),
                     "d_period_points": matched_stats.get("d_period_points", 0.0),
                     "c_period_points": matched_stats.get("c_period_points", 0.0),
+                    
+                    "c_daily_points": matched_stats.get("c_daily_points", [0.0] * 7),
+                    "d_daily_points": matched_stats.get("d_daily_points", [0.0] * 7),
+
+                    "b_period_label": summary_data.get("b_period_label", ""),
                     "d_period_label": summary_data.get("d_period_label", ""),
                     "c_period_label": summary_data.get("c_period_label", "")
                 }
@@ -375,7 +447,7 @@ def get_bloodline_members(bloodline: str):
             continue
         member_id = row[1].strip()
         member_job = row[3].strip() if len(row) > 3 else ""
-        bloodline_val = row[5].strip().lower() if len(row) > 5 else ""
+        bloodline_val = row[5].strip().lower() if len(row) > 6 else ""
         castle_val = row[6].strip().lower() if len(row) > 6 else ""
 
         if bloodline_val == target or castle_val == target:
