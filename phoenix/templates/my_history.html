@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>참여내역 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/style.css?v=5">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="/raid-record" class="nav-link">보스탐 기록</a>
+            <a href="/raid-status" class="nav-link">일별기록현황</a>
+            <a href="/item-status" class="nav-link">템 보유현황</a>
+            <a href="/my-history" class="nav-link active" id="navMyId">참여내역</a>
+        </div>
+        <div class="nav-right">
+            <span id="navUserInfo" style="color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; margin-right: 0.4rem;"></span>
+            <button id="adminModeBtn" onclick="toggleAdminMode()" class="admin-mode-toggle hidden">👑 관리자 모드: OFF</button>
+            <a href="/admin" class="nav-link admin-btn hidden" id="navAdminBtn">회원관리</a>
+            <button onclick="logoutUser()" class="btn" style="padding: 0.35rem 0.65rem; background: #334155; color: #fff; font-size: 0.82rem;">로그아웃</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- 1. 상단 본인 스펙 정보 카드 (고유아이디, 사용중인아이디, 클래스, 보유중요스킬, 보유쫄 아이디) -->
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
+                <h2 class="section-title" style="margin-bottom: 0;">🛡️ 내 캐릭터 및 참여·분배 내역</h2>
+
+                <!-- 관리자 모드 ON일 때만 다른 혈맹원 내역 조회 전환 가능 -->
+                <div id="adminMemberSearchBox" class="hidden" style="display: flex; gap: 0.4rem; align-items: center;">
+                    <span style="color: var(--accent-gold); font-size: 0.82rem; font-weight: 700;">👑 조회 대상:</span>
+                    <input type="text" id="targetMemberIdInput" placeholder="아이디 입력" style="width: 120px; padding: 0.3rem 0.5rem; font-size: 0.85rem;">
+                    <button type="button" class="btn btn-green" style="padding: 0.3rem 0.65rem; font-size: 0.82rem;" onclick="reloadProfileAndHistory()">조회</button>
+                </div>
+            </div>
+
+            <div class="profile-header-grid">
+                <div>
+                    <div class="profile-item-label">고유 아이디</div>
+                    <div class="profile-item-val" id="profUniqueId">-</div>
+                </div>
+                <div>
+                    <div class="profile-item-label">사용중인 아이디</div>
+                    <div class="profile-item-val" style="color: var(--accent-gold);" id="profActiveId">-</div>
+                </div>
+                <div>
+                    <div class="profile-item-label">클래스</div>
+                    <div class="profile-item-val" id="profClass">-</div>
+                </div>
+                <div>
+                    <div class="profile-item-label">보유 중요 스킬</div>
+                    <div class="profile-item-val" style="color: #6ee7b7;" id="profSkills">-</div>
+                </div>
+                <div>
+                    <div class="profile-item-label">보유 쫄 아이디</div>
+                    <div class="profile-item-val" id="profSubChars">-</div>
+                </div>
+            </div>
+
+            <!-- 날짜 및 월 선택 -->
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+                <div>
+                    <label>조회 기준 월 (일별/주별 합산용)</label>
+                    <input type="month" id="historyMonth" onchange="onHistoryMonthChange()" style="width: auto;">
+                </div>
+                <div>
+                    <label>일별 상세 날짜 선택</label>
+                    <input type="date" id="historyDate" onchange="onHistoryDateChange()" style="width: auto;">
+                </div>
+                <div style="margin-left: auto; text-align: right;">
+                    <div style="font-size: 0.82rem; color: var(--text-muted);">선택일 참여 횟수 / 월 누적 참여</div>
+                    <div style="font-size: 1.05rem; font-weight: 800; color: var(--accent-gold);">
+                        <span id="dayParticipatedCount">0</span>회 / 월 <span id="monthParticipatedCount">0</span>회
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 일별 16개 보스탐 원형 표시 + 보스타임별 개별 드랍템 및 본인 분배금 -->
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <h3 class="section-title" style="margin-bottom: 0; font-size: 1.05rem;">⏱️ <span id="selectedHistoryDateLabel">-</span> 보스탐 참여 현황 (16타임)</h3>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#10b981; margin-right:3px;"></span>본인 참여 타임 &nbsp;
+                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; border:1px dashed #475569; margin-right:3px;"></span>미참여
+                </div>
+            </div>
+
+            <!-- 16개 원형 타임 그리드 (8개씩 2줄, 참여 타임 디자인 구분) -->
+            <div id="myCircleTimeGrid" class="my-circle-grid"></div>
+
+            <!-- 각 보스타임별 드랍된 아이템 및 본인 개별 분배금 내역 -->
+            <div style="margin-top: 1rem;">
+                <div style="font-weight: 800; color: var(--accent-gold); margin-bottom: 0.6rem; font-size: 0.95rem;">
+                    💰 해당 일자 보스타임별 드랍 아이템 및 내 개별 분배금
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>보스탐 시간</th>
+                                <th>참여 인원수</th>
+                                <th>드랍 아이템 및 판매가</th>
+                                <th>혈비 제외 총 분배풀</th>
+                                <th>내 개별 분배금</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dailyIndividualShareBody">
+                            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">조회 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 일별 분배금 합산표 & 주별 분배금 합산표 (2열) -->
+        <div class="settlement-two-col">
+            <!-- 왼쪽: 일별 분배금 합산표 -->
+            <div class="card" style="margin-bottom: 0;">
+                <h3 class="section-title" style="font-size: 1.02rem;">📅 일별 분배금 합산표 (<span id="monthLabelDaily">-</span>)</h3>
+                <div style="overflow-x: auto; max-height: 360px;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>날짜</th>
+                                <th>참여 횟수</th>
+                                <th>일별 내 분배금 합계</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dailySummaryTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 오른쪽: 주별 분배금 합산표 -->
+            <div class="card" style="margin-bottom: 0;">
+                <h3 class="section-title" style="font-size: 1.02rem;">📊 주별 분배금 합산표 (<span id="monthLabelWeekly">-</span>)</h3>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>주차</th>
+                                <th>참여 횟수</th>
+                                <th>주별 내 분배금 합계</th>
+                            </tr>
+                        </thead>
+                        <tbody id="weeklySummaryTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentUser = null;
+        let hasAdminPrivilege = false;
+        let isAdminModeOn = false;
+        let currentTaxRate = 20;
+        let raidTimes = [];
+        let allMembers = [];
+        let monthRaidsCache = [];
+
+        window.onload = async () => {
+            const saved = localStorage.getItem('clan_user');
+            if (!saved) {
+                window.location.href = '/login';
+                return;
+            }
+            currentUser = JSON.parse(saved);
+            const roleStr = (currentUser.role || '').trim();
+            hasAdminPrivilege = roleStr === '관리자' || roleStr === '슈퍼관리자';
+            isAdminModeOn = hasAdminPrivilege && (localStorage.getItem('clan_admin_mode') === 'true');
+
+            // 괄호 없이 "(월은)" -> "월은 참여내역"
+            document.getElementById('navMyId').textContent = `${currentUser.active_id} 참여내역`;
+            document.getElementById('navUserInfo').textContent = `${currentUser.active_id} (${roleStr})`;
+            document.getElementById('targetMemberIdInput').value = currentUser.active_id;
+
+            if (hasAdminPrivilege) {
+                document.getElementById('adminModeBtn').classList.remove('hidden');
+            }
+
+            applyAdminModeUI();
+
+            const [timeRes, taxRes, memRes] = await Promise.all([
+                fetch('/api/raids/times'),
+                fetch('/api/raids/tax-rate'),
+                fetch('/api/auth/search-members')
+            ]);
+            raidTimes = (await timeRes.json()).times;
+            currentTaxRate = (await taxRes.json()).tax_rate ?? 20;
+            allMembers = await memRes.json();
+
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            document.getElementById('historyMonth').value = `${yyyy}-${mm}`;
+            document.getElementById('historyDate').value = `${yyyy}-${mm}-${dd}`;
+
+            await reloadProfileAndHistory();
+        };
+
+        function toggleAdminMode() {
+            if (!hasAdminPrivilege) return;
+            isAdminModeOn = !isAdminModeOn;
+            localStorage.setItem('clan_admin_mode', isAdminModeOn ? 'true' : 'false');
+            if (!isAdminModeOn) {
+                document.getElementById('targetMemberIdInput').value = currentUser.active_id;
+            }
+            applyAdminModeUI();
+            reloadProfileAndHistory();
+        }
+
+        function applyAdminModeUI() {
+            const toggleBtn = document.getElementById('adminModeBtn');
+            const navAdminBtn = document.getElementById('navAdminBtn');
+            const searchBox = document.getElementById('adminMemberSearchBox');
+
+            if (isAdminModeOn) {
+                toggleBtn.textContent = '👑 관리자 모드: ON';
+                toggleBtn.classList.add('active');
+                navAdminBtn.classList.remove('hidden');
+                searchBox.classList.remove('hidden');
+            } else {
+                toggleBtn.textContent = '👑 관리자 모드: OFF';
+                toggleBtn.classList.remove('active');
+                navAdminBtn.classList.add('hidden');
+                searchBox.classList.add('hidden');
+            }
+        }
+
+        function logoutUser() {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                localStorage.removeItem('clan_user');
+                localStorage.removeItem('clan_admin_mode');
+                window.location.href = '/login';
+            }
+        }
+
+        function getTargetMemberId() {
+            if (isAdminModeOn) {
+                return document.getElementById('targetMemberIdInput').value.trim() || currentUser.active_id;
+            }
+            return currentUser.active_id;
+        }
+
+        function renderProfileCard(targetId) {
+            const memberObj = allMembers.find(m => m.active_id === targetId) || currentUser;
+            document.getElementById('profUniqueId').textContent = memberObj.unique_id || '-';
+            document.getElementById('profActiveId').textContent = memberObj.active_id || targetId;
+            document.getElementById('profClass').textContent = memberObj.char_class || '-';
+
+            let skillsText = '-';
+            if (Array.isArray(memberObj.skills) && memberObj.skills.length > 0) {
+                skillsText = memberObj.skills.join(', ');
+            } else if (typeof memberObj.skills === 'string' && memberObj.skills.trim()) {
+                skillsText = memberObj.skills;
+            }
+            document.getElementById('profSkills').textContent = skillsText;
+            document.getElementById('profSubChars').textContent = memberObj.sub_chars || '없음';
+        }
+
+        async function onHistoryMonthChange() {
+            const monthVal = document.getElementById('historyMonth').value;
+            if (!monthVal) return;
+            const curDate = document.getElementById('historyDate').value;
+            if (!curDate.startsWith(monthVal)) {
+                document.getElementById('historyDate').value = `${monthVal}-01`;
+            }
+            await reloadProfileAndHistory();
+        }
+
+        async function onHistoryDateChange() {
+            const dateVal = document.getElementById('historyDate').value;
+            if (!dateVal) return;
+            const ym = dateVal.slice(0, 7);
+            if (document.getElementById('historyMonth').value !== ym) {
+                document.getElementById('historyMonth').value = ym;
+                await reloadProfileAndHistory();
+            } else {
+                renderAllHistoryViews();
+            }
+        }
+
+        function extractItemDetailsFromRecord(record) {
+            const rawTokens = (record.dropped_items || '').split(/[\s,，\n]+/).map(s => s.trim()).filter(Boolean);
+            const savedDetails = Array.isArray(record.item_details) ? record.item_details : [];
+            const legacyPrices = record.item_prices || {};
+
+            if (savedDetails.length > 0 && rawTokens.length === 0) {
+                return savedDetails.map(d => ({
+                    name: d.name || '',
+                    price: Number(d.price || 0),
+                    winner: d.winner || '',
+                    taken_date: d.taken_date || ''
+                }));
+            }
+
+            const usedIdx = new Set();
+            return rawTokens.map(token => {
+                let found = null;
+                for (let i = 0; i < savedDetails.length; i++) {
+                    if (!usedIdx.has(i) && savedDetails[i].name === token) {
+                        found = savedDetails[i];
+                        usedIdx.add(i);
+                        break;
+                    }
+                }
+                const fallbackPrice = legacyPrices[token] !== undefined ? Number(legacyPrices[token]) : 0;
+                return {
+                    name: token,
+                    price: found ? Number(found.price || 0) : fallbackPrice,
+                    winner: found ? (found.winner || '') : '',
+                    taken_date: found ? (found.taken_date || '') : ''
+                };
+            });
+        }
+
+        // 특정 보스탐 레코드에서 참여자 중복 제거 목록 및 본인의 개별 분배금 계산
+        function analyzeRaidForMember(record, targetId) {
+            const parties = record.parties || [];
+            const uniqueParticipants = new Set();
+            parties.forEach(p => {
+                if (p.leader) uniqueParticipants.add(p.leader);
+                (p.members || []).forEach(m => { if (m) uniqueParticipants.add(m); });
+            });
+
+            const isParticipated = uniqueParticipants.has(targetId);
+            const memberCount = uniqueParticipants.size;
+            const details = extractItemDetailsFromRecord(record);
+            const grossTotal = details.reduce((acc, cur) => acc + (Number(cur.price) || 0), 0);
+            const taxRate = record.clan_tax_rate !== undefined && record.clan_tax_rate !== null
+                ? Number(record.clan_tax_rate)
+                : currentTaxRate;
+
+            const netPool = Math.floor(grossTotal * (1 - taxRate / 100));
+            const myShare = (isParticipated && memberCount > 0 && netPool > 0)
+                ? Math.floor(netPool / memberCount)
+                : 0;
+
+            return {
+                isParticipated,
+                memberCount,
+                details,
+                grossTotal,
+                netPool,
+                myShare
+            };
+        }
+
+        async function reloadProfileAndHistory() {
+            const targetId = getTargetMemberId();
+            renderProfileCard(targetId);
+
+            const monthVal = document.getElementById('historyMonth').value;
+            const res = await fetch(`/api/raids?month=${monthVal}`);
+            monthRaidsCache = await res.json();
+
+            renderAllHistoryViews();
+        }
+
+        function renderAllHistoryViews() {
+            const targetId = getTargetMemberId();
+            const monthVal = document.getElementById('historyMonth').value;
+            const dateVal = document.getElementById('historyDate').value;
+
+            document.getElementById('selectedHistoryDateLabel').textContent = dateVal;
+            document.getElementById('monthLabelDaily').textContent = monthVal;
+            document.getElementById('monthLabelWeekly').textContent = monthVal;
+
+            // 1. 선택한 날짜의 16개 원형 보스탐 표시 & 타임별 개별 분배금 테이블
+            const dayRecords = monthRaidsCache.filter(r => r.raid_date === dateVal);
+            const circleGrid = document.getElementById('myCircleTimeGrid');
+            circleGrid.innerHTML = '';
+
+            let dayPartCount = 0;
+            const individualRowsHtml = [];
+
+            raidTimes.forEach(t => {
+                const record = dayRecords.find(r => r.raid_time === t);
+                let participated = false;
+
+                if (record) {
+                    const info = analyzeRaidForMember(record, targetId);
+                    participated = info.isParticipated;
+
+                    if (participated) {
+                        dayPartCount++;
+                        const itemsSummary = info.details.length > 0
+                            ? info.details.map(d => `${d.name}${d.price > 0 ? `(${d.price.toLocaleString()})` : ''}`).join(', ')
+                            : '득템 없음';
+
+                        individualRowsHtml.push(`
+                            <tr>
+                                <td style="color: var(--accent-gold); font-weight: 800;">${t}</td>
+                                <td>${info.memberCount}명</td>
+                                <td>${itemsSummary}</td>
+                                <td style="color: #34d399; font-weight: 700;">${info.netPool.toLocaleString()} 아데나</td>
+                                <td style="color: var(--accent-gold); font-weight: 900; font-size: 0.98rem;">${info.myShare.toLocaleString()} 아데나</td>
+                            </tr>
+                        `);
+                    }
+                }
+
+                const circle = document.createElement('div');
+                circle.className = `my-time-circle ${participated ? 'participated' : ''}`;
+                circle.innerHTML = t.replace('(', '<br>(');
+                circleGrid.appendChild(circle);
+            });
+
+            document.getElementById('dayParticipatedCount').textContent = dayPartCount;
+
+            const indBody = document.getElementById('dailyIndividualShareBody');
+            if (individualRowsHtml.length === 0) {
+                indBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">선택한 날짜(${dateVal})에 참여한 보스탐 기록이 없습니다.</td></tr>`;
+            } else {
+                const dayTotalShare = dayRecords.reduce((acc, r) => acc + analyzeRaidForMember(r, targetId).myShare, 0);
+                indBody.innerHTML = individualRowsHtml.join('') + `
+                    <tr style="background: rgba(245, 158, 11, 0.12);">
+                        <td colspan="4" style="text-align: right; font-weight: 800; color: var(--text-light);">선택일 내 분배금 총합계:</td>
+                        <td style="font-weight: 900; color: var(--accent-gold); font-size: 1.02rem;">${dayTotalShare.toLocaleString()} 아데나</td>
+                    </tr>
+                `;
+            }
+
+            // 2. 월 전체 기준 일별 분배금 합산표 & 주별 분배금 합산표 계산
+            const dailyMap = {};   // { "2026-11-14": { count: 2, share: 35000 } }
+            const weeklyMap = { 1: { count: 0, share: 0 }, 2: { count: 0, share: 0 }, 3: { count: 0, share: 0 }, 4: { count: 0, share: 0 }, 5: { count: 0, share: 0 } };
+            let monthPartTotal = 0;
+            let monthShareTotal = 0;
+
+            monthRaidsCache.forEach(r => {
+                const info = analyzeRaidForMember(r, targetId);
+                if (!info.isParticipated) return;
+
+                monthPartTotal++;
+                monthShareTotal += info.myShare;
+
+                if (!dailyMap[r.raid_date]) {
+                    dailyMap[r.raid_date] = { count: 0, share: 0 };
+                }
+                dailyMap[r.raid_date].count += 1;
+                dailyMap[r.raid_date].share += info.myShare;
+
+                // 날짜의 일(day) 기준 1~5주차 산정 (1~7일: 1주, 8~14일: 2주, 15~21일: 3주, 22~28일: 4주, 29일~: 5주)
+                const dayNum = parseInt(r.raid_date.slice(8, 10), 10);
+                const weekNum = Math.min(5, Math.ceil(dayNum / 7));
+                weeklyMap[weekNum].count += 1;
+                weeklyMap[weekNum].share += info.myShare;
+            });
+
+            document.getElementById('monthParticipatedCount').textContent = monthPartTotal;
+
+            // 일별 합산표 렌더링
+            const sortedDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
+            const dailyBody = document.getElementById('dailySummaryTableBody');
+            if (sortedDates.length === 0) {
+                dailyBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">해당 월 참여 내역이 없습니다.</td></tr>`;
+            } else {
+                dailyBody.innerHTML = sortedDates.map(d => `
+                    <tr style="cursor: pointer;" onclick="document.getElementById('historyDate').value='${d}'; onHistoryDateChange();">
+                        <td style="font-weight: 700;">${d}</td>
+                        <td>${dailyMap[d].count}회</td>
+                        <td style="color: var(--accent-gold); font-weight: 800;">${dailyMap[d].share.toLocaleString()} 아데나</td>
+                    </tr>
+                `).join('') + `
+                    <tr style="background: rgba(16, 185, 129, 0.12);">
+                        <td style="font-weight: 800;">월 총합계</td>
+                        <td style="font-weight: 800;">${monthPartTotal}회</td>
+                        <td style="color: #34d399; font-weight: 900;">${monthShareTotal.toLocaleString()} 아데나</td>
+                    </tr>
+                `;
+            }
+
+            // 주별 합산표 렌더링
+            const weeklyBody = document.getElementById('weeklySummaryTableBody');
+            const weekLabels = {
+                1: "1주차 (1일 ~ 7일)",
+                2: "2주차 (8일 ~ 14일)",
+                3: "3주차 (15일 ~ 21일)",
+                4: "4주차 (22일 ~ 28일)",
+                5: "5주차 (29일 ~ 말일)"
+            };
+            weeklyBody.innerHTML = [1, 2, 3, 4, 5].map(w => `
+                <tr>
+                    <td style="font-weight: 700;">${weekLabels[w]}</td>
+                    <td>${weeklyMap[w].count}회</td>
+                    <td style="color: var(--accent-gold); font-weight: 800;">${weeklyMap[w].share.toLocaleString()} 아데나</td>
+                </tr>
+            `).join('') + `
+                <tr style="background: rgba(16, 185, 129, 0.12);">
+                    <td style="font-weight: 800;">월 총합계</td>
+                    <td style="font-weight: 800;">${monthPartTotal}회</td>
+                    <td style="color: #34d399; font-weight: 900;">${monthShareTotal.toLocaleString()} 아데나</td>
+                </tr>
+            `;
+        }
+    </script>
+</body>
+</html>

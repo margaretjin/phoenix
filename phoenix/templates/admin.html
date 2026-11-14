@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>회원관리 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/style.css?v=6">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="/raid-record" class="nav-link">보스탐 기록</a>
+            <a href="/raid-status" class="nav-link">일별기록현황</a>
+            <a href="/item-status" class="nav-link">템 보유현황</a>
+            <a href="/my-history" class="nav-link" id="navMyId">참여내역</a>
+        </div>
+        <div class="nav-right">
+            <span id="navUserInfo" style="color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; margin-right: 0.4rem;"></span>
+            <button id="adminModeBtn" onclick="toggleAdminMode()" class="admin-mode-toggle hidden">👑 관리자 모드: OFF</button>
+            <a href="/admin" class="nav-link admin-btn active" id="navAdminBtn">회원관리</a>
+            <button onclick="logoutUser()" class="btn" style="padding: 0.3rem 0.6rem; background: #334155; color: #fff; font-size: 0.8rem;">로그아웃</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- 관리자 모드 OFF 안내 배너 -->
+        <div id="adminOffWarning" class="card hidden" style="border-color: var(--accent-gold); text-align: center;">
+            <p style="color: var(--accent-gold); font-weight: 800; font-size: 1rem;">
+                🔒 현재 [관리자 모드: OFF] 상태입니다. 회원 추가·수정·삭제 및 비밀번호 초기화를 하려면 우측 상단의 [👑 관리자 모드] 버튼을 켜주세요.
+            </p>
+        </div>
+
+        <!-- 관리자 모드 ON 전용: 신규 혈맹원 추가 / 수정 폼 -->
+        <div id="memberFormCard" class="card hidden">
+            <h2 class="section-title" id="formTitle">➕ 혈맹원 추가 / 수정</h2>
+            <input type="hidden" id="editMemberId">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.8rem; margin-bottom: 1rem;">
+                <div>
+                    <label>고유 아이디 (UID)</label>
+                    <input type="text" id="memUniqueId" placeholder="예: UID_004">
+                </div>
+                <div>
+                    <label>사용중인 아이디 (캐릭터명)</label>
+                    <input type="text" id="memActiveId" placeholder="예: 투헤븐">
+                </div>
+                <div>
+                    <label>클래스</label>
+                    <select id="memClass">
+                        <option value="기사">기사</option>
+                        <option value="요정">요정</option>
+                        <option value="법사">법사</option>
+                        <option value="군주">군주</option>
+                        <option value="다크엘프">다크엘프</option>
+                    </select>
+                </div>
+                <div>
+                    <label>혈맹</label>
+                    <select id="memClan">
+                        <option value="피닉스">피닉스</option>
+                        <option value="미가입">미가입</option>
+                        <option value="보류">보류</option>
+                    </select>
+                </div>
+                <div>
+                    <label>권한</label>
+                    <select id="memRole">
+                        <option value="일반회원">일반회원</option>
+                        <option value="관리자">관리자</option>
+                        <option value="슈퍼관리자">슈퍼관리자</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label>스킬 보유</label>
+                <div id="memSkills" class="skill-chips"></div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-green" onclick="saveMember()">저장하기</button>
+                <button class="btn" style="background: #475569; color: #fff;" onclick="resetMemberForm()">입력 초기화</button>
+            </div>
+        </div>
+
+        <!-- 혈맹원 전체 목록 -->
+        <div class="card">
+            <h2 class="section-title">👥 등록된 혈맹원 명단</h2>
+            <div style="display: flex; align-items: flex-end; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 220px;">
+                    <label for="memberSearchInput">회원 아이디 검색 (캐릭터명 / 고유 아이디)</label>
+                    <input type="search" id="memberSearchInput" placeholder="예: 월은 또는 UID_001" oninput="renderMembersTable()">
+                </div>
+                <span id="memberSearchResultCount" style="color: var(--text-muted); font-size: 0.85rem; padding-bottom: 0.6rem;"></span>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>캐릭터명</th>
+                            <th>클래스</th>
+                            <th>스킬 보유</th>
+                            <th>혈맹</th>
+                            <th>권한</th>
+                            <th>이메일</th>
+                            <th>비밀번호 상태</th>
+                            <th id="memberActionHeader" class="hidden">관리 (수정/삭제/비밀번호 재설정)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="memberTableBody">
+                        <tr><td colspan="7" style="text-align: center;">조회 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentUser = null;
+        let hasAdminPrivilege = false;
+        let isAdminModeOn = false;
+        let membersList = [];
+        const MEMBER_SKILLS = {
+            기사: ['스턴', '리덕', '솔캐', '바운스', '카베', '투망'],
+            요정: ['소울', '트리플', '왕바람', '왕어스', '씽', '게일', '어바', '똥물', '캔슬', '투망'],
+            법사: ['뮨', '캔슬', '미티어', '라톰', '파톰', '블리자드', '인비지', '투망']
+        };
+
+        window.onload = async () => {
+            document.getElementById('memClass').addEventListener('change', () => renderSkillOptions());
+            renderSkillOptions();
+            const saved = localStorage.getItem('clan_user');
+            if (!saved) {
+                window.location.href = '/login';
+                return;
+            }
+            currentUser = JSON.parse(saved);
+            const roleStr = (currentUser.role || '').trim();
+            hasAdminPrivilege = roleStr === '관리자' || roleStr === '슈퍼관리자';
+
+            if (!hasAdminPrivilege) {
+                alert('관리자 권한이 없습니다.');
+                window.location.href = '/raid-record';
+                return;
+            }
+
+            isAdminModeOn = localStorage.getItem('clan_admin_mode') === 'true';
+            document.getElementById('navMyId').textContent = `(${currentUser.active_id})참여내역`;
+            document.getElementById('navUserInfo').textContent = `${currentUser.active_id} (${roleStr})`;
+            document.getElementById('adminModeBtn').classList.remove('hidden');
+
+            applyAdminModeUI();
+            await loadMembers();
+        };
+
+        function toggleAdminMode() {
+            if (!hasAdminPrivilege) return;
+            isAdminModeOn = !isAdminModeOn;
+            localStorage.setItem('clan_admin_mode', isAdminModeOn ? 'true' : 'false');
+            applyAdminModeUI();
+            renderMembersTable();
+        }
+
+        function applyAdminModeUI() {
+            const toggleBtn = document.getElementById('adminModeBtn');
+            const warningCard = document.getElementById('adminOffWarning');
+            const formCard = document.getElementById('memberFormCard');
+            const actionHeader = document.getElementById('memberActionHeader');
+
+            if (isAdminModeOn) {
+                toggleBtn.textContent = '👑 관리자 모드: ON';
+                toggleBtn.classList.add('active');
+                warningCard.classList.add('hidden');
+                formCard.classList.remove('hidden');
+                actionHeader.classList.remove('hidden');
+            } else {
+                toggleBtn.textContent = '👑 관리자 모드: OFF';
+                toggleBtn.classList.remove('active');
+                warningCard.classList.remove('hidden');
+                formCard.classList.add('hidden');
+                actionHeader.classList.add('hidden');
+            }
+        }
+
+        function logoutUser() {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                localStorage.removeItem('clan_user');
+                localStorage.removeItem('clan_admin_mode');
+                window.location.href = '/login';
+            }
+        }
+
+        async function loadMembers() {
+            const res = await fetch('/api/auth/search-members');
+            membersList = await res.json();
+            renderMembersTable();
+        }
+
+        function renderMembersTable() {
+            const tbody = document.getElementById('memberTableBody');
+            const keyword = document.getElementById('memberSearchInput').value.trim().toLowerCase();
+            const filteredMembers = membersList.filter(m => {
+                if (!keyword) return true;
+                return [m.active_id, m.unique_id]
+                    .some(value => String(value || '').toLowerCase().includes(keyword));
+            });
+            document.getElementById('memberSearchResultCount').textContent = `${filteredMembers.length}명`;
+
+            if (filteredMembers.length === 0) {
+                const columnCount = isAdminModeOn ? 8 : 7;
+                tbody.innerHTML = `<tr><td colspan="${columnCount}" style="text-align: center; color: var(--text-muted);">검색 결과가 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filteredMembers.map(m => {
+                const pwBadge = m.has_password
+                    ? `<span style="color: var(--accent-green); font-weight: 700;">설정됨</span>`
+                    : `<span style="color: var(--accent-gold); font-weight: 700;">미설정(초기화됨)</span>`;
+                const skills = Array.isArray(m.skills) ? m.skills.join(', ') : (m.skills || '');
+
+                const actionBtns = isAdminModeOn ? `
+                    <td>
+                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                            <button class="btn btn-blue" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="editMember(${m.id})">수정</button>
+                            <button class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: var(--accent-gold); color: #000;" onclick="clearMemberPassword(${m.id}, '${m.active_id}')">비밀번호 재설정</button>
+                            <button class="btn btn-red" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteMember(${m.id}, '${m.active_id}')">삭제</button>
+                        </div>
+                    </td>
+                ` : '';
+
+                return `
+                    <tr>
+                        <td style="font-weight: 800;">${m.active_id}</td>
+                        <td>${m.char_class}</td>
+                        <td>${skills || '-'}</td>
+                        <td>${m.clan}</td>
+                        <td>${m.role}</td>
+                        <td>${m.google_email || '-'}</td>
+                        <td>${pwBadge}</td>
+                        ${actionBtns}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function editMember(id) {
+            if (!isAdminModeOn) return;
+            const m = membersList.find(x => x.id === id);
+            if (!m) return;
+            document.getElementById('editMemberId').value = m.id;
+            document.getElementById('memUniqueId').value = m.unique_id;
+            document.getElementById('memActiveId').value = m.active_id;
+            document.getElementById('memClass').value = m.char_class;
+            const skills = Array.isArray(m.skills) ? m.skills : String(m.skills || '').split(',').map(skill => skill.trim()).filter(Boolean);
+            renderSkillOptions(skills);
+            document.getElementById('memClan').value = m.clan;
+            document.getElementById('memRole').value = m.role;
+            document.getElementById('formTitle').textContent = `✏️ [${m.active_id}] 정보 수정`;
+        }
+
+        function resetMemberForm() {
+            document.getElementById('editMemberId').value = '';
+            document.getElementById('memUniqueId').value = '';
+            document.getElementById('memActiveId').value = '';
+            renderSkillOptions();
+            document.getElementById('formTitle').textContent = '➕ 혈맹원 추가 / 수정';
+        }
+
+        function renderSkillOptions(selectedSkills = []) {
+            const skillContainer = document.getElementById('memSkills');
+            skillContainer.replaceChildren();
+            const skills = MEMBER_SKILLS[document.getElementById('memClass').value] || [];
+
+            if (skills.length === 0) {
+                skillContainer.textContent = '이 클래스는 선택 가능한 스킬이 없습니다.';
+                return;
+            }
+
+            skills.forEach(skill => {
+                const label = document.createElement('label');
+                label.style.display = 'inline-flex';
+                label.style.alignItems = 'center';
+                label.style.gap = '0.25rem';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'memberSkill';
+                checkbox.value = skill;
+                checkbox.checked = selectedSkills.includes(skill);
+                label.className = 'skill-chip';
+                if (checkbox.checked) label.classList.add('selected');
+                checkbox.addEventListener('change', () => label.classList.toggle('selected', checkbox.checked));
+                const skillName = document.createElement('span');
+                skillName.textContent = skill;
+                label.append(checkbox, skillName);
+                skillContainer.appendChild(label);
+            });
+        }
+
+        async function saveMember() {
+            if (!isAdminModeOn) return;
+            const editId = document.getElementById('editMemberId').value;
+            const payload = {
+                unique_id: document.getElementById('memUniqueId').value.trim(),
+                active_id: document.getElementById('memActiveId').value.trim(),
+                char_class: document.getElementById('memClass').value,
+                clan: document.getElementById('memClan').value,
+                role: document.getElementById('memRole').value,
+                skills: [...document.querySelectorAll('#memSkills input[name="memberSkill"]:checked')].map(input => input.value),
+                requester_role: (currentUser.role || '').trim()
+            };
+
+            if (!payload.unique_id || !payload.active_id) {
+                return alert('고유 아이디와 캐릭터명을 입력해 주세요.');
+            }
+
+            const url = editId ? `/api/admin/members/${editId}` : '/api/admin/members';
+            const method = editId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                alert('저장되었습니다.');
+                resetMemberForm();
+                await loadMembers();
+            } else {
+                const err = await res.json();
+                alert(err.detail || '저장 중 오류가 발생했습니다.');
+            }
+        }
+
+        async function clearMemberPassword(memberId, activeId) {
+            if (!isAdminModeOn) return;
+            if (!confirm(`[${activeId}] 회원의 비밀번호를 지우시겠습니까?\n지운 후 해당 회원이 로그인할 때 새 비밀번호를 직접 입력하여 저장하게 됩니다.`)) return;
+
+            const res = await fetch(`/api/auth/reset-password/${memberId}?requester_role=${encodeURIComponent((currentUser.role || '').trim())}`, {
+                method: 'POST'
+            });
+
+            if (res.ok) {
+                alert(`[${activeId}] 회원의 비밀번호가 초기화되었습니다.`);
+                await loadMembers();
+            } else {
+                const err = await res.json();
+                alert(err.detail || '비밀번호 초기화 중 오류가 발생했습니다.');
+            }
+        }
+
+        async function deleteMember(memberId, activeId) {
+            if (!isAdminModeOn) return;
+            if (!confirm(`[${activeId}] 회원을 명단에서 삭제하시겠습니까?`)) return;
+
+            const requesterRole = encodeURIComponent((currentUser.role || '').trim());
+            const res = await fetch(`/api/admin/members/${memberId}?requester_role=${requesterRole}`, { method: 'DELETE' });
+            if (res.ok) {
+                alert('삭제되었습니다.');
+                await loadMembers();
+            } else {
+                const err = await res.json();
+                alert(err.detail || '회원 삭제 중 오류가 발생했습니다.');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>일별기록현황 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/style.css?v=5">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="/raid-record" class="nav-link">보스탐 기록</a>
+            <a href="/raid-status" class="nav-link active">일별기록현황</a>
+            <a href="/item-status" class="nav-link">템 보유현황</a>
+            <a href="/my-history" class="nav-link" id="navMyId">참여내역</a>
+        </div>
+        <div class="nav-right">
+            <span id="navUserInfo" style="color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; margin-right: 0.4rem;"></span>
+            <button id="adminModeBtn" onclick="toggleAdminMode()" class="admin-mode-toggle hidden">👑 관리자 모드: OFF</button>
+            <a href="/admin" class="nav-link admin-btn hidden" id="navAdminBtn">회원관리</a>
+            <button onclick="logoutUser()" class="btn" style="padding: 0.35rem 0.65rem; background: #334155; color: #fff; font-size: 0.82rem;">로그아웃</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- 1. 첫 번째 블록: 월별 선택 + 혈비 공제율 + 달력 펼치기/닫기 -->
+        <div class="card" style="margin-bottom: 1rem;">
+            <div class="week-selector-row" style="margin-bottom: 0;">
+                <input type="month" id="statusMonth" onchange="onMonthChange()" style="width: auto; font-weight: 700;">
+
+                <div class="tax-setting-box">
+                    <span style="color: var(--text-light); font-weight: 700;">💰 혈비 공제율:</span>
+                    <span id="taxRateDisplay" style="color: var(--accent-gold); font-weight: 800;">20%</span>
+                    <span id="superAdminTaxEditor" style="display: none; align-items: center; gap: 0.3rem; margin-left: 0.3rem;">
+                        <input type="number" id="taxRateInput" min="0" max="100" step="1" style="width: 55px; padding: 0.15rem 0.3rem; font-size: 0.8rem;">%
+                        <button type="button" class="btn btn-green" style="padding: 0.15rem 0.45rem; font-size: 0.75rem;" onclick="saveTaxRate()">저장</button>
+                    </span>
+                </div>
+
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 0.6rem;">
+                    <span id="selectedDateFullText" style="font-size: 0.9rem; color: var(--accent-gold); font-weight: 800;"></span>
+                    <button type="button" id="toggleCalendarBtn" class="btn" style="padding: 0.3rem 0.7rem; background: #334155; color: #fff; font-size: 0.8rem;" onclick="toggleCalendarSection()">
+                        달력 닫기 ▲
+                    </button>
+                </div>
+            </div>
+
+            <!-- 달력 펼치기/닫기 래퍼 -->
+            <div id="calendarCollapsibleArea" style="margin-top: 0.85rem;">
+                <div class="calendar-header-row">
+                    <div class="sun">일</div>
+                    <div>월</div>
+                    <div>화</div>
+                    <div>수</div>
+                    <div>목</div>
+                    <div>금</div>
+                    <div class="sat">토</div>
+                </div>
+                <div id="fullCalendarGrid" class="full-calendar-grid"></div>
+            </div>
+        </div>
+
+        <!-- 2. 두 번째 블록: 그날 총 득한 아이템과 득템한 시간 (펼치기 / 감추기) -->
+        <div class="card" style="margin-bottom: 1rem;">
+            <div class="summary-toggle-header" onclick="toggleDailyDropSummary()">
+                <span style="font-weight: 800; color: var(--accent-gold); font-size: 1rem;">
+                    🎁 해당 일자 총 득템 현황 (<span id="dailyDropCount">0</span>건)
+                </span>
+                <button type="button" id="toggleSummaryBtn" class="btn" style="padding: 0.25rem 0.7rem; background: #334155; color: #fff; font-size: 0.8rem;">
+                    펼치기 ▼
+                </button>
+            </div>
+            <div id="dailyDropSummaryBody" class="hidden" style="margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px solid var(--border-color); font-size: 0.92rem; line-height: 1.8;">
+                조회 중...
+            </div>
+        </div>
+
+        <!-- 3. 세 번째 블록: 16개 보스탐 동그라미(8개씩 2줄) + 하단 2열 상세 내역 -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
+                <h3 class="section-title" style="margin-bottom: 0; font-size: 1.05rem;">⏱️ 보스탐 시간별 상세 현황</h3>
+                <button id="statusDeleteRaidBtn" class="btn btn-red hidden" style="padding: 0.3rem 0.75rem; font-size: 0.8rem;" onclick="deleteCurrentTimeRaid()">🗑️ 이 시간 기록 전체 삭제</button>
+            </div>
+
+            <div id="circleTimeGrid" class="circle-time-grid"></div>
+
+            <!-- 관리자 모드 ON일 때 노출되는 빠른 아이템 목록(띄어쓰기 구분) 일괄 입력/저장 바 -->
+            <div id="statusAdminItemBar" class="hidden" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.12); border: 1px solid var(--accent-gold); border-radius: 8px; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <span style="color: var(--accent-gold); font-weight: 700; font-size: 0.85rem;">👑 [관리자 모드] 득템 일괄 입력:</span>
+                <input type="text" id="statusDroppedItemsInput" placeholder="예: 축젤 발터모 (띄어쓰기로 한 번에 입력)" style="flex: 1; min-width: 180px; padding: 0.35rem 0.6rem;">
+                <button type="button" class="btn btn-green" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;" onclick="saveDroppedItemsFromStatus()">저장</button>
+                <button type="button" class="btn btn-red" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;" onclick="clearAllDroppedItemsFromStatus()">전체삭제</button>
+            </div>
+
+            <div class="raid-detail-two-col">
+                <!-- 왼쪽 열: 득템 아이템 -->
+                <div class="detail-col-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+                        <span style="font-weight: 800; color: var(--accent-gold);">💎 득템 아이템 (<span id="detailSelectedTimeLabel">-</span>)</span>
+                        <button type="button" id="btnShowAddSingleItem" class="btn btn-green hidden" style="padding: 0.2rem 0.55rem; font-size: 0.75rem;" onclick="toggleAddSingleItemBox()">+ 아이템 추가</button>
+                    </div>
+
+                    <div id="addSingleItemBox" class="inline-add-box hidden">
+                        <div style="font-size: 0.78rem; color: var(--accent-gold); font-weight: 700; margin-bottom: 0.35rem;">➕ 누락 아이템 개별 추가</div>
+                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                            <input type="text" id="newSingleItemName" placeholder="아이템명 (예: 축젤)" style="flex: 1; min-width: 100px; padding: 0.28rem 0.45rem; font-size: 0.82rem;">
+                            <input type="number" id="newSingleItemPrice" placeholder="가격(아데나)" style="width: 105px; padding: 0.28rem 0.45rem; font-size: 0.82rem;">
+                            <button type="button" class="btn btn-green" style="padding: 0.28rem 0.6rem; font-size: 0.78rem;" onclick="addSingleItemToRaid()">추가저장</button>
+                        </div>
+                    </div>
+
+                    <div id="detailPoolSummaryBox" class="pool-summary-box hidden">
+                        <div>• 총액: <b id="totalGrossAdena" style="color: var(--accent-gold);">0 아데나</b></div>
+                        <div>• 혈비(<span id="appliedTaxRateLabel">20</span>%) 제외 총액: <b id="totalNetAdena" style="color: #34d399;">0 아데나</b></div>
+                    </div>
+
+                    <div id="detailItemsArea" style="font-size: 0.95rem; color: var(--text-light);">
+                        득템 내역이 없습니다.
+                    </div>
+                </div>
+
+                <!-- 오른쪽 열: 참여 혈맹원 -->
+                <div class="detail-col-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+                        <span style="font-weight: 800; color: #a7f3d0;">👥 참여 혈맹원 (<span id="detailMemberCount">0</span>명)</span>
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <span id="detailPerPersonBadge" style="font-size: 0.8rem; color: var(--accent-gold); font-weight: 800;"></span>
+                            <button type="button" id="btnShowAddMember" class="btn btn-green hidden" style="padding: 0.2rem 0.55rem; font-size: 0.75rem;" onclick="toggleAddMemberBox()">+ 인원 추가</button>
+                        </div>
+                    </div>
+
+                    <div id="addMemberBox" class="inline-add-box hidden">
+                        <div style="font-size: 0.78rem; color: #a7f3d0; font-weight: 700; margin-bottom: 0.35rem;">➕ 누락 참여 혈맹원 검색 추가</div>
+                        <div style="display: flex; gap: 0.35rem; align-items: center;">
+                            <input type="text" id="addMemberSearchInput" placeholder="추가할 혈맹원 아이디 검색" oninput="filterAddMemberCandidates()" style="flex: 1; padding: 0.28rem 0.45rem; font-size: 0.82rem;">
+                            <button type="button" class="btn btn-green" style="padding: 0.28rem 0.6rem; font-size: 0.78rem;" onclick="addSelectedMemberToRaid()">추가</button>
+                        </div>
+                        <div id="addMemberCandidates" class="winner-search-chips"></div>
+                    </div>
+
+                    <div id="detailMembersArea" style="font-size: 0.95rem; color: var(--text-light);">
+                        시간을 선택해 주세요.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentUser = null;
+        let hasAdminPrivilege = false;
+        let isSuperAdmin = false;
+        let isAdminModeOn = false;
+        let currentTaxRate = 20;
+        let raidTimes = [];
+        let allMembers = [];
+        let selectedDateStr = "";
+        let selectedTime = "09시";
+        let monthRaidsData = [];
+        let dayRaidsData = [];
+        let isSummaryOpen = false;
+        let isCalendarOpen = true;
+        let activeItemDetails = [];
+
+        window.onload = async () => {
+            const saved = localStorage.getItem('clan_user');
+            if (!saved) {
+                window.location.href = '/login';
+                return;
+            }
+            currentUser = JSON.parse(saved);
+            const roleStr = (currentUser.role || '').trim();
+            isSuperAdmin = roleStr === '슈퍼관리자';
+            hasAdminPrivilege = roleStr === '관리자' || isSuperAdmin;
+            isAdminModeOn = hasAdminPrivilege && (localStorage.getItem('clan_admin_mode') === 'true');
+
+            document.getElementById('navMyId').textContent = `${currentUser.active_id} 참여내역`;
+            document.getElementById('navUserInfo').textContent = `${currentUser.active_id} (${roleStr})`;
+
+            if (hasAdminPrivilege) {
+                document.getElementById('adminModeBtn').classList.remove('hidden');
+            }
+
+            applyAdminModeUI();
+
+            const [timeRes, taxRes, memRes] = await Promise.all([
+                fetch('/api/raids/times'),
+                fetch('/api/raids/tax-rate'),
+                fetch('/api/auth/search-members')
+            ]);
+            raidTimes = (await timeRes.json()).times;
+            currentTaxRate = (await taxRes.json()).tax_rate ?? 20;
+            allMembers = await memRes.json();
+            updateTaxRateUI();
+
+            if (raidTimes.length > 0) selectedTime = raidTimes[0];
+
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            document.getElementById('statusMonth').value = `${yyyy}-${mm}`;
+            selectedDateStr = formatYMD(now);
+
+            await refreshMonthAndDay();
+        };
+
+        function toggleCalendarSection() {
+            isCalendarOpen = !isCalendarOpen;
+            const area = document.getElementById('calendarCollapsibleArea');
+            const btn = document.getElementById('toggleCalendarBtn');
+            if (isCalendarOpen) {
+                area.classList.remove('hidden');
+                btn.textContent = '달력 닫기 ▲';
+            } else {
+                area.classList.add('hidden');
+                btn.textContent = '달력 펼치기 ▼';
+            }
+        }
+
+        function toggleAdminMode() {
+            if (!hasAdminPrivilege) return;
+            isAdminModeOn = !isAdminModeOn;
+            localStorage.setItem('clan_admin_mode', isAdminModeOn ? 'true' : 'false');
+            applyAdminModeUI();
+            renderSelectedTimeDetail();
+        }
+
+        function applyAdminModeUI() {
+            const toggleBtn = document.getElementById('adminModeBtn');
+            const navAdminBtn = document.getElementById('navAdminBtn');
+            const taxEditor = document.getElementById('superAdminTaxEditor');
+            const itemBar = document.getElementById('statusAdminItemBar');
+            const btnShowAddItem = document.getElementById('btnShowAddSingleItem');
+            const btnShowAddMember = document.getElementById('btnShowAddMember');
+
+            if (isAdminModeOn) {
+                toggleBtn.textContent = '👑 관리자 모드: ON';
+                toggleBtn.classList.add('active');
+                navAdminBtn.classList.remove('hidden');
+                itemBar.classList.remove('hidden');
+                btnShowAddItem.classList.remove('hidden');
+                btnShowAddMember.classList.remove('hidden');
+                taxEditor.style.display = isSuperAdmin ? 'inline-flex' : 'none';
+            } else {
+                toggleBtn.textContent = '👑 관리자 모드: OFF';
+                toggleBtn.classList.remove('active');
+                navAdminBtn.classList.add('hidden');
+                itemBar.classList.add('hidden');
+                btnShowAddItem.classList.add('hidden');
+                btnShowAddMember.classList.add('hidden');
+                document.getElementById('addSingleItemBox').classList.add('hidden');
+                document.getElementById('addMemberBox').classList.add('hidden');
+                taxEditor.style.display = 'none';
+            }
+        }
+
+        function updateTaxRateUI() {
+            document.getElementById('taxRateDisplay').textContent = `${currentTaxRate}%`;
+            document.getElementById('taxRateInput').value = currentTaxRate;
+        }
+
+        async function saveTaxRate() {
+            if (!isSuperAdmin || !isAdminModeOn) return alert('최종관리자(관리자 모드 ON)만 수정할 수 있습니다.');
+            const val = parseFloat(document.getElementById('taxRateInput').value);
+            if (isNaN(val) || val < 0 || val > 100) return alert('0~100 사이의 올바른 숫자를 입력해 주세요.');
+
+            const res = await fetch('/api/raids/tax-rate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tax_rate: val, requester_role: (currentUser.role || '').trim() })
+            });
+
+            if (res.ok) {
+                currentTaxRate = val;
+                updateTaxRateUI();
+                alert(`혈비 공제율이 ${val}%로 저장되었습니다.`);
+                renderDailyDropSummary();
+                renderSelectedTimeDetail();
+            }
+        }
+
+        function logoutUser() {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                localStorage.removeItem('clan_user');
+                localStorage.removeItem('clan_admin_mode');
+                window.location.href = '/login';
+            }
+        }
+
+        function formatYMD(d) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        async function onMonthChange() {
+            const val = document.getElementById('statusMonth').value;
+            if (!val) return;
+            selectedDateStr = `${val}-01`;
+            await refreshMonthAndDay();
+        }
+
+        async function refreshMonthAndDay() {
+            const monthVal = document.getElementById('statusMonth').value;
+            if (!monthVal) return;
+
+            const res = await fetch(`/api/raids?month=${monthVal}`);
+            monthRaidsData = await res.json();
+
+            renderFullMonthCalendar();
+            filterAndRenderDay();
+        }
+
+        function renderFullMonthCalendar() {
+            const monthVal = document.getElementById('statusMonth').value;
+            const [year, monthNum] = monthVal.split('-').map(Number);
+            const monthIndex = monthNum - 1;
+
+            document.getElementById('selectedDateFullText').textContent = `선택 날짜: ${selectedDateStr}`;
+
+            const firstDay = new Date(year, monthIndex, 1);
+            const lastDay = new Date(year, monthIndex + 1, 0);
+
+            const startSunday = new Date(firstDay);
+            startSunday.setDate(firstDay.getDate() - firstDay.getDay());
+
+            const datesWithRecords = new Set(
+                monthRaidsData
+                    .filter(r => (r.parties && r.parties.length > 0) || (r.dropped_items && r.dropped_items.trim() !== ''))
+                    .map(r => r.raid_date)
+            );
+
+            const grid = document.getElementById('fullCalendarGrid');
+            grid.innerHTML = '';
+
+            let cursor = new Date(startSunday);
+            while (cursor <= lastDay || cursor.getDay() !== 0) {
+                const ymd = formatYMD(cursor);
+                const dayOfWeek = cursor.getDay();
+                const isCurrentMonth = cursor.getMonth() === monthIndex;
+
+                const cell = document.createElement('div');
+                let classes = ['cal-day-cell'];
+                if (dayOfWeek === 0) classes.push('sun');
+                if (dayOfWeek === 6) classes.push('sat');
+                if (!isCurrentMonth) classes.push('other-month');
+                if (ymd === selectedDateStr) classes.push('selected');
+
+                cell.className = classes.join(' ');
+                const dotHtml = datesWithRecords.has(ymd) ? `<span class="cal-day-dot"></span>` : '';
+                cell.innerHTML = `<span>${cursor.getDate()}</span>${dotHtml}`;
+
+                cell.onclick = () => {
+                    selectedDateStr = ymd;
+                    if (!isCurrentMonth) {
+                        document.getElementById('statusMonth').value = ymd.slice(0, 7);
+                        refreshMonthAndDay();
+                    } else {
+                        renderFullMonthCalendar();
+                        filterAndRenderDay();
+                    }
+                };
+                grid.appendChild(cell);
+
+                cursor.setDate(cursor.getDate() + 1);
+                if (cursor > lastDay && cursor.getDay() === 0) break;
+            }
+        }
+
+        function filterAndRenderDay() {
+            dayRaidsData = monthRaidsData.filter(r => r.raid_date === selectedDateStr);
+            renderDailyDropSummary();
+            renderCircleTimeGrid();
+            renderSelectedTimeDetail();
+        }
+
+        function toggleDailyDropSummary() {
+            isSummaryOpen = !isSummaryOpen;
+            const body = document.getElementById('dailyDropSummaryBody');
+            const btn = document.getElementById('toggleSummaryBtn');
+            if (isSummaryOpen) {
+                body.classList.remove('hidden');
+                btn.textContent = '감추기 ▲';
+            } else {
+                body.classList.add('hidden');
+                btn.textContent = '펼치기 ▼';
+            }
+        }
+
+        function extractItemDetailsFromRecord(record) {
+            if (!record) return [];
+            const rawTokens = (record.dropped_items || '').split(/[\s,，\n]+/).map(s => s.trim()).filter(Boolean);
+            const savedDetails = Array.isArray(record.item_details) ? record.item_details : [];
+            const legacyPrices = record.item_prices || {};
+
+            if (savedDetails.length > 0 && rawTokens.length === 0) {
+                return savedDetails.map(d => ({
+                    name: d.name || '',
+                    price: Number(d.price || 0),
+                    winner: d.winner || '',
+                    taken_date: d.taken_date || ''
+                }));
+            }
+
+            const usedIdx = new Set();
+            return rawTokens.map(token => {
+                let found = null;
+                for (let i = 0; i < savedDetails.length; i++) {
+                    if (!usedIdx.has(i) && savedDetails[i].name === token) {
+                        found = savedDetails[i];
+                        usedIdx.add(i);
+                        break;
+                    }
+                }
+                const fallbackPrice = legacyPrices[token] !== undefined ? Number(legacyPrices[token]) : 0;
+                return {
+                    name: token,
+                    price: found ? Number(found.price || 0) : fallbackPrice,
+                    winner: found ? (found.winner || '') : '',
+                    taken_date: found ? (found.taken_date || '') : ''
+                };
+            });
+        }
+
+        function renderDailyDropSummary() {
+            const summaryBody = document.getElementById('dailyDropSummaryBody');
+            const countSpan = document.getElementById('dailyDropCount');
+
+            const dropEntries = [];
+            let dailyGrossTotal = 0;
+
+            dayRaidsData.forEach(r => {
+                const details = extractItemDetailsFromRecord(r);
+                details.forEach(d => {
+                    dailyGrossTotal += (d.price || 0);
+                    const priceText = d.price > 0 ? ` <span style="color:var(--accent-gold); font-weight:700;">${d.price.toLocaleString()} 아데나</span>` : '';
+                    const winnerText = d.winner ? ` <span style="color:#a7f3d0; font-weight:700;">${d.winner}</span>` : '';
+                    const dateSub = d.taken_date ? ` <small style="color:var(--text-muted);">(${d.taken_date})</small>` : '';
+                    dropEntries.push({ time: r.raid_time, html: `${d.name}${priceText}${winnerText}${dateSub}` });
+                });
+            });
+
+            countSpan.textContent = dropEntries.length;
+
+            if (dropEntries.length === 0) {
+                summaryBody.innerHTML = `<span style="color: var(--text-muted);">해당 날짜에 등록된 득템 내역이 없습니다.</span>`;
+            } else {
+                const dailyNetTotal = Math.floor(dailyGrossTotal * (1 - currentTaxRate / 100));
+                const headerTotals = `
+                    <div style="margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px dashed var(--border-color);">
+                        • 당일 총액: <b style="color:var(--accent-gold);">${dailyGrossTotal.toLocaleString()} 아데나</b> &nbsp;|&nbsp;
+                        혈비(${currentTaxRate}%) 제외 총액: <b style="color:#34d399;">${dailyNetTotal.toLocaleString()} 아데나</b>
+                    </div>
+                `;
+                summaryBody.innerHTML = headerTotals + dropEntries.map(e => 
+                    `<div>• <b style="color:var(--accent-gold);">[${e.time}]</b> ${e.html}</div>`
+                ).join('');
+            }
+        }
+
+        function renderCircleTimeGrid() {
+            const grid = document.getElementById('circleTimeGrid');
+            grid.innerHTML = '';
+
+            raidTimes.forEach(t => {
+                const record = dayRaidsData.find(r => r.raid_time === t);
+                const hasParties = record && record.parties && record.parties.length > 0;
+                const details = extractItemDetailsFromRecord(record);
+                const hasDrop = details.length > 0;
+
+                const circle = document.createElement('div');
+                let classes = ['time-circle'];
+                if (hasParties || hasDrop) classes.push('has-record');
+                if (hasDrop) classes.push('has-drop');
+                if (t === selectedTime) classes.push('selected');
+
+                circle.className = classes.join(' ');
+                circle.innerHTML = t.replace('(', '<br>(');
+                circle.onclick = () => {
+                    selectedTime = t;
+                    renderCircleTimeGrid();
+                    renderSelectedTimeDetail();
+                };
+                grid.appendChild(circle);
+            });
+        }
+
+        function renderSelectedTimeDetail() {
+            document.getElementById('detailSelectedTimeLabel').textContent = selectedTime;
+            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
+
+            const membersArea = document.getElementById('detailMembersArea');
+            const itemsArea = document.getElementById('detailItemsArea');
+            const memberCountSpan = document.getElementById('detailMemberCount');
+            const poolSummaryBox = document.getElementById('detailPoolSummaryBox');
+            const perPersonBadge = document.getElementById('detailPerPersonBadge');
+            const delRaidBtn = document.getElementById('statusDeleteRaidBtn');
+            const dropInput = document.getElementById('statusDroppedItemsInput');
+
+            if (!record) {
+                delRaidBtn.classList.add('hidden');
+                poolSummaryBox.classList.add('hidden');
+                dropInput.value = '';
+                activeItemDetails = [];
+                memberCountSpan.textContent = '0';
+                perPersonBadge.textContent = '';
+                membersArea.innerHTML = `<span style="color: var(--text-muted);">참여 기록이 없습니다.</span>`;
+                itemsArea.innerHTML = `<span style="color: var(--text-muted);">득템 내역이 없습니다.</span>`;
+                return;
+            }
+
+            if (isAdminModeOn) delRaidBtn.classList.remove('hidden');
+            else delRaidBtn.classList.add('hidden');
+
+            activeItemDetails = extractItemDetailsFromRecord(record);
+            dropInput.value = activeItemDetails.map(d => d.name).join(' ');
+
+            const totalItemPrice = activeItemDetails.reduce((acc, cur) => acc + (Number(cur.price) || 0), 0);
+            const distributableAmount = Math.floor(totalItemPrice * (1 - currentTaxRate / 100));
+
+            if (activeItemDetails.length > 0) {
+                poolSummaryBox.classList.remove('hidden');
+                document.getElementById('totalGrossAdena').textContent = `${totalItemPrice.toLocaleString()} 아데나`;
+                document.getElementById('appliedTaxRateLabel').textContent = currentTaxRate;
+                document.getElementById('totalNetAdena').textContent = `${distributableAmount.toLocaleString()} 아데나`;
+            } else {
+                poolSummaryBox.classList.add('hidden');
+            }
+
+            const parties = record.parties || [];
+            const orderedParticipants = [];
+            const seenIds = new Set();
+
+            parties.forEach(p => {
+                const leader = p.leader;
+                if (leader && !seenIds.has(leader)) {
+                    seenIds.add(leader);
+                    orderedParticipants.push({ id: leader, isLeader: true });
+                }
+                (p.members || []).forEach(m => {
+                    if (m && !seenIds.has(m)) {
+                        seenIds.add(m);
+                        orderedParticipants.push({ id: m, isLeader: false });
+                    }
+                });
+            });
+
+            const totalMembersCount = orderedParticipants.length;
+            memberCountSpan.textContent = totalMembersCount;
+
+            const perPersonShare = (totalMembersCount > 0 && distributableAmount > 0)
+                ? Math.floor(distributableAmount / totalMembersCount)
+                : 0;
+
+            perPersonBadge.textContent = perPersonShare > 0 ? `1인당 ${perPersonShare.toLocaleString()} 아데나` : '';
+
+            if (activeItemDetails.length === 0) {
+                itemsArea.innerHTML = `<span style="color: var(--text-muted);">득템 내역이 없습니다.</span>`;
+            } else {
+                itemsArea.innerHTML = activeItemDetails.map((item, idx) => {
+                    const priceFormatted = item.price > 0 ? `${Number(item.price).toLocaleString()} 아데나` : '가격 미입력';
+                    const winnerFormatted = item.winner ? item.winner : '';
+                    const takenDateLine = item.taken_date
+                        ? `<div class="item-taken-date-sub">↳ 가져간 날: ${item.taken_date}</div>`
+                        : '';
+
+                    if (!isAdminModeOn) {
+                        return `
+                            <div class="item-detail-card">
+                                <div class="item-view-main-line">
+                                    <span class="item-view-name">${item.name}</span>
+                                    <span class="item-view-price">${priceFormatted}</span>
+                                    <span class="item-view-winner">${winnerFormatted}</span>
+                                </div>
+                                ${takenDateLine}
+                            </div>
+                        `;
+                    } else {
+                        const hasWinner = Boolean(item.winner);
+                        return `
+                            <div class="item-detail-card">
+                                <div class="item-view-main-line" style="margin-bottom: 0.25rem;">
+                                    <span class="item-view-name">${item.name}</span>
+                                    <span class="item-view-price">${priceFormatted}</span>
+                                    <span class="item-view-winner">${winnerFormatted}</span>
+                                </div>
+                                ${takenDateLine}
+
+                                <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem;">
+                                    <span style="font-size: 0.78rem; color: var(--text-muted); width: 48px;">💰 가격:</span>
+                                    <input type="number" id="itemPrice_${idx}" value="${item.price > 0 ? item.price : ''}" placeholder="아데나 입력" style="width: 120px; padding: 0.25rem 0.45rem; font-size: 0.82rem;">
+                                    <button type="button" class="btn btn-green" style="padding: 0.25rem 0.55rem; font-size: 0.76rem;" onclick="saveItemPriceOnly(${record.id}, ${idx})">${item.price > 0 ? '가격수정' : '가격저장'}</button>
+                                    <button type="button" class="btn btn-red" style="padding: 0.25rem 0.55rem; font-size: 0.76rem;" onclick="deleteSingleItemDetail(${record.id}, ${idx})">아이템삭제</button>
+                                </div>
+
+                                <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem;">
+                                    <span style="font-size: 0.78rem; color: var(--text-muted); width: 48px;">👑 구매:</span>
+                                    <input type="text" id="winnerSearch_${idx}" value="${item.winner}" placeholder="혈원 검색/외판" oninput="filterWinnerCandidates(${idx})" style="width: 100px; padding: 0.25rem 0.45rem; font-size: 0.82rem;">
+                                    <input type="date" id="takenDate_${idx}" value="${item.taken_date}" style="width: 120px; padding: 0.2rem 0.35rem; font-size: 0.76rem;">
+                                    <button type="button" class="btn btn-blue" style="padding: 0.25rem 0.55rem; font-size: 0.76rem;" onclick="saveItemWinnerOnly(${record.id}, ${idx})">${hasWinner ? '당첨자수정' : '당첨자저장'}</button>
+                                    <button type="button" class="btn btn-red" style="padding: 0.25rem 0.55rem; font-size: 0.76rem;" ${hasWinner ? '' : 'disabled'} onclick="deleteItemWinnerOnly(${record.id}, ${idx})">당첨자삭제</button>
+                                </div>
+                                <div id="winnerCandidates_${idx}" class="winner-search-chips"></div>
+                            </div>
+                        `;
+                    }
+                }).join('');
+            }
+
+            if (totalMembersCount === 0) {
+                membersArea.innerHTML = `<span style="color: var(--text-muted);">참여 인원이 없습니다.</span>`;
+            } else {
+                membersArea.innerHTML = orderedParticipants.map(member => {
+                    const nameHtml = member.isLeader
+                        ? `<span style="color: #a7f3d0; font-weight: 800;">${member.id}</span>`
+                        : `<span style="color: var(--text-light); font-weight: 600;">${member.id}</span>`;
+                    const shareHtml = perPersonShare > 0
+                        ? `<span class="member-share-badge">${perPersonShare.toLocaleString()} 아데나</span>`
+                        : `<span style="color: var(--text-muted); font-size: 0.82rem;">-</span>`;
+
+                    const deleteMemberBtn = isAdminModeOn
+                        ? `<button type="button" class="btn btn-red" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; margin-left: 0.4rem;" onclick="removeMemberFromRaid('${member.id}')">삭제</button>`
+                        : '';
+
+                    return `
+                        <div class="member-share-row">
+                            ${nameHtml}
+                            <div style="display: flex; align-items: center;">
+                                ${shareHtml}
+                                ${deleteMemberBtn}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        function toggleAddSingleItemBox() {
+            if (!isAdminModeOn) return;
+            document.getElementById('addSingleItemBox').classList.toggle('hidden');
+        }
+
+        async function addSingleItemToRaid() {
+            if (!isAdminModeOn) return;
+            const itemName = document.getElementById('newSingleItemName').value.trim();
+            const itemPrice = Number(document.getElementById('newSingleItemPrice').value.trim() || 0);
+            if (!itemName) return alert('추가할 아이템명을 입력해 주세요.');
+
+            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
+            const updatedDetails = [
+                ...activeItemDetails,
+                { name: itemName, price: itemPrice, winner: '', taken_date: '' }
+            ];
+            const droppedStr = updatedDetails.map(d => d.name).join(' ');
+
+            if (!record) {
+                const createRes = await fetch('/api/raids', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        raid_date: selectedDateStr,
+                        raid_time: selectedTime,
+                        parties: [],
+                        dropped_items: droppedStr,
+                        requester_role: (currentUser.role || '').trim(),
+                        requester_id: currentUser.active_id
+                    })
+                });
+                if (!createRes.ok) return alert('저장 중 오류가 발생했습니다.');
+                const createdData = (await createRes.json()).data;
+
+                await fetch('/api/raids/item-details', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        raid_id: createdData.id,
+                        item_details: updatedDetails,
+                        requester_role: (currentUser.role || '').trim()
+                    })
+                });
+            } else {
+                const res = await fetch('/api/raids/item-details', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        raid_id: record.id,
+                        item_details: updatedDetails,
+                        requester_role: (currentUser.role || '').trim()
+                    })
+                });
+                if (!res.ok) return alert('아이템 추가 중 오류가 발생했습니다.');
+            }
+
+            document.getElementById('newSingleItemName').value = '';
+            document.getElementById('newSingleItemPrice').value = '';
+            document.getElementById('addSingleItemBox').classList.add('hidden');
+            alert(`[${itemName}] 아이템이 추가되었습니다.`);
+            await refreshMonthAndDay();
+        }
+
+        function toggleAddMemberBox() {
+            if (!isAdminModeOn) return;
+            document.getElementById('addMemberBox').classList.toggle('hidden');
+        }
+
+        function filterAddMemberCandidates() {
+            const inputVal = document.getElementById('addMemberSearchInput').value.trim();
+            const container = document.getElementById('addMemberCandidates');
+            container.innerHTML = '';
+            if (!inputVal) return;
+
+            const matched = allMembers.filter(m => m.active_id.includes(inputVal)).slice(0, 8);
+            matched.forEach(m => {
+                const chip = document.createElement('span');
+                chip.className = 'winner-chip';
+                chip.textContent = m.active_id;
+                chip.onclick = () => {
+                    document.getElementById('addMemberSearchInput').value = m.active_id;
+                    container.innerHTML = '';
+                };
+                container.appendChild(chip);
+            });
+        }
+
+        async function addSelectedMemberToRaid() {
+            if (!isAdminModeOn) return;
+            const memberId = document.getElementById('addMemberSearchInput').value.trim();
+            if (!memberId) return alert('추가할 혈맹원 아이디를 입력해 주세요.');
+
+            const validMember = allMembers.find(m => m.active_id === memberId);
+            if (!validMember) return alert('등록된 혈맹원 명단에 없는 아이디입니다.');
+
+            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
+            const parties = record ? (record.parties || []) : [];
+            const alreadyIn = parties.some(p => p.leader === memberId || (p.members || []).includes(memberId));
+            if (alreadyIn) return alert(`[${memberId}] 님은 이미 참여 명단에 등록되어 있습니다.`);
+
+            let targetPartyPayload;
+            if (parties.length > 0) {
+                const firstParty = parties[0];
+                const newMembers = Array.from(new Set([firstParty.leader, ...(firstParty.members || []), memberId]));
+                targetPartyPayload = [{ leader: firstParty.leader, members: newMembers }];
+            } else {
+                targetPartyPayload = [{ leader: memberId, members: [memberId] }];
+            }
+
+            const res = await fetch('/api/raids', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_date: selectedDateStr,
+                    raid_time: selectedTime,
+                    parties: targetPartyPayload,
+                    dropped_items: record ? (record.dropped_items || '') : '',
+                    requester_role: (currentUser.role || '').trim(),
+                    requester_id: currentUser.active_id
+                })
+            });
+
+            if (res.ok) {
+                document.getElementById('addMemberSearchInput').value = '';
+                document.getElementById('addMemberCandidates').innerHTML = '';
+                document.getElementById('addMemberBox').classList.add('hidden');
+                alert(`[${memberId}] 님이 참여 명단에 추가되었습니다.`);
+                await refreshMonthAndDay();
+            }
+        }
+
+        function filterWinnerCandidates(idx) {
+            const inputVal = document.getElementById(`winnerSearch_${idx}`).value.trim();
+            const container = document.getElementById(`winnerCandidates_${idx}`);
+            container.innerHTML = '';
+            if (!inputVal) return;
+
+            // 외판 원클릭 선택 칩 + 혈맹원 검색 결과
+            const extChip = document.createElement('span');
+            extChip.className = 'winner-chip';
+            extChip.style.background = '#1d4ed8';
+            extChip.textContent = '🌐 외판';
+            extChip.onclick = () => {
+                document.getElementById(`winnerSearch_${idx}`).value = '외판';
+                const dateInput = document.getElementById(`takenDate_${idx}`);
+                if (!dateInput.value) dateInput.value = formatYMD(new Date());
+                container.innerHTML = '';
+            };
+            container.appendChild(extChip);
+
+            const matched = allMembers.filter(m => m.active_id.includes(inputVal)).slice(0, 7);
+            matched.forEach(m => {
+                const chip = document.createElement('span');
+                chip.className = 'winner-chip';
+                chip.textContent = m.active_id;
+                chip.onclick = () => {
+                    document.getElementById(`winnerSearch_${idx}`).value = m.active_id;
+                    const dateInput = document.getElementById(`takenDate_${idx}`);
+                    if (!dateInput.value) dateInput.value = formatYMD(new Date());
+                    container.innerHTML = '';
+                };
+                container.appendChild(chip);
+            });
+        }
+
+        async function saveItemPriceOnly(raidId, idx) {
+            if (!isAdminModeOn) return;
+            const priceVal = Number(document.getElementById(`itemPrice_${idx}`).value.trim() || 0);
+            activeItemDetails[idx].price = priceVal;
+
+            const res = await fetch('/api/raids/item-details', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_id: raidId,
+                    item_details: activeItemDetails,
+                    requester_role: (currentUser.role || '').trim()
+                })
+            });
+
+            if (res.ok) {
+                alert(`[${activeItemDetails[idx].name}] 가격이 저장되었습니다.`);
+                await refreshMonthAndDay();
+            }
+        }
+
+        async function saveItemWinnerOnly(raidId, idx) {
+            if (!isAdminModeOn) return;
+            const winnerVal = document.getElementById(`winnerSearch_${idx}`).value.trim();
+            let dateVal = document.getElementById(`takenDate_${idx}`).value;
+
+            if (!winnerVal) return alert('구매자(혈원 아이디 또는 외판)를 입력해 주세요.');
+            if (!dateVal) dateVal = formatYMD(new Date());
+
+            activeItemDetails[idx].winner = winnerVal;
+            activeItemDetails[idx].taken_date = dateVal;
+
+            const res = await fetch('/api/raids/item-details', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_id: raidId,
+                    item_details: activeItemDetails,
+                    requester_role: (currentUser.role || '').trim()
+                })
+            });
+
+            if (res.ok) {
+                alert(`[${activeItemDetails[idx].name}] 당첨/구매자(${winnerVal})가 저장되었습니다.`);
+                await refreshMonthAndDay();
+            }
+        }
+
+        async function deleteItemWinnerOnly(raidId, idx) {
+            if (!isAdminModeOn) return;
+            const targetItem = activeItemDetails[idx];
+            if (!targetItem || !targetItem.winner) return;
+            if (!confirm(`[${targetItem.name}]의 당첨자(${targetItem.winner}) 기록을 삭제하시겠습니까?`)) return;
+
+            activeItemDetails[idx].winner = '';
+            activeItemDetails[idx].taken_date = '';
+
+            const res = await fetch('/api/raids/item-details', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_id: raidId,
+                    item_details: activeItemDetails,
+                    requester_role: (currentUser.role || '').trim()
+                })
+            });
+
+            if (res.ok) {
+                alert(`[${targetItem.name}] 당첨자 정보가 삭제되었습니다.`);
+                await refreshMonthAndDay();
+            }
+        }
+
+        async function deleteSingleItemDetail(raidId, idx) {
+            if (!isAdminModeOn) return;
+            const targetItem = activeItemDetails[idx];
+            if (!targetItem) return;
+            if (!confirm(`[${targetItem.name}] 아이템 자체를 삭제하시겠습니까?`)) return;
+
+            activeItemDetails.splice(idx, 1);
+
+            const res = await fetch('/api/raids/item-details', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_id: raidId,
+                    item_details: activeItemDetails,
+                    requester_role: (currentUser.role || '').trim()
+                })
+            });
+
+            if (res.ok) {
+                alert(`[${targetItem.name}] 아이템이 삭제되었습니다.`);
+                await refreshMonthAndDay();
+            }
+        }
+
+        async function saveDroppedItemsFromStatus() {
+            if (!isAdminModeOn) return;
+            const dropped_items = document.getElementById('statusDroppedItemsInput').value.trim();
+
+            const res = await fetch('/api/raids', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_date: selectedDateStr,
+                    raid_time: selectedTime,
+                    parties: [],
+                    dropped_items: dropped_items,
+                    requester_role: (currentUser.role || '').trim(),
+                    requester_id: currentUser.active_id
+                })
+            });
+
+            if (res.ok) {
+                alert('아이템 목록이 저장되었습니다.');
+                await refreshMonthAndDay();
+            }
+        }
+
+        async function clearAllDroppedItemsFromStatus() {
+            if (!isAdminModeOn) return;
+            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
+            if (!record) return;
+            if (!confirm(`[${selectedTime}]의 모든 득템 아이템을 삭제하시겠습니까?`)) return;
+
+            const res = await fetch('/api/raids/item-details', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_id: record.id,
+                    item_details: [],
+                    requester_role: (currentUser.role || '').trim()
+                })
+            });
+
+            if (res.ok) {
+                alert('모든 아이템이 삭제되었습니다.');
+                await refreshMonthAndDay();
+            }
+        }
+
+        async function removeMemberFromRaid(memberId) {
+            if (!isAdminModeOn) return;
+            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
+            if (!record) return;
+            if (!confirm(`[${memberId}] 님을 이 시간 참여 명단에서 삭제하시겠습니까?`)) return;
+
+            const parties = record.parties || [];
+            for (const p of parties) {
+                const updatedMembers = (p.members || []).filter(m => m !== memberId);
+                if (updatedMembers.length === 0) {
+                    await fetch(`/api/raids/party?date=${selectedDateStr}&time=${encodeURIComponent(selectedTime)}&leader=${encodeURIComponent(p.leader)}&role=${encodeURIComponent((currentUser.role || '').trim())}`, {
+                        method: 'DELETE'
+                    });
+                } else if (updatedMembers.length !== (p.members || []).length) {
+                    if (p.leader === memberId) {
+                        await fetch(`/api/raids/party?date=${selectedDateStr}&time=${encodeURIComponent(selectedTime)}&leader=${encodeURIComponent(p.leader)}&role=${encodeURIComponent((currentUser.role || '').trim())}`, {
+                            method: 'DELETE'
+                        });
+                        await fetch('/api/raids', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                raid_date: selectedDateStr,
+                                raid_time: selectedTime,
+                                parties: [{ leader: updatedMembers[0], members: updatedMembers }],
+                                dropped_items: record.dropped_items || '',
+                                requester_role: (currentUser.role || '').trim(),
+                                requester_id: currentUser.active_id
+                            })
+                        });
+                    } else {
+                        await fetch('/api/raids', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                raid_date: selectedDateStr,
+                                raid_time: selectedTime,
+                                parties: [{ leader: p.leader, members: updatedMembers }],
+                                dropped_items: record.dropped_items || '',
+                                requester_role: (currentUser.role || '').trim(),
+                                requester_id: currentUser.active_id
+                            })
+                        });
+                    }
+                }
+            }
+
+            alert(`[${memberId}] 님이 명단에서 삭제되었습니다.`);
+            await refreshMonthAndDay();
+        }
+
+        async function deleteCurrentTimeRaid() {
+            if (!isAdminModeOn) return;
+            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
+            if (!record) return;
+            if (!confirm(`[${selectedDateStr} ${selectedTime}] 기록 전체를 삭제하시겠습니까?`)) return;
+
+            const res = await fetch(`/api/raids/${record.id}?role=${encodeURIComponent((currentUser.role || '').trim())}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                alert('삭제되었습니다.');
+                await refreshMonthAndDay();
+            }
+        }
+    </script>
+</body>
+</html>
