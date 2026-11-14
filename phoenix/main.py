@@ -1,6 +1,6 @@
 from pathlib import Path
-
 from fastapi import FastAPI, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -8,9 +8,12 @@ from fastapi.templating import Jinja2Templates
 from routers import auth_router, raid_router, admin_router
 
 app = FastAPI(title="혈맹 보스탐 체크기")
+
+# 서버 응답 압축 최적화 (모바일 로딩 속도 향상)
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 BASE_DIR = Path(__file__).resolve().parent
 
-# 정적 파일(CSS 등) 및 HTML 템플릿 연결
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
@@ -19,7 +22,6 @@ app.include_router(auth_router.router)
 app.include_router(raid_router.router)
 app.include_router(admin_router.router)
 
-# 기본 접속 시 로그인 또는 보스탐 기록 페이지로 이동
 @app.get("/")
 async def root():
     return RedirectResponse(url="/login")
@@ -39,6 +41,10 @@ async def raid_status_page(request: Request):
 @app.get("/item-status", response_class=HTMLResponse)
 async def item_status_page(request: Request):
     return templates.TemplateResponse(request, "item_status.html", {})
+
+@app.get("/distribution", response_class=HTMLResponse)
+async def distribution_page(request: Request):
+    return templates.TemplateResponse(request, "distribution.html", {})
 
 @app.get("/my-history", response_class=HTMLResponse)
 async def my_history_page(request: Request):

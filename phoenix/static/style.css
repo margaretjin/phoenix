@@ -1,567 +1,8 @@
 :root {
-    --bg-main: #0f172a;
+    --bg-dark: #0f172a;
     --bg-card: #1e293b;
     --bg-input: #090d16;
     --border-color: #334155;
-    --accent-gold: #f59e0b;
-    --accent-green: #10b981;
-    --accent-red: #ef4444;
-    --accent-blue: #3b82f6;
-    --text-light: #f8fafc;
-    --text-muted: #94a3b8;
-}
-
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
-
-body {
-    background-color: var(--bg-main);
-    color: var(--text-light);
-    min-height: 100vh;
-}
-
-/* 상단 네비게이션 박스 (좌측/우측 분리) */
-.navbar {
-    background-color: var(--bg-card);
-    border-bottom: 1px solid var(--border-color);
-    padding: 0.85rem 1.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}
-
-.nav-left, .nav-right {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-}
-
-.nav-link {
-    text-decoration: none;
-    color: var(--text-light);
-    background-color: #334155;
-    padding: 0.5rem 0.9rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    transition: 0.15s;
-}
-
-.nav-link:hover, .nav-link.active {
-    background-color: var(--accent-gold);
-    color: #000;
-}
-
-.nav-link.admin-btn {
-    border: 1px solid var(--accent-gold);
-}
-
-.container {
-    max-width: 1100px;
-    margin: 1.5rem auto;
-    padding: 0 1rem;
-}
-
-.card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.section-title {
-    color: var(--accent-gold);
-    font-size: 1.25rem;
-    font-weight: 700;
-    margin-bottom: 1rem;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-label {
-    display: block;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-bottom: 0.35rem;
-}
-
-input, select, textarea {
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    background-color: var(--bg-input);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-light);
-    font-size: 0.9rem;
-}
-
-/* 16개 보스탐 타임 클릭박스 그리드 */
-.time-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
-    gap: 0.5rem;
-    margin: 0.75rem 0 1.25rem 0;
-}
-
-.time-box {
-    background-color: var(--bg-input);
-    border: 1px solid var(--border-color);
-    color: var(--text-light);
-    padding: 0.65rem;
-    text-align: center;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 0.85rem;
-}
-
-.time-box.selected {
-    background-color: var(--accent-gold);
-    color: #000;
-    border-color: var(--accent-gold);
-}
-
-/* 버튼 공통 */
-.btn {
-    padding: 0.65rem 1.2rem;
-    border-radius: 6px;
-    border: none;
-    font-weight: 700;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.btn-primary { background-color: var(--accent-gold); color: #000; }
-.btn-blue { background-color: var(--accent-blue); color: #fff; }
-.btn-green { background-color: var(--accent-green); color: #000; }
-.btn-red { background-color: var(--accent-red); color: #fff; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* OCR 판독 토큰 칩 (일치: 초록 / 불일치: 빨강 클릭 보정) */
-.token-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-    padding: 1rem;
-    background-color: var(--bg-input);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    min-height: 60px;
-}
-
-.ocr-token {
-    padding: 0.4rem 0.75rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.ocr-token.matched {
-    background-color: rgba(16, 185, 129, 0.2);
-    border: 1px solid var(--accent-green);
-    color: #6ee7b7;
-}
-
-.ocr-token.unmatched {
-    background-color: rgba(239, 68, 68, 0.25);
-    border: 2px solid var(--accent-red);
-    color: #fca5a5;
-    cursor: pointer;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.03); }
-}
-
-/* 근접 아이디 선택 모달 */
-.modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.75);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-}
-
-.modal-content {
-    background: var(--bg-card);
-    border: 1px solid var(--accent-gold);
-    border-radius: 10px;
-    padding: 1.5rem;
-    width: 90%;
-    max-width: 420px;
-}
-
-/* 기술 체크박스 칩 */
-.skill-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.6rem;
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-}
-
-.skill-chip {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    background: #1e293b;
-    padding: 0.35rem 0.65rem;
-    border: 1px solid transparent;
-    border-radius: 5px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.skill-chip input { width: auto; }
-
-.skill-chip:hover {
-    border-color: var(--accent-gold);
-}
-
-.skill-chip.selected {
-    background: rgba(245, 158, 11, 0.18);
-    border-color: var(--accent-gold);
-    color: var(--accent-gold);
-    font-weight: 700;
-}
-
-.skill-chip:focus-within {
-    outline: 2px solid var(--accent-gold);
-    outline-offset: 2px;
-}
-
-/* 테이블 스타일 */
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-th, td { padding: 0.7rem; border-bottom: 1px solid var(--border-color); text-align: left; }
-th { color: var(--accent-gold); background-color: var(--bg-input); }
-.badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
-.badge-super { background: #dc2626; color: #fff; }
-.badge-admin { background: var(--accent-gold); color: #000; }
-.badge-user { background: #475569; color: #fff; }
-.hidden { display: none !important; }
-
-/* =========================================================
-   보스탐 기록 페이지 (raid_record.html) 전용 스타일 분리
-   ========================================================= */
-.party-card {
-    background: rgba(15, 23, 42, 0.7);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.85rem 1rem;
-    margin-bottom: 0.6rem;
-    font-size: 1.15rem;
-    line-height: 1.6;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-}
-
-.party-text-line {
-    color: var(--text-light);
-    font-weight: 600;
-    word-break: break-all;
-}
-
-.party-leader-soft-green {
-    color: #a7f3d0;
-    font-weight: 800;
-}
-
-.admin-action-btns {
-    display: flex;
-    gap: 0.4rem;
-    flex-shrink: 0;
-}
-
-/* 보스탐 시간 박스 상태별 컬러 구분 */
-.time-box {
-    position: relative;
-    transition: all 0.15s ease;
-}
-
-.time-box.available-slot {
-    background: #475569;
-    border-color: #94a3b8;
-    color: #ffffff;
-}
-
-.time-box.completed-slot {
-    border: 1.5px solid #34d399;
-}
-
-.time-box.completed-slot::after {
-    content: '✔';
-    position: absolute;
-    top: 2px;
-    right: 5px;
-    font-size: 0.7rem;
-    color: #34d399;
-    font-weight: 900;
-}
-
-.time-box.future-slot {
-    background: #0f172a;
-    border-color: #1e293b;
-    color: #475569;
-    cursor: not-allowed;
-    opacity: 0.55;
-}
-
-.time-box.selected {
-    background: var(--accent-gold) !important;
-    color: #000 !important;
-    border-color: #fef08a !important;
-    font-weight: 800;
-}
-
-.time-box.selected.completed-slot::after {
-    color: #064e3b;
-}
-
-/* 일반회원용 전날/오늘 버튼 스타일 */
-.day-toggle-btn {
-    flex: 1;
-    padding: 0.6rem;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    background: #1e293b;
-    color: var(--text-muted);
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.day-toggle-btn.active {
-    background: var(--accent-gold);
-    color: #000;
-    border-color: var(--accent-gold);
-}
-
-/* 달력 아이콘 클릭 영역 확보 */
-input[type="month"], input[type="date"] {
-    cursor: pointer;
-    color-scheme: dark;
-}
-
-/* =========================================================
-   보스탐기록현황 페이지 (raid_status.html) 전용 스타일
-   ========================================================= */
-.week-selector-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.8rem;
-    flex-wrap: wrap;
-}
-
-.week-nav-box {
-    display: inline-flex;
-    align-items: center;
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.35rem 0.6rem;
-    gap: 0.5rem;
-}
-
-.week-arrow-btn {
-    background: #334155;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 0.2rem 0.55rem;
-    cursor: pointer;
-    font-weight: 800;
-    font-size: 0.85rem;
-}
-
-.week-arrow-btn:hover {
-    background: var(--accent-gold);
-    color: #000;
-}
-
-.weekday-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 0.4rem;
-}
-
-.weekday-btn {
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.55rem 0.2rem;
-    text-align: center;
-    cursor: pointer;
-    color: var(--text-light);
-    font-weight: 700;
-    font-size: 0.9rem;
-    transition: all 0.15s ease;
-}
-
-.weekday-btn.sun { color: #f87171; }
-.weekday-btn.sat { color: #60a5fa; }
-.weekday-btn.other-month { opacity: 0.35; }
-
-.weekday-btn.selected {
-    background: var(--accent-gold) !important;
-    color: #000 !important;
-    border-color: var(--accent-gold) !important;
-}
-
-.weekday-date-sub {
-    font-size: 0.72rem;
-    font-weight: 500;
-    margin-left: 2px;
-    opacity: 0.9;
-}
-
-.summary-toggle-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    user-select: none;
-}
-
-/* 보스탐 16개 타임 동그라미 (8개씩 2줄) */
-.circle-time-grid {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 0.6rem;
-    justify-items: center;
-    margin: 1rem 0;
-}
-
-.time-circle {
-    width: 62px;
-    height: 62px;
-    border-radius: 50%;
-    background: #1e293b;
-    border: 2px solid var(--border-color);
-    color: var(--text-muted);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.78rem;
-    font-weight: 700;
-    cursor: pointer;
-    text-align: center;
-    line-height: 1.15;
-    transition: all 0.15s ease;
-}
-
-.time-circle.has-record {
-    border-color: #34d399;
-    color: var(--text-light);
-    background: rgba(52, 211, 153, 0.12);
-}
-
-.time-circle.has-drop {
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
-}
-
-.time-circle.selected {
-    background: var(--accent-gold) !important;
-    color: #000 !important;
-    border-color: #fef08a !important;
-    transform: scale(1.06);
-}
-
-/* 하단 2열 상세 레이아웃 */
-.raid-detail-two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-.detail-col-box {
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1rem;
-}
-
-.item-price-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    gap: 0.5rem;
-}
-
-.item-price-row:last-child {
-    border-bottom: none;
-}
-
-.member-share-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.35rem 0.5rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    font-size: 0.92rem;
-}
-
-.member-share-badge {
-    color: var(--accent-gold);
-    font-weight: 800;
-    font-size: 0.88rem;
-}
-
-.tax-setting-box {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: rgba(245, 158, 11, 0.12);
-    border: 1px solid var(--accent-gold);
-    padding: 0.3rem 0.65rem;
-    border-radius: 6px;
-    font-size: 0.82rem;
-}
-
-@media (max-width: 640px) {
-    .circle-time-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-:root {
-    --bg-dark: #0f172a;
-    --bg-card: #1e293b;
-    --bg-input: #0f172a;
-    --border-color: #334155;
     --text-light: #f8fafc;
     --text-muted: #94a3b8;
     --accent-gold: #f59e0b;
@@ -574,6 +15,7 @@ input[type="month"], input[type="date"] {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -581,28 +23,32 @@ body {
     color: var(--text-light);
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     line-height: 1.5;
+    min-height: 100vh;
 }
 
 .hidden {
     display: none !important;
 }
 
-/* 상단 네비게이션 바 */
+/* 상단 네비게이션 바 (모바일 가로 스크롤 및 터치 최적화) */
 .navbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: #020617;
     border-bottom: 1px solid var(--border-color);
-    padding: 0.75rem 1.5rem;
+    padding: 0.7rem 1.2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    gap: 0.6rem;
     flex-wrap: wrap;
-    gap: 0.5rem;
 }
 
 .nav-left, .nav-right {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.45rem;
     flex-wrap: wrap;
 }
 
@@ -610,10 +56,12 @@ body {
     color: var(--text-muted);
     text-decoration: none;
     font-weight: 700;
-    font-size: 0.92rem;
-    padding: 0.4rem 0.75rem;
+    font-size: 0.88rem;
+    padding: 0.42rem 0.75rem;
     border-radius: 6px;
+    background: #1e293b;
     transition: all 0.15s ease;
+    white-space: nowrap;
 }
 
 .nav-link:hover, .nav-link.active {
@@ -633,57 +81,62 @@ body {
 
 /* 관리자 모드 ON/OFF 토글 스위치 */
 .admin-mode-toggle {
-    padding: 0.35rem 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    height: 34px;
+    padding: 0 0.8rem;
     border-radius: 6px;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     font-weight: 800;
     cursor: pointer;
-    border: 1px solid var(--border-color);
+    border: 1px solid #475569;
     background: #1e293b;
     color: var(--text-muted);
-    transition: all 0.15s ease;
+    white-space: nowrap;
 }
 
 .admin-mode-toggle.active {
     background: var(--accent-gold);
     color: #000;
     border-color: #fef08a;
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.45);
 }
 
 /* 레이아웃 공통 */
 .container {
-    max-width: 980px;
-    margin: 1.5rem auto;
-    padding: 0 1rem;
+    max-width: 1060px;
+    margin: 1.2rem auto;
+    padding: 0 0.85rem;
 }
 
 .card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 10px;
-    padding: 1.4rem;
-    margin-bottom: 1.2rem;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
 }
 
 .section-title {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     font-weight: 800;
     color: var(--accent-gold);
-    margin-bottom: 1rem;
+    margin-bottom: 0.9rem;
 }
 
 label {
     display: block;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--text-muted);
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.3rem;
     font-weight: 600;
 }
 
-input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="month"], input[type="date"], select, textarea {
+input, select, textarea {
     width: 100%;
-    padding: 0.6rem 0.75rem;
+    padding: 0.58rem 0.7rem;
     background: var(--bg-input);
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -696,13 +149,20 @@ input[type="month"], input[type="date"] {
     color-scheme: dark;
 }
 
+/* 버튼 공통 */
 .btn {
     border: none;
     border-radius: 6px;
-    padding: 0.55rem 1rem;
+    padding: 0.55rem 0.95rem;
     font-weight: 700;
+    font-size: 0.86rem;
     cursor: pointer;
     transition: opacity 0.15s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
 }
 
 .btn:disabled {
@@ -710,15 +170,17 @@ input[type="month"], input[type="date"] {
     cursor: not-allowed;
 }
 
+.btn-primary { background: var(--accent-gold); color: #000; }
 .btn-green { background: var(--accent-green); color: #000; }
 .btn-red { background: var(--accent-red); color: #fff; }
 .btn-blue { background: var(--accent-blue); color: #fff; }
+.btn-dark { background: #334155; color: #fff; }
 
-/* 보스탐 기록 (raid_record.html) */
+/* 보스탐 기록 16타임 그리드 */
 .time-grid {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    gap: 0.5rem;
+    gap: 0.45rem;
     margin-bottom: 1rem;
 }
 
@@ -727,18 +189,18 @@ input[type="month"], input[type="date"] {
     background: var(--bg-input);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 0.6rem 0.3rem;
+    padding: 0.6rem 0.2rem;
     text-align: center;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.15s ease;
+    user-select: none;
 }
 
 .time-box.available-slot {
     background: #475569;
     border-color: #94a3b8;
-    color: #ffffff;
+    color: #fff;
 }
 
 .time-box.completed-slot {
@@ -749,8 +211,8 @@ input[type="month"], input[type="date"] {
     content: '✔';
     position: absolute;
     top: 2px;
-    right: 5px;
-    font-size: 0.7rem;
+    right: 4px;
+    font-size: 0.68rem;
     color: #34d399;
     font-weight: 900;
 }
@@ -776,7 +238,7 @@ input[type="month"], input[type="date"] {
 
 .day-toggle-btn {
     flex: 1;
-    padding: 0.6rem;
+    padding: 0.58rem;
     border-radius: 6px;
     border: 1px solid var(--border-color);
     background: #1e293b;
@@ -791,23 +253,27 @@ input[type="month"], input[type="date"] {
     border-color: var(--accent-gold);
 }
 
+/* 실시간 매칭 토큰 칩 */
 .token-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.45rem;
-    padding: 0.8rem;
+    gap: 0.4rem;
+    padding: 0.75rem;
     background: var(--bg-input);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    min-height: 52px;
+    min-height: 50px;
 }
 
 .ocr-token {
-    padding: 0.3rem 0.65rem;
+    padding: 0.32rem 0.6rem;
     border-radius: 6px;
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     font-weight: 700;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
 }
 
 .ocr-token.matched {
@@ -818,22 +284,23 @@ input[type="month"], input[type="date"] {
 
 .ocr-token.unmatched {
     background: rgba(239, 68, 68, 0.25);
-    border: 1px solid var(--accent-red);
+    border: 1.5px solid var(--accent-red);
     color: #fca5a5;
 }
 
+/* 파티 카드 */
 .party-card {
     background: rgba(15, 23, 42, 0.7);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 0.85rem 1rem;
-    margin-bottom: 0.6rem;
-    font-size: 1.15rem;
-    line-height: 1.6;
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .party-text-line {
@@ -849,7 +316,7 @@ input[type="month"], input[type="date"] {
 
 .admin-action-btns {
     display: flex;
-    gap: 0.4rem;
+    gap: 0.35rem;
     flex-shrink: 0;
 }
 
@@ -857,92 +324,82 @@ input[type="month"], input[type="date"] {
 .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.78);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 999;
+    padding: 1rem;
 }
 
 .modal-content {
     background: var(--bg-card);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--accent-gold);
     border-radius: 10px;
-    padding: 1.4rem;
-    width: 90%;
+    padding: 1.25rem;
+    width: 100%;
     max-width: 420px;
 }
 
-/* 보스탐기록현황 (raid_status.html) */
+/* 달력 및 일별기록현황 */
 .week-selector-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.8rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
 }
 
-.week-nav-box {
-    display: inline-flex;
-    align-items: center;
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.35rem 0.6rem;
-    gap: 0.5rem;
-}
-
-.week-arrow-btn {
-    background: #334155;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 0.2rem 0.55rem;
-    cursor: pointer;
-    font-weight: 800;
-    font-size: 0.85rem;
-}
-
-.week-arrow-btn:hover {
-    background: var(--accent-gold);
-    color: #000;
-}
-
-.weekday-grid {
+.calendar-header-row, .full-calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 0.4rem;
+    gap: 0.3rem;
 }
 
-.weekday-btn {
+.calendar-header-row {
+    margin-bottom: 0.3rem;
+    text-align: center;
+    font-weight: 800;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.calendar-header-row .sun, .cal-day-cell.sun { color: #f87171; }
+.calendar-header-row .sat, .cal-day-cell.sat { color: #60a5fa; }
+
+.cal-day-cell {
     background: var(--bg-input);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 0.55rem 0.2rem;
+    padding: 0.45rem 0.15rem;
     text-align: center;
     cursor: pointer;
-    color: var(--text-light);
     font-weight: 700;
-    font-size: 0.9rem;
-    transition: all 0.15s ease;
+    font-size: 0.88rem;
+    color: var(--text-light);
+    min-height: 42px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
-.weekday-btn.sun { color: #f87171; }
-.weekday-btn.sat { color: #60a5fa; }
-.weekday-btn.other-month { opacity: 0.35; }
-
-.weekday-btn.selected {
+.cal-day-cell.other-month { opacity: 0.28; }
+.cal-day-cell.selected {
     background: var(--accent-gold) !important;
     color: #000 !important;
-    border-color: var(--accent-gold) !important;
+    border-color: #fef08a !important;
+    font-weight: 900;
 }
 
-.weekday-date-sub {
-    font-size: 0.72rem;
-    font-weight: 500;
-    margin-left: 2px;
-    opacity: 0.9;
+.cal-day-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #34d399;
+    margin-top: 2px;
 }
+
+.cal-day-cell.selected .cal-day-dot { background: #064e3b; }
 
 .summary-toggle-header {
     display: flex;
@@ -952,17 +409,18 @@ input[type="month"], input[type="date"] {
     user-select: none;
 }
 
-.circle-time-grid {
+/* 16개 원형 타임 그리드 */
+.circle-time-grid, .my-circle-grid {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    gap: 0.6rem;
+    gap: 0.5rem;
     justify-items: center;
-    margin: 1rem 0;
+    margin: 0.85rem 0;
 }
 
-.time-circle {
-    width: 62px;
-    height: 62px;
+.time-circle, .my-time-circle {
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     background: #1e293b;
     border: 2px solid var(--border-color);
@@ -971,7 +429,7 @@ input[type="month"], input[type="date"] {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     font-weight: 700;
     cursor: pointer;
     text-align: center;
@@ -993,130 +451,67 @@ input[type="month"], input[type="date"] {
     background: var(--accent-gold) !important;
     color: #000 !important;
     border-color: #fef08a !important;
-    transform: scale(1.06);
+    transform: scale(1.05);
 }
 
-.raid-detail-two-col {
+.my-time-circle {
+    background: #0f172a;
+    border: 1.5px dashed #334155;
+    cursor: default;
+}
+
+.my-time-circle.participated {
+    background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.35), rgba(15, 23, 42, 0.95));
+    border: 2px solid #10b981;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.my-time-circle.participated::after {
+    content: '참여';
+    font-size: 0.6rem;
+    background: #10b981;
+    color: #000;
+    font-weight: 900;
+    padding: 0 4px;
+    border-radius: 3px;
+    margin-top: 2px;
+}
+
+/* 2열 상세 레이아웃 */
+.raid-detail-two-col, .settlement-two-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: 0.9rem;
+    margin-top: 0.9rem;
 }
 
 .detail-col-box {
     background: var(--bg-input);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 1rem;
+    padding: 0.9rem;
 }
 
-.item-price-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    gap: 0.5rem;
-}
-
-.item-price-row:last-child {
-    border-bottom: none;
-}
-
-.member-share-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.35rem 0.5rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    font-size: 0.92rem;
-}
-
-.member-share-badge {
-    color: var(--accent-gold);
-    font-weight: 800;
-    font-size: 0.88rem;
-}
-
-.tax-setting-box {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: rgba(245, 158, 11, 0.12);
-    border: 1px solid var(--accent-gold);
-    padding: 0.3rem 0.65rem;
-    border-radius: 6px;
-    font-size: 0.82rem;
-}
-
-/* 테이블 공통 (my_history.html, admin.html) */
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
-}
-
-.data-table th, .data-table td {
-    border-bottom: 1px solid var(--border-color);
-    padding: 0.65rem 0.5rem;
-    text-align: left;
-}
-
-.data-table th {
-    color: var(--accent-gold);
-    font-weight: 800;
-    background: rgba(15, 23, 42, 0.5);
-}
-
-@media (max-width: 640px) {
-    .time-grid, .circle-time-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    .raid-detail-two-col {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* =========================================================
-   아이템별 아데나 가격 + 당첨자 검색 + 수령일 표시 스타일
-   ========================================================= */
 .item-detail-card {
-    padding: 0.65rem 0.5rem;
+    padding: 0.6rem 0.4rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.item-detail-card:last-child {
-    border-bottom: none;
-}
+.item-detail-card:last-child { border-bottom: none; }
 
 .item-view-main-line {
     display: flex;
     align-items: baseline;
-    gap: 0.5rem;
+    gap: 0.45rem;
     flex-wrap: wrap;
-    font-size: 0.96rem;
+    font-size: 0.92rem;
 }
 
-.item-view-name {
-    font-weight: 800;
-    color: var(--text-light);
-}
-
-.item-view-price {
-    font-weight: 700;
-    color: var(--accent-gold);
-}
-
-.item-view-winner {
-    font-weight: 800;
-    color: #a7f3d0;
-}
-
-.item-taken-date-sub {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: 0.15rem;
-}
+.item-view-name { font-weight: 800; color: var(--text-light); }
+.item-view-price { font-weight: 700; color: var(--accent-gold); }
+.item-view-winner { font-weight: 800; color: #a7f3d0; }
+.item-taken-date-sub { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.15rem; }
 
 .winner-search-chips {
     display: flex;
@@ -1130,97 +525,24 @@ input[type="month"], input[type="date"] {
     color: #fff;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    padding: 0.15rem 0.45rem;
+    padding: 0.2rem 0.5rem;
     font-size: 0.75rem;
     font-weight: 700;
     cursor: pointer;
 }
 
-.winner-chip:hover {
-    background: var(--accent-gold);
-    color: #000;
-}
+.winner-chip:hover { background: var(--accent-gold); color: #000; }
 
 .pool-summary-box {
     background: rgba(15, 23, 42, 0.65);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 0.55rem 0.75rem;
-    margin-bottom: 0.75rem;
-    font-size: 0.85rem;
+    padding: 0.55rem 0.7rem;
+    margin-bottom: 0.7rem;
+    font-size: 0.84rem;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-}
-/* =========================================================
-   일별기록현황 전체 달력 그리드 및 개별 추가 UI 스타일
-   ========================================================= */
-.calendar-header-row {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 0.35rem;
-    margin-bottom: 0.35rem;
-    text-align: center;
-    font-weight: 800;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-}
-
-.calendar-header-row .sun { color: #f87171; }
-.calendar-header-row .sat { color: #60a5fa; }
-
-.full-calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 0.35rem;
-}
-
-.cal-day-cell {
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.5rem 0.25rem;
-    text-align: center;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 0.92rem;
-    color: var(--text-light);
-    min-height: 44px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    transition: all 0.15s ease;
-}
-
-.cal-day-cell:hover {
-    border-color: var(--accent-gold);
-}
-
-.cal-day-cell.sun { color: #f87171; }
-.cal-day-cell.sat { color: #60a5fa; }
-.cal-day-cell.other-month {
-    opacity: 0.28;
-}
-
-.cal-day-cell.selected {
-    background: var(--accent-gold) !important;
-    color: #000 !important;
-    border-color: #fef08a !important;
-    font-weight: 900;
-}
-
-.cal-day-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #34d399;
-    margin-top: 3px;
-}
-
-.cal-day-cell.selected .cal-day-dot {
-    background: #064e3b;
+    gap: 0.2rem;
 }
 
 .inline-add-box {
@@ -1228,160 +550,225 @@ input[type="month"], input[type="date"] {
     border: 1px dashed var(--accent-gold);
     border-radius: 6px;
     padding: 0.65rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.7rem;
 }
 
-/* =========================================================
-   관리자 모드 ON/OFF 통일 스위치 & 공통 뱃지/요약 스타일
-   ========================================================= */
-.admin-mode-toggle {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+.member-share-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.38rem 0.4rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.9rem;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.member-share-badge {
+    color: var(--accent-gold);
+    font-weight: 800;
+    font-size: 0.85rem;
+}
+
+.tax-setting-box {
+    display: flex;
+    align-items: center;
     gap: 0.35rem;
-    height: 32px;
-    padding: 0 0.85rem !important;
-    border-radius: 6px !important;
-    font-size: 0.82rem !important;
-    font-weight: 800 !important;
-    cursor: pointer;
-    border: 1px solid #475569 !important;
-    background: #1e293b !important;
-    color: #94a3b8 !important;
-    transition: all 0.15s ease;
-    white-space: nowrap;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid var(--accent-gold);
+    padding: 0.28rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
 }
 
-.admin-mode-toggle.active {
-    background: var(--accent-gold) !important;
-    color: #000 !important;
-    border-color: #fef08a !important;
-    box-shadow: 0 0 10px rgba(245, 158, 11, 0.45);
-}
-
-/* 템 보유현황 요약 카드 그리드 */
+/* KPI 카드 & 상태 뱃지 */
 .summary-kpi-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1.2rem;
+    gap: 0.65rem;
+    margin-bottom: 1rem;
 }
 
 .kpi-box {
     background: var(--bg-input);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 0.85rem 1rem;
+    padding: 0.75rem 0.6rem;
     text-align: center;
 }
 
 .kpi-label {
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     font-weight: 700;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.2rem;
 }
 
 .kpi-value {
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     font-weight: 900;
     color: var(--accent-gold);
 }
 
-/* 판매 유형 뱃지 */
 .status-badge {
     display: inline-block;
-    padding: 0.18rem 0.5rem;
+    padding: 0.18rem 0.48rem;
     border-radius: 4px;
-    font-size: 0.75rem;
+    font-size: 0.74rem;
     font-weight: 800;
+    white-space: nowrap;
 }
+
 .badge-holding { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
 .badge-clan { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid #10b981; }
 .badge-external { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid #3b82f6; }
+.badge-done { background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid #10b981; }
+.badge-wait { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid #475569; }
 
-/* 참여내역 상단 개인 프로필 카드 */
+/* 프로필 그리드 & 스킬 칩 */
 .profile-header-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 0.65rem;
     background: rgba(15, 23, 42, 0.75);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1.2rem;
+    padding: 0.9rem;
+    margin-bottom: 1rem;
 }
 
-.profile-item-label {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    font-weight: 700;
-}
+.profile-item-label { font-size: 0.74rem; color: var(--text-muted); font-weight: 700; }
+.profile-item-val { font-size: 0.92rem; color: var(--text-light); font-weight: 800; margin-top: 0.12rem; word-break: break-all; }
 
-.profile-item-val {
-    font-size: 0.96rem;
-    color: var(--text-light);
-    font-weight: 800;
-    margin-top: 0.15rem;
-}
-
-/* 참여내역 16개 원형 타임 표시 (미참여 vs 본인 참여 구분) */
-.my-circle-grid {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 0.55rem;
-    justify-items: center;
-    margin: 0.8rem 0 1.2rem 0;
-}
-
-.my-time-circle {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: #0f172a;
-    border: 1.5px dashed #334155;
-    color: #475569;
+.skill-chips {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.55rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.skill-chip {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
+    gap: 0.3rem;
+    background: #1e293b;
+    padding: 0.32rem 0.6rem;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.skill-chip input { width: auto; }
+.skill-chip.selected {
+    background: rgba(245, 158, 11, 0.18);
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
     font-weight: 700;
-    text-align: center;
-    line-height: 1.15;
-    position: relative;
 }
 
-/* 본인이 참여한 시간 원형 디자인 (금색/에메랄드 강조 링) */
-.my-time-circle.participated {
-    background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.35), rgba(15, 23, 42, 0.95));
-    border: 2.5px solid #10b981;
-    color: #ffffff;
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.45);
-    transform: scale(1.04);
+/* 데이터 테이블 (모바일 가로 스크롤 대응) */
+.table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-.my-time-circle.participated::after {
-    content: '참여';
-    font-size: 0.62rem;
-    background: #10b981;
-    color: #000;
-    font-weight: 900;
-    padding: 0 4px;
-    border-radius: 3px;
-    margin-top: 2px;
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+    min-width: 540px;
 }
 
-/* 주별/일별 합산 2열 그리드 */
-.settlement-two-col {
+.data-table th, .data-table td {
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.6rem 0.45rem;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.data-table th {
+    color: var(--accent-gold);
+    font-weight: 800;
+    background: rgba(15, 23, 42, 0.6);
+    white-space: nowrap;
+}
+
+/* 보조캐릭 3칸 입력 그리드 */
+.sub-char-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-top: 1.2rem;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
 }
 
-@media (max-width: 720px) {
-    .summary-kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    .my-circle-grid { grid-template-columns: repeat(4, 1fr); }
-    .settlement-two-col { grid-template-columns: 1fr; }
+/* =========================================================
+   모바일 반응형 미디어 쿼리 (스마트폰 / 태블릿 완벽 대응)
+   ========================================================= */
+@media (max-width: 768px) {
+    .navbar {
+        padding: 0.55rem 0.75rem;
+        gap: 0.45rem;
+    }
+
+    .nav-left, .nav-right {
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 2px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .container {
+        margin: 0.75rem auto;
+        padding: 0 0.55rem;
+    }
+
+    .card {
+        padding: 0.95rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .section-title {
+        font-size: 1.05rem;
+    }
+
+    /* iOS 사파리 자동 줌인 방지용 16px 고정 */
+    input, select, textarea {
+        font-size: 16px;
+        padding: 0.5rem 0.6rem;
+    }
+
+    .time-grid, .circle-time-grid, .my-circle-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.4rem;
+    }
+
+    .time-circle, .my-time-circle {
+        width: 56px;
+        height: 56px;
+        font-size: 0.72rem;
+    }
+
+    .raid-detail-two-col, .settlement-two-col {
+        grid-template-columns: 1fr;
+    }
+
+    .summary-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sub-char-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cal-day-cell {
+        min-height: 38px;
+        font-size: 0.8rem;
+        padding: 0.3rem 0.1rem;
+    }
 }

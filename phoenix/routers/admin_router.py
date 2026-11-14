@@ -12,21 +12,40 @@ class MemberPayload(BaseModel):
     skills: List[str]
     clan: str
     sub_chars: Optional[str] = ""
+    google_email: Optional[str] = None
     role: str = "일반회원"
     requester_role: str
+
+def normalize_sub_chars(raw_sub: Optional[str]) -> str:
+    if not raw_sub:
+        return ""
+    parts = [p.strip() for p in raw_sub.split(",") if p.strip()]
+    return ", ".join(parts[:3])  # 최대 3개까지만 허용
+
+def validate_role_assignment(requester_role: str, target_new_role: str, existing_role: Optional[str] = None) -> str:
+    if requester_role not in ["슈퍼관리자", "관리자"]:
+        raise HTTPException(status_code=403, detail="관리자 권한이 없습니다.")
+
+    if existing_role == "슈퍼관리자" and requester_role != "슈퍼관리자":
+        raise HTTPException(status_code=403, detail="일반 관리자는 슈퍼관리자 계정을 수정할 수 없습니다.")
+
+    if requester_role == "슈퍼관리자":
+        return target_new_role if target_new_role in ["슈퍼관리자", "관리자", "일반회원"] else "일반회원"
+
+    # 일반 관리자는 '관리자'와 '일반회원'만 선택 가능
+    if target_new_role == "슈퍼관리자":
+        raise HTTPException(status_code=403, detail="슈퍼관리자 권한은 슈퍼관리자만 부여할 수 있습니다.")
+    return target_new_role if target_new_role in ["관리자", "일반회원"] else "일반회원"
 
 @router.get("/members")
 def list_all_members():
     res = supabase.table("members").select("*").order("id").execute()
-    return res.data
+    return res.data or []
 
 @router.post("/members")
 def create_member(req: MemberPayload):
-    if req.requester_role not in ["슈퍼관리자", "관리자"]:
-        raise HTTPException(status_code=403, detail="권한이 없습니다.")
-    
-    # 일반 관리자는 권한을 일반회원으로만 생성 가능 (슈퍼관리자만 관리자/슈퍼관리자 임명 가능)
-    assigned_role = req.role if req.requester_role == "슈퍼관리자" else "일반회원"
+    assigned_role = validate_role_assignment(req.requester_role, req.role)
+    email_val = req.google_email.strip().lower() if req.google_email and req.google_email.strip() else None
 
     data = {
         "unique_id": req.unique_id.strip(),
@@ -34,7 +53,8 @@ def create_member(req: MemberPayload):
         "char_class": req.char_class,
         "skills": req.skills,
         "clan": req.clan,
-        "sub_chars": req.sub_chars.strip() if req.sub_chars else "",
+        "sub_chars": normalize_sub_chars(req.sub_chars),
+        "google_email": email_val,
         "role": assigned_role
     }
     res = supabase.table("members").insert(data).execute()
@@ -42,13 +62,13 @@ def create_member(req: MemberPayload):
 
 @router.put("/members/{member_id}")
 def update_member(member_id: int, req: MemberPayload):
-    if req.requester_role not in ["슈퍼관리자", "관리자"]:
-        raise HTTPException(status_code=403, detail="권한이 없습니다.")
-
     existing = supabase.table("members").select("*").eq("id", member_id).execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="회원을 찾을 수 없습니다.")
     target = existing.data[0]
+
+    assigned_role = validate_role_assignment(req.requester_role, req.role, target.get("role"))
+    email_val = req.google_email.strip().lower() if req.google_email and req.google_email.strip() else None
 
     update_data = {
         "unique_id": req.unique_id.strip(),
@@ -56,15 +76,10 @@ def update_member(member_id: int, req: MemberPayload):
         "char_class": req.char_class,
         "skills": req.skills,
         "clan": req.clan,
-        "sub_chars": req.sub_chars.strip() if req.sub_chars else "",
+        "sub_chars": normalize_sub_chars(req.sub_chars),
+        "google_email": email_val,
+        "role": assigned_role
     }
-
-    # 슈퍼관리자만 관리자 임명(role 변경) 가능
-    if req.requester_role == "슈퍼관리자":
-        update_data["role"] = req.role
-    else:
-        if target["role"] == "슈퍼관리자":
-            raise HTTPException(status_code=403, detail="일반 관리자는 슈퍼관리자 정보를 수정할 수 없습니다.")
 
     res = supabase.table("members").update(update_data).eq("id", member_id).execute()
     return res.data[0]
@@ -73,9 +88,9 @@ def update_member(member_id: int, req: MemberPayload):
 def delete_member(member_id: int, requester_role: str):
     if requester_role not in ["슈퍼관리자", "관리자"]:
         raise HTTPException(status_code=403, detail="권한이 없습니다.")
-    
+
     target = supabase.table("members").select("*").eq("id", member_id).execute().data
-    if target and target[0]["role"] == "슈퍼관리자" and requester_role != "슈퍼관리자":
+    if target and target[0].get("role") == "슈퍼관리자" and requester_role != "슈퍼관리자":
         raise HTTPException(status_code=403, detail="슈퍼관리자는 삭제할 수 없습니다.")
 
     supabase.table("members").delete().eq("id", member_id).execute()
