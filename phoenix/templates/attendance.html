@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>참여도 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=27">
-    <link rel="stylesheet" href="/static/attendance.css?v=27">
+    <link rel="stylesheet" href="/static/common.css?v=29">
+    <link rel="stylesheet" href="/static/attendance.css?v=29">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -53,20 +53,24 @@
                     <div id="kpiMonthRaids" class="att-kpi-val">총 0회</div>
                 </div>
                 <div class="att-kpi-box">
-                    <div class="att-kpi-label">해당 월 메인보스탐(9·15·21·3시)</div>
+                    <div class="att-kpi-label">해당 월 메인보스탐</div>
                     <div id="kpiMonthMainRaids" class="att-kpi-val main-highlight">총 0회</div>
                 </div>
             </div>
         </section>
 
-        <!-- 2. 전체 혈원 참여도 표 (일 전체/일 메인보스탐 삭제, 월별 메인보스탐 및 월별 09·15·21·03시 표시) -->
+        <!-- 2. 전체 혈원 참여도 표 (월 전체순 / 월별 메인탐순 / 월별 09시 / 월별 15시 / 월별 21시 / 월별 22시(오만) / 월별 03시) -->
         <section class="card-box">
             <div class="att-header-row">
-                <span class="section-label">🏆 전체 혈원 월별 참여 횟수 및 메인보스탐(09시·15시·21시·03시) 참여도</span>
+                <span class="section-label">🏆 전체 혈원 월별 참여 횟수 및 메인보스탐 참여도</span>
                 <div class="sort-btn-group">
                     <button type="button" id="sortBtn_monthTotal" class="sort-tab-btn active" onclick="setSortMode('monthTotal')">월 전체순</button>
                     <button type="button" id="sortBtn_monthMain" class="sort-tab-btn" onclick="setSortMode('monthMain')">월별 메인탐순</button>
-                    <button type="button" id="sortBtn_name" class="sort-tab-btn" onclick="setSortMode('name')">이름순</button>
+                    <button type="button" id="sortBtn_09시" class="sort-tab-btn" onclick="setSortMode('09시')">월별 09시</button>
+                    <button type="button" id="sortBtn_15시" class="sort-tab-btn" onclick="setSortMode('15시')">월별 15시</button>
+                    <button type="button" id="sortBtn_21시" class="sort-tab-btn" onclick="setSortMode('21시')">월별 21시</button>
+                    <button type="button" id="sortBtn_22시(오만)" class="sort-tab-btn" onclick="setSortMode('22시(오만)')">월별 22시(오만)</button>
+                    <button type="button" id="sortBtn_03시" class="sort-tab-btn" onclick="setSortMode('03시')">월별 03시</button>
                 </div>
             </div>
 
@@ -78,27 +82,28 @@
                             <th>혈원명</th>
                             <th>클래스</th>
                             <th>월 전체<br>참여</th>
-                            <th class="main-white-th">월별 메인보스탐<br>(9·15·21·3시)</th>
+                            <th class="main-white-th">월별 메인보스탐</th>
                             <th class="slot-class-th">월별 09시</th>
                             <th class="slot-class-th">월별 15시</th>
                             <th class="slot-class-th">월별 21시</th>
+                            <th class="slot-class-th">월별 22시(오만)</th>
                             <th class="slot-class-th">월별 03시</th>
                         </tr>
                     </thead>
                     <tbody id="attendanceTableBody">
-                        <tr><td colspan="9" class="empty-party-msg">조회 중...</td></tr>
+                        <tr><td colspan="10" class="empty-party-msg">조회 중...</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
     </main>
 
-    <script src="/static/common.js?v=27"></script>
+    <script src="/static/common.js?v=29"></script>
     <script>
-        const MAIN_SLOTS = ['09시', '15시', '21시', '03시'];
+        const MAIN_SLOTS = ['09시', '15시', '21시', '22시(오만)', '03시'];
         let allMembers = [];
         let monthRaids = [];
-        let sortMode = 'monthTotal'; // 'monthTotal' | 'monthMain' | 'name'
+        let sortMode = 'monthTotal'; // 'monthTotal' | 'monthMain' | '09시' | '15시' | '21시' | '22시(오만)' | '03시'
 
         window.onload = async () => {
             const user = ClanApp.initPage('/attendance');
@@ -120,7 +125,7 @@
 
         function setSortMode(mode) {
             sortMode = mode;
-            ['monthTotal', 'monthMain', 'name'].forEach(k => {
+            ['monthTotal', 'monthMain', '09시', '15시', '21시', '22시(오만)', '03시'].forEach(k => {
                 const btn = document.getElementById(`sortBtn_${k}`);
                 if (btn) btn.classList.toggle('active', k === mode);
             });
@@ -153,11 +158,17 @@
                     sub_chars: m.sub_chars || '',
                     monthTotal: 0,
                     monthMain: 0,
-                    slotCounts: { '09시': 0, '15시': 0, '21시': 0, '03시': 0 }
+                    slotCounts: {
+                        '09시': 0,
+                        '15시': 0,
+                        '21시': 0,
+                        '22시(오만)': 0,
+                        '03시': 0
+                    }
                 });
             });
 
-            // 월 전체 참여 및 월별 메인보스탐(09시, 15시, 21시, 03시) 집계
+            // 월 전체 참여 및 월별 메인보스탐(09시, 15시, 21시, 22시(오만), 03시) 집계
             monthRaids.forEach(r => {
                 const pList = ClanApp.extractParticipants(r);
                 const isMainSlot = MAIN_SLOTS.includes(r.raid_time);
@@ -190,21 +201,23 @@
                 } else if (sortMode === 'monthMain') {
                     if (b.monthMain !== a.monthMain) return b.monthMain - a.monthMain;
                     if (b.monthTotal !== a.monthTotal) return b.monthTotal - a.monthTotal;
+                } else if (MAIN_SLOTS.includes(sortMode)) {
+                    const diff = (b.slotCounts[sortMode] || 0) - (a.slotCounts[sortMode] || 0);
+                    if (diff !== 0) return diff;
+                    if (b.monthMain !== a.monthMain) return b.monthMain - a.monthMain;
                 }
                 return a.id.localeCompare(b.id, 'ko');
             });
 
             const tbody = document.getElementById('attendanceTableBody');
             if (rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="empty-party-msg">조회된 혈원이 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" class="empty-party-msg">조회된 혈원이 없습니다.</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = rows.map((r, idx) => {
                 const rank = idx + 1;
                 const rankHtml = `<span class="rank-badge ${rank <= 3 ? 'top-rank' : ''}">${rank}</span>`;
-
-                // 월별 09시~03시: 클래스(요정)와 동일한 색상(#d4d4d8)으로 표시
                 const fmtSlot = (cnt) => `<span class="class-same-color">${cnt}회</span>`;
 
                 return `
@@ -217,6 +230,7 @@
                         <td>${fmtSlot(r.slotCounts['09시'])}</td>
                         <td>${fmtSlot(r.slotCounts['15시'])}</td>
                         <td>${fmtSlot(r.slotCounts['21시'])}</td>
+                        <td>${fmtSlot(r.slotCounts['22시(오만)'])}</td>
                         <td>${fmtSlot(r.slotCounts['03시'])}</td>
                     </tr>
                 `;

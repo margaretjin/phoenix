@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=18">
-    <link rel="stylesheet" href="/static/item_status.css?v=18">
+    <link rel="stylesheet" href="/static/common.css?v=30">
+    <link rel="stylesheet" href="/static/item_status.css?v=30">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -63,8 +63,8 @@
                 </div>
 
                 <div class="filter-field">
-                    <label>아이템 / 당첨자 검색</label>
-                    <input type="text" id="keywordSearch" class="input-common" placeholder="아이템명 또는 당첨자" oninput="renderItemTable()">
+                    <label>아이템 / 수령자 검색</label>
+                    <input type="text" id="keywordSearch" class="input-common" placeholder="아이템명 또는 수령자" oninput="renderItemTable()">
                 </div>
             </div>
         </section>
@@ -76,6 +76,7 @@
                 <span id="itemTotalCountBadge" style="font-size: 12px; font-weight: bold; color: #60a5fa;">총 0건</span>
             </div>
 
+            <!-- 수령자 검색 자동완성용 혈맹원 명단 -->
             <datalist id="clanMemberDatalist"></datalist>
 
             <div class="status-table-wrap">
@@ -87,7 +88,7 @@
                             <th>아이템명</th>
                             <th>구분</th>
                             <th>판매가격</th>
-                            <th>당첨자</th>
+                            <th>수령자</th>
                             <th>판매<br>완료일</th>
                             <th>분배<br>완료일</th>
                             <th id="adminSaveHeader" class="hidden">관리</th>
@@ -101,17 +102,22 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=18"></script>
+    <script src="/static/common.js?v=30"></script>
     <script>
         let allMembers = [];
+        let memberAliasMap = {};     // 소문자 아이디(본캐/보조캐릭) -> 정식 본캐릭 아이디 매핑
         let itemPriceMap = {};
         let flattenedItems = [];
-        let editingItemKeys = new Set(); // 디폴트는 모두 잠금(텍스트 표시), [수정] 버튼을 누른 행만 입력창 활성화
+        let editingItemKeys = new Set();     // 우측 [수정] 버튼을 눌러 판매가격/수령자/판매완료일을 편집 중인 키
+        let editingDistDateKeys = new Set(); // 분배완료일의 [수정] 버튼을 눌러 분배완료일을 편집 중인 키
 
         window.onload = async () => {
             const user = ClanApp.initPage('/item-status', () => {
                 document.getElementById('adminSaveHeader').classList.toggle('hidden', !ClanApp.isAdminModeOn);
-                if (!ClanApp.isAdminModeOn) editingItemKeys.clear();
+                if (!ClanApp.isAdminModeOn) {
+                    editingItemKeys.clear();
+                    editingDistDateKeys.clear();
+                }
                 renderItemTable();
             });
             if (!user) return;
@@ -126,14 +132,30 @@
             await loadItemStatusData();
         };
 
+        function toShortDate(dateStr) {
+            if (!dateStr || dateStr.length < 8) return '-';
+            return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
+        }
+
         async function loadMembersForDatalist() {
+            memberAliasMap = {};
             try {
                 const res = await fetch('/api/auth/search-members');
                 allMembers = await res.json();
                 const dl = document.getElementById('clanMemberDatalist');
-                dl.innerHTML = allMembers.map(m => `<option value="${m.active_id}">${m.char_class} (${m.clan})</option>`).join('');
+                dl.innerHTML = allMembers.map(m => {
+                    const activeId = (m.active_id || '').trim();
+                    if (activeId) {
+                        memberAliasMap[activeId.toLowerCase()] = activeId;
+                    }
+                    (m.sub_chars || '').split(',').map(s => s.trim()).filter(Boolean).forEach(sub => {
+                        memberAliasMap[sub.toLowerCase()] = activeId;
+                    });
+                    return `<option value="${activeId}">${m.char_class} (${m.clan})</option>`;
+                }).join('');
             } catch (e) {
                 allMembers = [];
+                memberAliasMap = {};
             }
         }
 
@@ -149,6 +171,24 @@
             } catch (e) {
                 itemPriceMap = {};
             }
+        }
+
+        // [핵심] 수령자(winner)와 판매가격(price)에 따른 구분 자동 판별
+        // 1. 수령자 미입력 -> '보유중'
+        // 2. 수령자가 혈맹원 명단에 존재 -> 판매가격 === 0 이면 '이벤트', 판매가격 > 0 이면 '내판'
+        // 3. 수령자가 혈맹원 명단에 없음 -> '외판'
+        function computeAutoSaleType(winnerRaw, priceVal) {
+            const w = (winnerRaw || '').trim();
+            const p = Number(priceVal || 0);
+
+            if (!w) {
+                return '보유중';
+            }
+            const isClanMember = Boolean(memberAliasMap[w.toLowerCase()]);
+            if (isClanMember) {
+                return p === 0 ? '이벤트' : '내판';
+            }
+            return '외판';
         }
 
         function onViewModeChange() {
@@ -204,12 +244,20 @@
 
             flattenedItems = [];
             raids.forEach(r => {
+                const rawSavedDetails = Array.isArray(r.item_details) ? r.item_details : [];
                 const details = ClanApp.extractItemDetails(r, itemPriceMap);
+
                 details.forEach((item, idx) => {
-                    let sType = item.sale_type || '보유중';
-                    if (!['보유중', '내판', '외판', '이벤트'].includes(sType)) {
-                        sType = '보유중';
-                    }
+                    const winner = (item.winner || '').trim();
+                    const price = Number(item.price || 0);
+                    const autoType = computeAutoSaleType(winner, price);
+                    const distDate = (item.dist_date || '').trim();
+
+                    // 분배완료일에 일자가 아직 입력되지 않은 경우 디폴트값 = 체크 표시(true)
+                    const rawObj = rawSavedDetails[idx] || {};
+                    const isChecked = distDate
+                        ? true
+                        : (rawObj.dist_checked === undefined || rawObj.dist_checked === null ? true : Boolean(rawObj.dist_checked));
 
                     flattenedItems.push({
                         key: `${r.id}_${idx}`,
@@ -218,19 +266,41 @@
                         raid_date: r.raid_date,
                         raid_time: r.raid_time,
                         name: item.name,
-                        sale_type: sType,
-                        price: Number(item.price || 0),
-                        winner: item.winner || '',
+                        sale_type: autoType,
+                        price,
+                        winner,
                         taken_date: item.taken_date || '',
                         default_taken_date: item.taken_date || todayStr,
-                        dist_date: item.dist_date || '',
-                        dist_checked: Boolean(item.dist_checked || item.dist_date),
+                        dist_date: distDate,
+                        dist_checked: isChecked,
                         full_details_ref: details
                     });
                 });
             });
 
+            // 아직 DB에 dist_checked 기본값(True)이 저장되지 않은 신규 드랍 아이템이 있으면 백그라운드로 자동 동기화해 분배금 관리에 즉시 뜨도록 보장
+            await autoSyncDefaultCheckedItems(raids);
+
             renderItemTable();
+        }
+
+        async function autoSyncDefaultCheckedItems(raids) {
+            if (!ClanApp.hasAdminPrivilege) return;
+            for (const r of raids) {
+                const rawList = Array.isArray(r.item_details) ? r.item_details : [];
+                const extracted = ClanApp.extractItemDetails(r, itemPriceMap);
+                if (extracted.length > 0 && rawList.length === 0) {
+                    await fetch('/api/raids/item-details', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            raid_id: r.id,
+                            item_details: extracted,
+                            requester_role: ClanApp.role
+                        })
+                    });
+                }
+            }
         }
 
         function getFilteredItems() {
@@ -250,6 +320,25 @@
             renderItemTable();
         }
 
+        function startEditDistDate(key) {
+            if (!ClanApp.isAdminModeOn) return;
+            editingDistDateKeys.add(key);
+            editingItemKeys.add(key);
+            renderItemTable();
+        }
+
+        // 수정 모드에서 수령자 또는 판매가격 입력 시 실시간으로 구분 배지(보유중/내판/외판/이벤트) 미리보기 업데이트
+        function onLiveWinnerOrPriceInput(i) {
+            const winnerEl = document.getElementById(`stWinner_${i}`);
+            const priceEl = document.getElementById(`stPrice_${i}`);
+            const badgeEl = document.getElementById(`stLiveBadge_${i}`);
+            if (!badgeEl) return;
+
+            const newType = computeAutoSaleType(winnerEl ? winnerEl.value : '', priceEl ? priceEl.value : 0);
+            badgeEl.className = `sale-badge type-${newType}`;
+            badgeEl.textContent = newType;
+        }
+
         function renderItemTable() {
             const filtered = getFilteredItems();
             document.getElementById('itemTotalCountBadge').textContent = `총 ${filtered.length}건`;
@@ -263,10 +352,13 @@
             const isAdmin = ClanApp.isAdminModeOn;
 
             tbody.innerHTML = filtered.map((row, i) => {
-                const shortDate = row.raid_date.slice(2);
+                const shortDate = toShortDate(row.raid_date);
                 const badgeHtml = `<span class="sale-badge type-${row.sale_type}">${row.sale_type}</span>`;
+                const priceDisplay = row.sale_type === '이벤트'
+                    ? '0 (이벤트)'
+                    : (row.price > 0 ? row.price.toLocaleString() : '-');
 
-                // 1. 일반 모드: 전체 조회 전용
+                // 1. 일반 모드: 조회 전용
                 if (!isAdmin) {
                     return `
                         <tr>
@@ -274,39 +366,55 @@
                             <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
                             <td style="color:#fbbf24; font-weight:800;">${row.name}</td>
                             <td>${badgeHtml}</td>
-                            <td style="color:#4ade80; font-weight:700;">${row.price > 0 ? row.price.toLocaleString() : '-'}</td>
+                            <td style="color:#4ade80; font-weight:700;">${priceDisplay}</td>
                             <td style="color:#a7f3d0; font-weight:700;">${row.winner || '-'}</td>
-                            <td>${row.taken_date || '-'}</td>
-                            <td style="color:#60a5fa; font-weight:700;">${row.dist_date || '-'}</td>
+                            <td>${row.taken_date ? toShortDate(row.taken_date) : '-'}</td>
+                            <td style="color:#60a5fa; font-weight:700;">${row.dist_date ? toShortDate(row.dist_date) : '-'}</td>
                         </tr>
                     `;
                 }
 
                 const hasDistDate = Boolean(row.dist_date && row.dist_date.trim());
-                const isEditing = editingItemKeys.has(row.key);
+                const isEditingRow = editingItemKeys.has(row.key);
+                const isEditingDist = editingDistDateKeys.has(row.key);
 
-                // 분배완료일 칸: 분배완료일이 있으면 날짜만 깔끔하게 표시(체크박스 숨김), 미분배 상태면 분배 체크박스 표시
-                const distCellHtml = hasDistDate
-                    ? `<span class="dist-date-text">${row.dist_date}</span>`
-                    : `<div class="dist-check-cell">
-                           <span class="dist-date-text empty">미분배</span>
-                           <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
-                                  ${row.dist_checked ? 'checked' : ''}
-                                  title="체크 시 분배금 관리에 표시됩니다."
-                                  onchange="onDistCheckToggle(${i})">
-                       </div>`;
+                // [핵심] 분배완료일 칸 표시 규칙:
+                // - 분배완료일에 일자가 입력되어 있으면 -> 일자 텍스트 + [수정] 버튼 표시 (분배완료일 수정 중이면 날짜 입력칸 표시)
+                // - 분배완료일에 일자가 입력되지 않았으면 -> 디폴트 체크표시(checked)된 체크박스 표시
+                let distCellHtml = '';
+                if (hasDistDate) {
+                    if (isEditingDist) {
+                        distCellHtml = `<input type="date" id="stDistDate_${i}" class="tbl-input tbl-date-input" value="${row.dist_date}">`;
+                    } else {
+                        distCellHtml = `
+                            <div class="dist-check-cell">
+                                <span class="dist-date-text">${toShortDate(row.dist_date)}</span>
+                                <button type="button" class="btn-row-edit" onclick="startEditDistDate('${row.key}')">수정</button>
+                            </div>
+                        `;
+                    }
+                } else {
+                    distCellHtml = `
+                        <div class="dist-check-cell">
+                            <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
+                                   ${row.dist_checked ? 'checked' : ''}
+                                   title="분배완료일 미입력 시 기본 체크됩니다."
+                                   onchange="onDistCheckToggle(${i})">
+                        </div>
+                    `;
+                }
 
-                // 2. 관리자 모드 (기본 상태 = 저장된 내용 텍스트 표시 + 우측 [수정] 버튼)
-                if (!isEditing) {
+                // 2. 관리자 모드 (기본 상태 = 텍스트 표시 + 우측 [수정] 버튼)
+                if (!isEditingRow) {
                     return `
                         <tr>
                             <td>${shortDate}</td>
                             <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
                             <td style="color:#fbbf24; font-weight:800;">${row.name}</td>
                             <td>${badgeHtml}</td>
-                            <td style="color:#4ade80; font-weight:700;">${row.price > 0 ? row.price.toLocaleString() : '-'}</td>
+                            <td style="color:#4ade80; font-weight:700;">${priceDisplay}</td>
                             <td style="color:#a7f3d0; font-weight:700;">${row.winner || '-'}</td>
-                            <td>${row.taken_date || '-'}</td>
+                            <td>${row.taken_date ? toShortDate(row.taken_date) : '-'}</td>
                             <td>${distCellHtml}</td>
                             <td>
                                 <button type="button" class="btn-row-edit" onclick="startEditItemRow('${row.key}')">수정</button>
@@ -315,26 +423,23 @@
                     `;
                 }
 
-                // 3. 관리자 모드 ([수정] 버튼을 누른 행만 입력창 + [저장] 버튼 활성화)
+                // 3. 관리자 모드 ([수정] 버튼을 누른 행 -> 판매가격/수령자/판매완료일 입력창 + 자동 구분 배지 + [저장] 버튼)
                 return `
                     <tr>
                         <td>${shortDate}</td>
                         <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
                         <td style="color:#fbbf24; font-weight:800;">${row.name}</td>
                         <td>
-                            <select id="stType_${i}" class="tbl-select">
-                                <option value="보유중" ${row.sale_type === '보유중' ? 'selected' : ''}>보유중</option>
-                                <option value="내판" ${row.sale_type === '내판' ? 'selected' : ''}>내판</option>
-                                <option value="외판" ${row.sale_type === '외판' ? 'selected' : ''}>외판</option>
-                                <option value="이벤트" ${row.sale_type === '이벤트' ? 'selected' : ''}>이벤트</option>
-                            </select>
+                            <span id="stLiveBadge_${i}" class="sale-badge type-${row.sale_type}">${row.sale_type}</span>
                         </td>
                         <td>
-                            <input type="number" id="stPrice_${i}" class="tbl-input tbl-price-input" value="${row.price || 0}" min="0">
+                            <input type="number" id="stPrice_${i}" class="tbl-input tbl-price-input" value="${row.price}" min="0"
+                                   oninput="onLiveWinnerOrPriceInput(${i})">
                         </td>
                         <td>
                             <input type="text" id="stWinner_${i}" class="tbl-input tbl-winner-input" list="clanMemberDatalist"
-                                   value="${row.winner}" placeholder="당첨자 검색">
+                                   value="${row.winner}" placeholder="수령자 검색"
+                                   oninput="onLiveWinnerOrPriceInput(${i})">
                         </td>
                         <td>
                             <input type="date" id="stTaken_${i}" class="tbl-input tbl-date-input" value="${row.default_taken_date}">
@@ -348,7 +453,7 @@
             }).join('');
         }
 
-        // 미분배 상태에서 체크박스만 바로 토글했을 때 즉시 반영
+        // 미분배 상태에서 체크박스 토글 시 즉시 반영
         async function onDistCheckToggle(i) {
             if (!ClanApp.isAdminModeOn) return;
             const target = getFilteredItems()[i];
@@ -357,18 +462,21 @@
             const chkEl = document.getElementById(`stDistChk_${i}`);
             const dist_checked = chkEl ? chkEl.checked : target.dist_checked;
 
-            // 만약 현재 수정 모드 열려있는 상태라면 입력창 값도 함께 가져옴
-            const typeEl = document.getElementById(`stType_${i}`);
             const priceEl = document.getElementById(`stPrice_${i}`);
             const winnerEl = document.getElementById(`stWinner_${i}`);
             const takenEl = document.getElementById(`stTaken_${i}`);
 
+            const rawWinner = winnerEl ? winnerEl.value.trim() : target.winner;
+            const canonicalWinner = memberAliasMap[rawWinner.toLowerCase()] || rawWinner;
+            const price = priceEl ? Number(priceEl.value || 0) : target.price;
+            const autoSaleType = computeAutoSaleType(canonicalWinner, price);
+
             const updatedDetails = [...target.full_details_ref];
             updatedDetails[target.item_idx] = {
                 name: target.name,
-                sale_type: typeEl ? typeEl.value : target.sale_type,
-                price: priceEl ? Number(priceEl.value || 0) : target.price,
-                winner: winnerEl ? winnerEl.value.trim() : target.winner,
+                sale_type: autoSaleType,
+                price,
+                winner: canonicalWinner,
                 taken_date: takenEl ? takenEl.value : target.taken_date,
                 dist_date: target.dist_date || '',
                 dist_checked
@@ -392,27 +500,41 @@
             }
         }
 
-        // [저장] 버튼 클릭 시 저장 후 다시 조회 전용(잠금 + [수정] 버튼) 상태로 복귀
+        // [저장] 버튼 클릭 시 수령자 명단 매칭 및 가격에 따라 내판/외판/이벤트 자동 구분 후 저장
         async function saveItemRow(i) {
             if (!ClanApp.isAdminModeOn) return;
             const target = getFilteredItems()[i];
             if (!target) return;
 
-            const sale_type = document.getElementById(`stType_${i}`).value;
-            const price = Number(document.getElementById(`stPrice_${i}`).value || 0);
-            const winner = document.getElementById(`stWinner_${i}`).value.trim();
-            const taken_date = document.getElementById(`stTaken_${i}`).value || ClanApp.formatYMD(new Date());
+            const priceInputEl = document.getElementById(`stPrice_${i}`);
+            const winnerInputEl = document.getElementById(`stWinner_${i}`);
+            const takenInputEl = document.getElementById(`stTaken_${i}`);
+            const distDateInputEl = document.getElementById(`stDistDate_${i}`);
             const chkEl = document.getElementById(`stDistChk_${i}`);
-            const dist_checked = chkEl ? chkEl.checked : target.dist_checked;
+
+            const rawWinner = winnerInputEl ? winnerInputEl.value.trim() : target.winner;
+            // 보조캐릭으로 입력했더라도 혈맹원 명단에 있으면 본캐릭명으로 정규화
+            const canonicalWinner = memberAliasMap[rawWinner.toLowerCase()] || rawWinner;
+            const price = priceInputEl ? Number(priceInputEl.value || 0) : target.price;
+
+            // 수령자 및 판매가격 기준 자동 구분 (명단에 있으면 내판 / 명단+0원이면 이벤트 / 명단에 없으면 외판 / 미입력시 보유중)
+            const sale_type = computeAutoSaleType(canonicalWinner, price);
+
+            const taken_date = takenInputEl
+                ? (takenInputEl.value || (canonicalWinner ? ClanApp.formatYMD(new Date()) : ''))
+                : target.taken_date;
+
+            const dist_date = distDateInputEl ? distDateInputEl.value : (target.dist_date || '');
+            const dist_checked = dist_date ? true : (chkEl ? chkEl.checked : true);
 
             const updatedDetails = [...target.full_details_ref];
             updatedDetails[target.item_idx] = {
                 name: target.name,
                 sale_type,
                 price,
-                winner,
+                winner: canonicalWinner,
                 taken_date,
-                dist_date: target.dist_date || '',
+                dist_date,
                 dist_checked
             };
 
@@ -428,6 +550,7 @@
 
             if (res.ok) {
                 editingItemKeys.delete(target.key);
+                editingDistDateKeys.delete(target.key);
                 await loadItemStatusData();
             } else {
                 const err = await res.json().catch(() => ({}));

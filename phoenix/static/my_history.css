@@ -1,5 +1,5 @@
 /* =========================================================
-   [my_history.css] 내 참여내역 페이지 전용 스타일
+   [my_history.css] 참여내역 페이지 전용 스타일
    ========================================================= */
 
 .excel-btn-group {
@@ -113,7 +113,7 @@
 }
 
 .history-selected-date {
-    color: #ff5722;
+    color: #ffffff;
     font-size: 15px;
     font-weight: 800;
 }
@@ -189,17 +189,25 @@
     font-size: 12px;
 }
 
-/* 아이템 (혈비제외가) 표시 스타일 */
-.drop-item-formatted {
+/* 보스탐 시간 글씨 색상: 흰색 */
+.raid-slot-white {
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 12.5px;
+}
+
+/* 아이템 컬럼 */
+.drop-item-name {
     font-weight: 800;
     color: #fbbf24;
     font-size: 13px;
 }
 
-.drop-item-price-part {
+/* 혈비제외가 컬럼 */
+.drop-item-net-price {
     color: #4ade80;
-    font-weight: 700;
-    margin-left: 2px;
+    font-weight: 800;
+    font-size: 12.5px;
 }
 
 .clan-dist-date-cell {

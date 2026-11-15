@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>분배금 관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=25">
-    <link rel="stylesheet" href="/static/distribution.css?v=25">
+    <link rel="stylesheet" href="/static/common.css?v=29">
+    <link rel="stylesheet" href="/static/distribution.css?v=29">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -19,10 +19,6 @@
                 <button type="button" class="btn-excel-sm" onclick="exportDistExcel('week')">주별(+7일)</button>
                 <button type="button" class="btn-excel-sm" onclick="exportDistExcel('month')">월별</button>
             </div>
-        </div>
-
-        <div id="distAdminNotice" class="admin-notice-banner hidden">
-            🔒 혈분배일 확정 및 분배금 수령 완료 처리는 관리자만 가능합니다. (우측 상단 [👑 관리자 ON]을 켜주세요)
         </div>
 
         <!-- 1. 상단 조회 기준 : 혈분배일 -->
@@ -69,7 +65,7 @@
             </div>
         </section>
 
-        <!-- 2. 💎 분배해야 할 아이템 및 혈분배일 설정 (획득일시 | 아이템 | 가격 | 혈비제외 가격 | 분배인원 | 분배상태 | 혈분배일 | 저장) -->
+        <!-- 2. 💎 분배해야 할 아이템 및 혈분배일 설정 -->
         <section class="card-box">
             <div class="checked-item-header">
                 <span class="section-label">💎 분배해야 할 아이템 및 혈분배일 설정</span>
@@ -101,7 +97,7 @@
             </div>
         </section>
 
-        <!-- 3. 요약 KPI 5칸: 혈분배일 선택 시 해당 날에 분배하는 아이템 & 하단 참여자별 수령현황 동시 연동 -->
+        <!-- 3. 요약 KPI 5칸 -->
         <section class="card-box">
             <div class="dist-kpi-strip-5">
                 <div class="dist-kpi-box">
@@ -127,7 +123,7 @@
             </div>
         </section>
 
-        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 (모바일 1줄 배치: 왼쪽 컴팩트 검색창 / 오른쪽 전체보기·분배대기·분배완료) -->
+        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 -->
         <section class="card-box">
             <div class="dist-member-header">
                 <span class="section-label">👥 참여자별 개별 분배금 수령 현황</span>
@@ -136,7 +132,6 @@
                 </div>
             </div>
 
-            <!-- 모바일에서도 1줄 유지: 왼쪽 작은 검색창 / 오른쪽 전체보기 · 분배대기 · 분배완료 -->
             <div class="dist-member-oneline-bar">
                 <input type="search" id="participantSearchInput" class="input-common member-search-left"
                        placeholder="캐릭/아이템 검색" oninput="renderMergedParticipantsTable()">
@@ -168,16 +163,16 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=25"></script>
+    <script src="/static/common.js?v=29"></script>
     <script>
         let currentTaxRate = 20;
         let itemPriceMap = {};
         let allRaids = [];
-        let checkedEntries = [];             // 템보유현황에서 체크된 모든 아이템
-        let editingDistDateKeys = new Set(); // 상단 아이템 혈분배일 [수정] 버튼을 누른 키
-        let unlockedMembers = new Set();     // 하단 참여자 테이블에서 [수정] 버튼을 누른 캐릭터명
-        let memberInputDrafts = {};          // 참여자별 수령방식/대리인/분배받아간일 입력 임시 보관
-        let memberStatusFilter = 'wait';     // 하단 참여자 테이블 디폴트 = '분배 대기' ('wait')
+        let checkedEntries = [];
+        let editingDistDateKeys = new Set();
+        let unlockedMembers = new Set();
+        let memberInputDrafts = {};
+        let memberStatusFilter = 'wait';
 
         window.onload = async () => {
             const user = ClanApp.initPage('/distribution', () => {
@@ -199,7 +194,6 @@
             await loadAllRaidsForDistribution();
         };
 
-        // 날짜 포맷을 26-11-15 형태로 변환
         function toShortDate(dateStr) {
             if (!dateStr || dateStr.length < 8) return '-';
             return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
@@ -240,7 +234,6 @@
 
         function applyDistAdminUI() {
             const isOn = ClanApp.isAdminModeOn;
-            document.getElementById('distAdminNotice').classList.toggle('hidden', isOn);
             document.getElementById('checkedItemSaveHeader').classList.toggle('hidden', !isOn);
         }
 
@@ -350,7 +343,6 @@
                 details.forEach((item, idx) => {
                     if (!item.dist_checked) return;
 
-                    // [핵심] 아이템 관리에서 설정된 전역 혈비율(currentTaxRate)을 모든 아이템에 일관 적용하여 혈비제외 가격 산출
                     const price = Number(item.price || 0);
                     const netPool = Math.floor(price * (1 - currentTaxRate / 100));
                     const perItemShare = (pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
@@ -431,7 +423,6 @@
             renderMergedParticipantsTable();
         }
 
-        // 1. 상단 💎 분배해야 할 아이템 및 혈분배일 설정 렌더링 (선물 아이콘 제거, 가격 옆에 혈비제외 가격 표시, 혈분배일 26-11-15 형태)
         function renderCheckedItemsTable() {
             const list = getStatusFilteredEntries();
             const tbody = document.getElementById('checkedItemTableBody');
@@ -550,7 +541,6 @@
             }
         }
 
-        // 2. 중간 5칸 요약 KPI: '혈분배일 선택(kpiDistDatePicker)' 날짜의 분배 아이템 기준
         function renderFiveKpiSummary() {
             const dateMatchedEntries = getSelectedKpiDateEntries();
 
@@ -592,7 +582,6 @@
             document.getElementById('kpiWaitCount').textContent = `${wait}명`;
         }
 
-        // 3. 하단 👥 참여자별 개별 분배금 수령 현황 (혈비제외 가격 ÷ 인원으로 산출된 per_share 합산)
         function buildMergedParticipantsList() {
             const targetEntries = getSelectedKpiDateEntries();
             const selectedKpiDate = document.getElementById('kpiDistDatePicker').value || ClanApp.formatYMD(new Date());

@@ -12,8 +12,8 @@ window.ClanApp = {
         '15시', '17시', '18시', '19시', '21시', '22시(오만)', '23시', '24시'
     ],
 
-    // 메인 보스탐 고정 4개 타임 (09시, 15시, 21시, 03시)
-    MAIN_RAID_TIMES: ['09시', '15시', '21시', '03시'],
+    // 메인 보스탐 고정 5개 타임 (09시, 15시, 21시, 22시(오만), 03시)
+    MAIN_RAID_TIMES: ['09시', '15시', '21시', '22시(오만)', '03시'],
 
     initPage(activePath, onAdminToggleCallback = null) {
         const saved = localStorage.getItem('clan_user');
@@ -37,22 +37,19 @@ window.ClanApp = {
         const nav = document.getElementById('appNavbar');
         if (!nav || !this.user) return;
 
-        // 상단 6개 메인 메뉴
         const links = [
             { href: '/raid-record', label: '보스탐기록' },
             { href: '/raid-status', label: '일별현황' },
             { href: '/item-status', label: '템보유현황' },
             { href: '/distribution', label: '분배금관리' },
-            { href: '/my-history', label: '내참여내역' },
+            { href: '/my-history', label: '참여내역' },
             { href: '/attendance', label: '참여도' }
         ];
 
         const adminTabs = [];
-        // 회원관리는 관리자 이상만 노출
         if (this.hasAdminPrivilege && (this.isAdminModeOn || activePath === '/admin')) {
             adminTabs.push({ href: '/admin', label: '회원관리' });
         }
-        // '아이템관리' -> '아이템'으로 변경 (일반회원도 모두 열람 가능)
         adminTabs.push({ href: '/item-manage', label: '아이템' });
 
         const adminTabsHtml = adminTabs.map(l =>
@@ -157,6 +154,7 @@ window.ClanApp = {
         return 'expired';
     },
 
+    // 레코드에서 아이템 상세 배열 추출 (디폴트 dist_checked = true 지원 및 이벤트 0원 보존)
     extractItemDetails(record, priceMap = {}) {
         if (!record) return [];
         const rawTokens = (record.dropped_items || '').split(/[\s,，\n]+/).map(s => s.trim()).filter(Boolean);
@@ -165,16 +163,21 @@ window.ClanApp = {
         if (savedDetails.length > 0 && rawTokens.length === 0) {
             return savedDetails.map(d => {
                 const name = d.name || '';
+                const sType = d.sale_type || '보유중';
+                const hasExplicitZero = (sType === '이벤트') || (d.winner && Number(d.price) === 0);
                 const savedPrice = Number(d.price || 0);
+                const finalPrice = hasExplicitZero ? 0 : (savedPrice > 0 ? savedPrice : Number(priceMap[name] || 0));
                 const distDate = d.dist_date || '';
+                const isChecked = (d.dist_checked === undefined || d.dist_checked === null) ? true : Boolean(d.dist_checked);
+
                 return {
                     name,
-                    sale_type: d.sale_type || '보유중',
-                    price: savedPrice > 0 ? savedPrice : Number(priceMap[name] || 0),
+                    sale_type: sType,
+                    price: finalPrice,
                     winner: d.winner || '',
                     taken_date: d.taken_date || '',
                     dist_date: distDate,
-                    dist_checked: Boolean(d.dist_checked || distDate)
+                    dist_checked: Boolean(isChecked || distDate)
                 };
             });
         }
@@ -189,16 +192,23 @@ window.ClanApp = {
                     break;
                 }
             }
+            const sType = found && found.sale_type ? found.sale_type : '보유중';
+            const hasExplicitZero = found && ((sType === '이벤트') || (found.winner && Number(found.price) === 0));
             const savedPrice = found ? Number(found.price || 0) : 0;
+            const finalPrice = hasExplicitZero ? 0 : (savedPrice > 0 ? savedPrice : Number(priceMap[token] || 0));
             const distDate = found ? (found.dist_date || '') : '';
+            const isChecked = (!found || found.dist_checked === undefined || found.dist_checked === null)
+                ? true
+                : Boolean(found.dist_checked);
+
             return {
                 name: token,
-                sale_type: found && found.sale_type ? found.sale_type : '보유중',
-                price: savedPrice > 0 ? savedPrice : Number(priceMap[token] || 0),
+                sale_type: sType,
+                price: finalPrice,
                 winner: found ? (found.winner || '') : '',
                 taken_date: found ? (found.taken_date || '') : '',
                 dist_date: distDate,
-                dist_checked: Boolean((found && found.dist_checked) || distDate)
+                dist_checked: Boolean(isChecked || distDate)
             };
         });
     },

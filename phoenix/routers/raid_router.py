@@ -32,10 +32,10 @@ class ItemDetailEntry(BaseModel):
     name: str
     sale_type: str = "보유중"       # "보유중" | "내판" | "외판" | "이벤트"
     price: int = 0
-    winner: str = ""
+    winner: str = ""                # 수령자
     taken_date: str = ""            # 판매완료일
     dist_date: str = ""             # 분배완료일
-    dist_checked: bool = False      # 템보유현황에서 분배금 관리 대상으로 체크 여부
+    dist_checked: bool = True       # 디폴트값: 체크 표시(True)
 
 class ItemDetailsUpdateRequest(BaseModel):
     raid_id: int
@@ -88,15 +88,19 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
                 break
         default_p = price_map.get(token, 0)
         if matched_item:
-            saved_p = int(matched_item.get("price") or 0)
+            saved_p = int(matched_item.get("price") if matched_item.get("price") is not None else default_p)
+            s_type = matched_item.get("sale_type") or "보유중"
+            # 이벤트가 아닐 때 가격이 비어있으면 기본가 매칭
+            if s_type != "이벤트" and saved_p == 0 and not matched_item.get("winner"):
+                saved_p = default_p
             synced.append({
                 "name": token,
-                "sale_type": matched_item.get("sale_type") or "보유중",
-                "price": saved_p if saved_p > 0 else default_p,
+                "sale_type": s_type,
+                "price": saved_p,
                 "winner": matched_item.get("winner") or "",
                 "taken_date": matched_item.get("taken_date") or "",
                 "dist_date": matched_item.get("dist_date") or "",
-                "dist_checked": bool(matched_item.get("dist_checked") or False)
+                "dist_checked": True if matched_item.get("dist_checked") is None else bool(matched_item.get("dist_checked"))
             })
         else:
             synced.append({
@@ -106,7 +110,7 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
                 "winner": "",
                 "taken_date": "",
                 "dist_date": "",
-                "dist_checked": False
+                "dist_checked": True
             })
     return synced
 
@@ -137,8 +141,8 @@ def fetch_tax_rate():
 
 @router.post("/tax-rate")
 def update_tax_rate(req: TaxRateUpdateRequest):
-    if req.requester_role != "슈퍼관리자":
-        raise HTTPException(status_code=403, detail="혈비 비율은 슈퍼관리자만 수정할 수 있습니다.")
+    if req.requester_role not in ["슈퍼관리자", "관리자"]:
+        raise HTTPException(status_code=403, detail="혈비 비율은 관리자 이상만 수정할 수 있습니다.")
     if req.tax_rate < 0 or req.tax_rate > 100:
         raise HTTPException(status_code=400, detail="혈비 비율은 0~100% 사이여야 합니다.")
 
@@ -348,7 +352,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
 
     writer.writerow([
         "획득일", "보스탐 시간", "참여 인원수", "참여 명단",
-        "아이템명", "구분", "판매 가격(아데나)", "당첨자(구매자)", "판매완료일", "분배완료일",
+        "아이템명", "구분", "판매 가격(아데나)", "수령자", "판매완료일", "분배완료일",
         "혈비 공제율(%)", "혈비 제외 분배풀", "1인당 분배금", "분배완료 인원", "미분배 인원"
     ])
 
@@ -361,7 +365,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
 
         details = r.get("item_details") or []
         tax_rate = float(r.get("clan_tax_rate") if r.get("clan_tax_rate") is not None else default_tax)
-        gross_total = sum((int(d.get("price") or 0) or price_map.get(d.get("name", ""), 0)) for d in details)
+        gross_total = sum((0 if d.get("sale_type") == "이벤트" else (int(d.get("price") or 0) or price_map.get(d.get("name", ""), 0))) for d in details)
         net_pool = int(gross_total * (1 - tax_rate / 100.0))
         per_share = (net_pool // p_count) if (p_count > 0 and net_pool > 0) else 0
 
@@ -388,10 +392,11 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
         else:
             for item in details:
                 it_name = item.get("name", "")
-                it_price = int(item.get("price") or 0) or price_map.get(it_name, 0)
+                s_type = item.get("sale_type", "보유중")
+                it_price = 0 if s_type == "이벤트" else (int(item.get("price") or 0) or price_map.get(it_name, 0))
                 writer.writerow([
                     r_date, r_time, p_count, p_names,
-                    it_name, item.get("sale_type", "보유중"), it_price,
+                    it_name, s_type, it_price,
                     item.get("winner", ""), item.get("taken_date", ""), item.get("dist_date", ""),
                     tax_rate, net_pool, per_share,
                     ", ".join(done_list), ", ".join(wait_list)
@@ -409,16 +414,3 @@ def delete_raid(raid_id: int, role: str):
         raise HTTPException(status_code=403, detail="관리자 이상만 삭제할 수 있습니다.")
     supabase.table("raid_logs").delete().eq("id", raid_id).execute()
     return {"status": "deleted"}
-
-@router.post("/tax-rate")
-def update_tax_rate(req: TaxRateUpdateRequest):
-    if req.requester_role not in ["슈퍼관리자", "관리자"]:
-        raise HTTPException(status_code=403, detail="혈비 비율은 관리자 이상만 수정할 수 있습니다.")
-    if req.tax_rate < 0 or req.tax_rate > 100:
-        raise HTTPException(status_code=400, detail="혈비 비율은 0~100% 사이여야 합니다.")
-
-    supabase.table("clan_settings").upsert({
-        "setting_key": "clan_tax_rate",
-        "setting_value": str(req.tax_rate)
-    }).execute()
-    return {"status": "updated", "tax_rate": req.tax_rate}

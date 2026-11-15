@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>내 참여내역 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=25">
-    <link rel="stylesheet" href="/static/my_history.css?v=25">
+    <title>참여내역 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/common.css?v=29">
+    <link rel="stylesheet" href="/static/my_history.css?v=29">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -13,7 +13,7 @@
     <main class="main-container">
         <!-- 상단 타이틀 & 관리자 조회대상 검색 / 엑셀 다운로드 -->
         <div class="top-bar">
-            <h1 class="page-title">🛡️ 내 캐릭터 및 참여·분배금 수령 내역</h1>
+            <h1 class="page-title">🛡️ 캐릭터 및 참여·분배금 수령 내역</h1>
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                 <div id="adminMemberSearchBox" class="admin-target-search admin-only">
                     <span style="color: #fbbf24; font-size: 11.5px; font-weight: 800;">👑 조회 캐릭터:</span>
@@ -28,7 +28,7 @@
             </div>
         </div>
 
-        <!-- 1. 캐릭터 프로필 & 다중 기준(혈분배일 / 본인수령일 / 보스탐일) × 기간(일별/주별+7일/월별) + 아이템별 검색 -->
+        <!-- 1. 캐릭터 프로필 & 다중 기준 검색 -->
         <section class="card-box">
             <div class="history-profile-grid">
                 <div>
@@ -89,7 +89,6 @@
                     <input type="search" id="historyItemSearch" class="input-common" placeholder="아이템명 입력" oninput="renderHistoryItemsTable()">
                 </div>
 
-                <!-- 해당 일 참여횟수 & 월별 보스탐 참여횟수 상시 표시 -->
                 <div class="participation-kpi-group">
                     <div class="part-kpi-badge">
                         <div class="part-kpi-label">해당 일 참여횟수</div>
@@ -103,7 +102,7 @@
             </div>
         </section>
 
-        <!-- 2. 선택일 16개 보스탐 참여 타임 그리드 (보스탐 기록과 동일한 8x2 직사각형 모양) -->
+        <!-- 2. 선택일 16개 보스탐 참여 타임 그리드 -->
         <section class="card-box">
             <div class="history-time-header">
                 <span class="section-label">⏱️ <span id="selectedHistoryDateLabel" class="history-selected-date">00-00-00</span> 보스탐 참여 타임</span>
@@ -117,7 +116,7 @@
             <div id="myCommonTimeGrid" class="common-time-grid"></div>
         </section>
 
-        <!-- 3. 참여 보스탐 아이템 및 분배금 수령 내역 (보스탐 | 아이템 (혈비제외가) | 참여인원 | 내 개별 분배금 | 혈분배일 | 분배금 수령상태) -->
+        <!-- 3. 참여 보스탐 아이템 및 분배금 수령 내역 (보스탐 | 아이템 | 혈비제외가 | 참여인원 | 개별 분배금 | 혈분배일 | 분배금수령상태) -->
         <section class="card-box">
             <div class="history-items-header">
                 <span class="section-label">💎 참여 보스탐 아이템 및 분배금 수령 내역</span>
@@ -133,34 +132,37 @@
                     <thead>
                         <tr>
                             <th>보스탐</th>
-                            <th>아이템 (혈비제외가)</th>
+                            <th>아이템</th>
+                            <th>혈비제외가</th>
                             <th>참여인원</th>
-                            <th>내 개별 분배금</th>
+                            <th>개별 분배금</th>
                             <th>혈분배일</th>
-                            <th>분배금 수령상태</th>
+                            <th>분배금수령상태</th>
                         </tr>
                     </thead>
                     <tbody id="dailyIndividualShareBody">
-                        <tr><td colspan="6" class="empty-party-msg">조회 중...</td></tr>
+                        <tr><td colspan="7" class="empty-party-msg">조회 중...</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
     </main>
 
-    <script src="/static/common.js?v=25"></script>
+    <script src="/static/common.js?v=29"></script>
     <script>
         let currentTaxRate = 20;
         let allMembers = [];
         let itemPriceMap = {};
         let allRaidsCache = [];
-        let historyItemFilter = 'all'; // 'all' | 'wait' | 'done'
+        let historyItemFilter = 'all';
 
         window.onload = async () => {
             const user = ClanApp.initPage('/my-history', () => {
                 if (!ClanApp.isAdminModeOn) {
                     document.getElementById('targetMemberIdInput').value = ClanApp.user.active_id;
                     reloadProfileAndHistory();
+                } else {
+                    renderHistoryItemsTable();
                 }
             });
             if (!user) return;
@@ -175,7 +177,6 @@
             await reloadProfileAndHistory();
         };
 
-        // 날짜를 26-11-15 형태로 변환
         function toShortDate(dateStr) {
             if (!dateStr || dateStr.length < 8) return '-';
             return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
@@ -425,7 +426,6 @@
 
                     if (!matchesDateFilter(compareDate, periodMode, refDateVal, refMonthVal)) return;
 
-                    // [핵심] 아이템 관리에서 설정된 전역 혈비율(currentTaxRate)을 일관되게 적용하여 혈비제외가 및 내 개별 분배금 산출
                     const grossPrice = Number(item.price || 0);
                     const netPrice = Math.floor(grossPrice * (1 - currentTaxRate / 100));
                     const myItemShare = (memberCount > 0 && netPrice > 0) ? Math.floor(netPrice / memberCount) : 0;
@@ -459,20 +459,14 @@
 
             const tbody = document.getElementById('dailyIndividualShareBody');
             if (targetRows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-party-msg">해당 검색 조건에 조회된 아이템 내역이 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="empty-party-msg">해당 검색 조건에 조회된 아이템 내역이 없습니다.</td></tr>`;
                 return;
             }
 
             const totalMyShare = targetRows.reduce((acc, cur) => acc + cur.my_share, 0);
 
-            // 열 구성: 보스탐 | 아이템 (혈비제외가) | 참여인원 | 내 개별 분배금 | 혈분배일 | 분배금 수령상태
+            // 열 구성 (일반 모드 / 관리자 모드 동일): 보스탐 | 아이템 | 혈비제외가 | 참여인원 | 개별 분배금 | 혈분배일 | 분배금수령상태
             const rowsHtml = targetRows.map(row => {
-                // 아이템 (혈비제외가) 표시: 예) 축젤(40,000)
-                const formattedItemHtml = `
-                    <span class="drop-item-formatted">${row.item_name}<span class="drop-item-price-part">(${row.net_price.toLocaleString()})</span></span>
-                `;
-
-                // 수령 상태: 본인수령 / 대리 (캐릭이름) 수령 / 분배 대기 + 수령일 26-11-15
                 let statusHtml = '';
                 if (row.is_done) {
                     const methodLabel = (row.method === '대리수령' && row.proxy_name)
@@ -491,8 +485,9 @@
 
                 return `
                     <tr>
-                        <td style="color:#ff5722; font-weight:800;">${toShortDate(row.raid_date)} ${row.raid_time}</td>
-                        <td>${formattedItemHtml}</td>
+                        <td class="raid-slot-white">${toShortDate(row.raid_date)} ${row.raid_time}</td>
+                        <td class="drop-item-name">${row.item_name}</td>
+                        <td class="drop-item-net-price">${row.net_price.toLocaleString()}</td>
                         <td>${row.memberCount}명</td>
                         <td style="color:#fbbf24; font-weight:900;">${row.my_share.toLocaleString()}</td>
                         <td class="clan-dist-date-cell">${row.clan_dist_date ? toShortDate(row.clan_dist_date) : '-'}</td>
@@ -501,10 +496,9 @@
                 `;
             }).join('');
 
-            // 맨 아래 조회 기간 내 분배금 합계를 맨 오른쪽 끝에 배치
             tbody.innerHTML = rowsHtml + `
                 <tr class="history-sum-row">
-                    <td colspan="6">
+                    <td colspan="7">
                         조회 기간 내 분배금 합계:
                         <span class="history-sum-amount">${totalMyShare.toLocaleString()}</span>
                     </td>
