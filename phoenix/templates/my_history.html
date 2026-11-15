@@ -2,136 +2,162 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>참여내역 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/style.css?v=7">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>내 참여내역 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/common.css?v=25">
+    <link rel="stylesheet" href="/static/my_history.css?v=25">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
 
-    <main class="container">
-        <!-- 1. 상단 내 캐릭터 정보 & 보조캐릭 표시 -->
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
-                <h2 class="section-title" style="margin-bottom: 0;">🛡️ 내 캐릭터 및 참여·분배금 수령 내역</h2>
-
-                <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
-                    <div id="adminMemberSearchBox" class="hidden" style="display: flex; gap: 0.35rem; align-items: center;">
-                        <span style="color: var(--accent-gold); font-size: 0.8rem; font-weight: 700;">👑 조회 대상:</span>
-                        <input type="text" id="targetMemberIdInput" placeholder="아이디" style="width: 110px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
-                        <button class="btn btn-green" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="reloadProfileAndHistory()">조회</button>
-                    </div>
-                    <button class="btn btn-blue" style="padding: 0.32rem 0.65rem; font-size: 0.78rem;" onclick="ClanApp.downloadExcel({ date: document.getElementById('historyDate').value })">
-                        📥 선택일 엑셀 다운로드
-                    </button>
+    <main class="main-container">
+        <!-- 상단 타이틀 & 관리자 조회대상 검색 / 엑셀 다운로드 -->
+        <div class="top-bar">
+            <h1 class="page-title">🛡️ 내 캐릭터 및 참여·분배금 수령 내역</h1>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <div id="adminMemberSearchBox" class="admin-target-search admin-only">
+                    <span style="color: #fbbf24; font-size: 11.5px; font-weight: 800;">👑 조회 캐릭터:</span>
+                    <input type="text" id="targetMemberIdInput" class="input-common" placeholder="아이디" style="width: 100px; padding: 4px 7px; font-size: 12px;">
+                    <button type="button" class="btn-sm btn-sm-blue" onclick="reloadProfileAndHistory()">조회</button>
                 </div>
-            </div>
-
-            <div class="profile-header-grid">
-                <div>
-                    <div class="profile-item-label">고유 아이디</div>
-                    <div class="profile-item-val" id="profUniqueId">-</div>
-                </div>
-                <div>
-                    <div class="profile-item-label">본캐릭터</div>
-                    <div class="profile-item-val" style="color: var(--accent-gold);" id="profActiveId">-</div>
-                </div>
-                <div>
-                    <div class="profile-item-label">보조캐릭 (1~3)</div>
-                    <div class="profile-item-val" style="color: #a7f3d0;" id="profSubChars">-</div>
-                </div>
-                <div>
-                    <div class="profile-item-label">클래스 / 스킬</div>
-                    <div class="profile-item-val" style="color: #6ee7b7;" id="profClassSkills">-</div>
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: flex-end;">
-                <div>
-                    <label>조회 기준 월</label>
-                    <input type="month" id="historyMonth" onchange="onHistoryMonthChange()" style="width: auto;">
-                </div>
-                <div>
-                    <label>일별 상세 날짜 선택</label>
-                    <input type="date" id="historyDate" onchange="onHistoryDateChange()" style="width: auto;">
-                </div>
-                <div style="margin-left: auto; text-align: right;">
-                    <div style="font-size: 0.78rem; color: var(--text-muted);">선택일 참여 / 월 누적 참여</div>
-                    <div style="font-size: 1rem; font-weight: 800; color: var(--accent-gold);">
-                        <span id="dayParticipatedCount">0</span>회 / 월 <span id="monthParticipatedCount">0</span>회
-                    </div>
+                <div class="excel-btn-group admin-only">
+                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('day')">📥 일별</button>
+                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('week')">주별(+7일)</button>
+                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('month')">월별</button>
                 </div>
             </div>
         </div>
 
-        <!-- 2. 선택일 16타임 참여 원형 그리드 + 개별 분배금 및 분배완료 표기 -->
-        <div class="card">
-            <h3 class="section-title" style="font-size: 1rem;">⏱️ <span id="selectedHistoryDateLabel">-</span> 참여 타임 및 분배금 수령 상태</h3>
-            <div id="myCircleTimeGrid" class="my-circle-grid"></div>
+        <!-- 1. 캐릭터 프로필 & 다중 기준(혈분배일 / 본인수령일 / 보스탐일) × 기간(일별/주별+7일/월별) + 아이템별 검색 -->
+        <section class="card-box">
+            <div class="history-profile-grid">
+                <div>
+                    <div class="prof-box-label">고유 아이디</div>
+                    <div class="prof-box-val" id="profUniqueId">-</div>
+                </div>
+                <div>
+                    <div class="prof-box-label">본캐릭터</div>
+                    <div class="prof-box-val" style="color: #fbbf24;" id="profActiveId">-</div>
+                </div>
+                <div>
+                    <div class="prof-box-label">보조캐릭 (1~3)</div>
+                    <div class="prof-box-val" style="color: #a7f3d0;" id="profSubChars">-</div>
+                </div>
+                <div>
+                    <div class="prof-box-label">클래스 / 스킬</div>
+                    <div class="prof-box-val" style="color: #4ade80;" id="profClassSkills">-</div>
+                </div>
+            </div>
 
-            <div class="table-scroll" style="margin-top: 0.9rem;">
-                <table class="data-table">
+            <div class="history-filter-grid">
+                <div class="history-filter-field">
+                    <label>날짜 검색 기준</label>
+                    <select id="historyDateBasis" class="input-common" onchange="renderAllHistoryViews()">
+                        <option value="raid_date">보스탐 일자 기준</option>
+                        <option value="dist_date">혈분배일 기준</option>
+                        <option value="paid_date">본인수령일 기준</option>
+                    </select>
+                </div>
+
+                <div class="history-filter-field">
+                    <label>조회 단위 (월/주/일)</label>
+                    <select id="historyPeriodMode" class="input-common" onchange="onHistoryPeriodModeChange()">
+                        <option value="day">일별</option>
+                        <option value="week">주별 (+7일)</option>
+                        <option value="month">월별</option>
+                        <option value="all">전체</option>
+                    </select>
+                </div>
+
+                <div id="historyDateBox" class="history-filter-field">
+                    <label><span id="historyDateLabel">기준 일자</span><span id="historyWeekRangeHint" class="week-range-hint"></span></label>
+                    <input type="date" id="historyDate" class="input-common" onchange="onHistoryDateChange()">
+                </div>
+
+                <div id="historyMonthBox" class="history-filter-field hidden">
+                    <label>조회 월 선택</label>
+                    <input type="month" id="historyMonth" class="input-common" onchange="onHistoryMonthChange()">
+                </div>
+
+                <div id="historyAllBox" class="history-filter-field hidden">
+                    <label>기간 범위</label>
+                    <input type="text" class="input-common" value="전체 누적 내역" disabled>
+                </div>
+
+                <div class="history-filter-field">
+                    <label>아이템별 검색</label>
+                    <input type="search" id="historyItemSearch" class="input-common" placeholder="아이템명 입력" oninput="renderHistoryItemsTable()">
+                </div>
+
+                <!-- 해당 일 참여횟수 & 월별 보스탐 참여횟수 상시 표시 -->
+                <div class="participation-kpi-group">
+                    <div class="part-kpi-badge">
+                        <div class="part-kpi-label">해당 일 참여횟수</div>
+                        <div class="part-kpi-val day-val"><span id="dayParticipatedCount">0</span>회</div>
+                    </div>
+                    <div class="part-kpi-badge">
+                        <div class="part-kpi-label">월별 보스탐 참여횟수</div>
+                        <div class="part-kpi-val"><span id="monthParticipatedCount">0</span>회</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 선택일 16개 보스탐 참여 타임 그리드 (보스탐 기록과 동일한 8x2 직사각형 모양) -->
+        <section class="card-box">
+            <div class="history-time-header">
+                <span class="section-label">⏱️ <span id="selectedHistoryDateLabel" class="history-selected-date">00-00-00</span> 보스탐 참여 타임</span>
+                <div style="display: flex; gap: 6px;">
+                    <button type="button" class="btn-sm btn-sm-dark" onclick="moveHistoryDay(-1)">◀ 전날</button>
+                    <button type="button" class="btn-sm btn-sm-blue" onclick="setHistoryToday()">오늘</button>
+                    <button type="button" class="btn-sm btn-sm-dark" onclick="moveHistoryDay(1)">다음날 ▶</button>
+                </div>
+            </div>
+
+            <div id="myCommonTimeGrid" class="common-time-grid"></div>
+        </section>
+
+        <!-- 3. 참여 보스탐 아이템 및 분배금 수령 내역 (보스탐 | 아이템 (혈비제외가) | 참여인원 | 내 개별 분배금 | 혈분배일 | 분배금 수령상태) -->
+        <section class="card-box">
+            <div class="history-items-header">
+                <span class="section-label">💎 참여 보스탐 아이템 및 분배금 수령 내역</span>
+                <div class="status-tab-bar">
+                    <button type="button" id="histTab_all" class="status-tab-btn active" onclick="setHistoryItemFilter('all')">전체 (<span id="cntAllItems">0</span>)</button>
+                    <button type="button" id="histTab_wait" class="status-tab-btn" onclick="setHistoryItemFilter('wait')">분배대기중인 아이템 (<span id="cntWaitItems">0</span>)</button>
+                    <button type="button" id="histTab_done" class="status-tab-btn" onclick="setHistoryItemFilter('done')">분배완료 아이템 (<span id="cntDoneItems">0</span>)</button>
+                </div>
+            </div>
+
+            <div class="history-table-wrap">
+                <table class="history-item-table">
                     <thead>
                         <tr>
                             <th>보스탐</th>
-                            <th>인원</th>
-                            <th>드랍 아이템 (분배일자)</th>
+                            <th>아이템 (혈비제외가)</th>
+                            <th>참여인원</th>
                             <th>내 개별 분배금</th>
-                            <th>분배금 수령 상태</th>
+                            <th>혈분배일</th>
+                            <th>분배금 수령상태</th>
                         </tr>
                     </thead>
-                    <tbody id="dailyIndividualShareBody"></tbody>
+                    <tbody id="dailyIndividualShareBody">
+                        <tr><td colspan="6" class="empty-party-msg">조회 중...</td></tr>
+                    </tbody>
                 </table>
             </div>
-        </div>
-
-        <!-- 3. 일별 / 주별 분배금 합산표 -->
-        <div class="settlement-two-col">
-            <div class="card">
-                <h3 class="section-title" style="font-size: 0.98rem;">📅 일별 분배금 합산표</h3>
-                <div class="table-scroll" style="max-height: 340px;">
-                    <table class="data-table" style="min-width: 320px;">
-                        <thead>
-                            <tr>
-                                <th>날짜</th>
-                                <th>참여</th>
-                                <th>내 분배금 합계</th>
-                                <th>수령 상태</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dailySummaryTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3 class="section-title" style="font-size: 0.98rem;">📊 주별 분배금 합산표</h3>
-                <div class="table-scroll">
-                    <table class="data-table" style="min-width: 320px;">
-                        <thead>
-                            <tr>
-                                <th>주차</th>
-                                <th>참여</th>
-                                <th>주별 내 분배금 합계</th>
-                            </tr>
-                        </thead>
-                        <tbody id="weeklySummaryTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        </section>
     </main>
 
-    <script src="/static/common.js?v=7"></script>
+    <script src="/static/common.js?v=25"></script>
     <script>
         let currentTaxRate = 20;
-        let raidTimes = [];
         let allMembers = [];
-        let monthRaidsCache = [];
+        let itemPriceMap = {};
+        let allRaidsCache = [];
+        let historyItemFilter = 'all'; // 'all' | 'wait' | 'done'
 
         window.onload = async () => {
             const user = ClanApp.initPage('/my-history', () => {
-                document.getElementById('adminMemberSearchBox').classList.toggle('hidden', !ClanApp.isAdminModeOn);
                 if (!ClanApp.isAdminModeOn) {
                     document.getElementById('targetMemberIdInput').value = ClanApp.user.active_id;
                     reloadProfileAndHistory();
@@ -140,23 +166,62 @@
             if (!user) return;
 
             document.getElementById('targetMemberIdInput').value = user.active_id;
-            document.getElementById('adminMemberSearchBox').classList.toggle('hidden', !ClanApp.isAdminModeOn);
-
-            const [timeRes, taxRes, memRes] = await Promise.all([
-                fetch('/api/raids/times'),
-                fetch('/api/raids/tax-rate'),
-                fetch('/api/auth/search-members')
-            ]);
-            raidTimes = (await timeRes.json()).times;
-            currentTaxRate = (await taxRes.json()).tax_rate ?? 20;
-            allMembers = await memRes.json();
 
             const now = new Date();
             document.getElementById('historyMonth').value = ClanApp.formatYM(now);
             document.getElementById('historyDate').value = ClanApp.formatYMD(now);
 
+            await Promise.all([loadTaxRate(), loadMembers(), loadItemMasterPrices()]);
             await reloadProfileAndHistory();
         };
+
+        // 날짜를 26-11-15 형태로 변환
+        function toShortDate(dateStr) {
+            if (!dateStr || dateStr.length < 8) return '-';
+            return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
+        }
+
+        function getPlusSevenDaysRange(startDateStr) {
+            const [y, m, d] = startDateStr.split('-').map(Number);
+            const startObj = new Date(y, m - 1, d);
+            const endObj = new Date(y, m - 1, d + 7);
+            const start = ClanApp.formatYMD(startObj);
+            const end = ClanApp.formatYMD(endObj);
+            const shortLabel = `${start.slice(2).replace(/-/g, '.')}~${end.slice(2).replace(/-/g, '.')}`;
+            return { start, end, shortLabel };
+        }
+
+        async function loadTaxRate() {
+            try {
+                const res = await fetch('/api/raids/tax-rate');
+                currentTaxRate = Number((await res.json()).tax_rate ?? 20);
+            } catch (e) {
+                currentTaxRate = 20;
+            }
+        }
+
+        async function loadMembers() {
+            try {
+                const res = await fetch('/api/auth/search-members');
+                allMembers = await res.json();
+            } catch (e) {
+                allMembers = [];
+            }
+        }
+
+        async function loadItemMasterPrices() {
+            itemPriceMap = {};
+            try {
+                const res = await fetch('/api/items');
+                if (!res.ok) return;
+                const list = await res.json();
+                list.forEach(it => {
+                    if (it.item_name) itemPriceMap[it.item_name] = Number(it.default_price || 0);
+                });
+            } catch (e) {
+                itemPriceMap = {};
+            }
+        }
 
         function getTargetMemberId() {
             if (ClanApp.isAdminModeOn) {
@@ -174,182 +239,292 @@
             document.getElementById('profClassSkills').textContent = `${m.char_class || '-'} (${skills || '스킬없음'})`;
         }
 
-        async function onHistoryMonthChange() {
+        function updateWeekHintLabel() {
+            const mode = document.getElementById('historyPeriodMode').value;
+            const hintEl = document.getElementById('historyWeekRangeHint');
+            if (mode !== 'week') {
+                hintEl.textContent = '';
+                return;
+            }
+            const dVal = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
+            hintEl.textContent = `(${getPlusSevenDaysRange(dVal).shortLabel})`;
+        }
+
+        function onHistoryPeriodModeChange() {
+            const mode = document.getElementById('historyPeriodMode').value;
+            const dateBox = document.getElementById('historyDateBox');
+            const monthBox = document.getElementById('historyMonthBox');
+            const allBox = document.getElementById('historyAllBox');
+            const dateLabel = document.getElementById('historyDateLabel');
+
+            dateBox.classList.add('hidden');
+            monthBox.classList.add('hidden');
+            allBox.classList.add('hidden');
+
+            if (mode === 'month') {
+                monthBox.classList.remove('hidden');
+            } else if (mode === 'week') {
+                dateLabel.textContent = '주간 시작일';
+                dateBox.classList.remove('hidden');
+            } else if (mode === 'day') {
+                dateLabel.textContent = '기준 일자';
+                dateBox.classList.remove('hidden');
+            } else {
+                allBox.classList.remove('hidden');
+            }
+
+            updateWeekHintLabel();
+            renderAllHistoryViews();
+        }
+
+        function onHistoryMonthChange() {
             const ym = document.getElementById('historyMonth').value;
             if (!ym) return;
             if (!document.getElementById('historyDate').value.startsWith(ym)) {
                 document.getElementById('historyDate').value = `${ym}-01`;
             }
-            await reloadProfileAndHistory();
+            renderAllHistoryViews();
         }
 
-        async function onHistoryDateChange() {
+        function onHistoryDateChange() {
             const d = document.getElementById('historyDate').value;
             if (!d) return;
-            const ym = d.slice(0, 7);
-            if (document.getElementById('historyMonth').value !== ym) {
-                document.getElementById('historyMonth').value = ym;
-                await reloadProfileAndHistory();
-            } else {
-                renderAllHistoryViews();
-            }
+            document.getElementById('historyMonth').value = d.slice(0, 7);
+            updateWeekHintLabel();
+            renderAllHistoryViews();
         }
 
-        function analyzeRaidForMember(record, targetId) {
-            const participants = ClanApp.extractParticipants(record).map(p => p.id);
-            const isParticipated = participants.includes(targetId);
-            const details = ClanApp.extractItemDetails(record);
-            const gross = details.reduce((a, c) => a + (Number(c.price) || 0), 0);
-            const taxRate = record.clan_tax_rate ?? currentTaxRate;
-            const netPool = Math.floor(gross * (1 - taxRate / 100));
-            const myShare = (isParticipated && participants.length > 0 && netPool > 0)
-                ? Math.floor(netPool / participants.length)
-                : 0;
+        function moveHistoryDay(offset) {
+            const dVal = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
+            const [y, m, d] = dVal.split('-').map(Number);
+            const target = new Date(y, m - 1, d);
+            target.setDate(target.getDate() + offset);
+            document.getElementById('historyDate').value = ClanApp.formatYMD(target);
+            onHistoryDateChange();
+        }
 
-            const distInfo = ((record.distributions || {})[targetId]) || { status: '분배대기', method: '본인수령', proxy_name: '', paid_date: '' };
+        function setHistoryToday() {
+            document.getElementById('historyDate').value = ClanApp.formatYMD(new Date());
+            onHistoryDateChange();
+        }
 
-            return {
-                isParticipated,
-                memberCount: participants.length,
-                details,
-                netPool,
-                myShare,
-                distInfo
-            };
+        function setHistoryItemFilter(filterVal) {
+            historyItemFilter = filterVal;
+            ['all', 'wait', 'done'].forEach(k => {
+                const btn = document.getElementById(`histTab_${k}`);
+                if (btn) btn.classList.toggle('active', k === filterVal);
+            });
+            renderHistoryItemsTable();
         }
 
         async function reloadProfileAndHistory() {
             const targetId = getTargetMemberId();
             renderProfileCard(targetId);
-            const ym = document.getElementById('historyMonth').value;
-            const res = await fetch(`/api/raids?month=${ym}`);
-            monthRaidsCache = await res.json();
+            const res = await fetch('/api/raids');
+            allRaidsCache = await res.json();
+            updateWeekHintLabel();
             renderAllHistoryViews();
         }
 
         function renderAllHistoryViews() {
             const targetId = getTargetMemberId();
-            const dateVal = document.getElementById('historyDate').value;
-            document.getElementById('selectedHistoryDateLabel').textContent = dateVal;
+            const dateVal = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
+            const monthVal = document.getElementById('historyMonth').value || dateVal.slice(0, 7);
+            document.getElementById('selectedHistoryDateLabel').textContent = toShortDate(dateVal);
 
-            const dayRecords = monthRaidsCache.filter(r => r.raid_date === dateVal);
-            const circleGrid = document.getElementById('myCircleTimeGrid');
-            circleGrid.innerHTML = '';
-
+            let monthPartCount = 0;
             let dayPartCount = 0;
-            const rowsHtml = [];
 
-            raidTimes.forEach(t => {
-                const rec = dayRecords.find(r => r.raid_time === t);
-                let participated = false;
-
-                if (rec) {
-                    const info = analyzeRaidForMember(rec, targetId);
-                    participated = info.isParticipated;
-
-                    if (participated) {
+            allRaidsCache.forEach(r => {
+                const pIds = ClanApp.extractParticipants(r).map(p => p.id);
+                if (pIds.includes(targetId)) {
+                    if ((r.raid_date || '').startsWith(monthVal)) {
+                        monthPartCount++;
+                    }
+                    if (r.raid_date === dateVal) {
                         dayPartCount++;
-                        const itemsText = info.details.length > 0
-                            ? info.details.map(d => `${d.name}${d.price > 0 ? `(${d.price.toLocaleString()})` : ''}${d.dist_date ? ` <small style="color:#93c5fd;">[분배일:${d.dist_date}]</small>` : ''}`).join(', ')
-                            : '득템 없음';
-
-                        let statusHtml = `<span class="status-badge badge-wait">분배대기</span>`;
-                        if (info.distInfo.status === '분배완료') {
-                            const methodLabel = info.distInfo.method === '대리수령' && info.distInfo.proxy_name
-                                ? `대리수령:${info.distInfo.proxy_name}`
-                                : (info.distInfo.method || '본인수령');
-                            const dateSub = info.distInfo.paid_date ? ` <small style="color:var(--text-muted);">(${info.distInfo.paid_date})</small>` : '';
-                            statusHtml = `<span class="status-badge badge-done">✔ 분배완료 (${methodLabel})</span>${dateSub}`;
-                        } else if (info.myShare === 0) {
-                            statusHtml = `<span style="color:var(--text-muted); font-size:0.78rem;">분배금 없음</span>`;
-                        }
-
-                        rowsHtml.push(`<tr>
-                            <td style="color:var(--accent-gold); font-weight:800;">${t}</td>
-                            <td>${info.memberCount}명</td>
-                            <td>${itemsText}</td>
-                            <td style="color:var(--accent-gold); font-weight:900;">${info.myShare.toLocaleString()} 아데나</td>
-                            <td>${statusHtml}</td>
-                        </tr>`);
                     }
                 }
-
-                const c = document.createElement('div');
-                c.className = `my-time-circle ${participated ? 'participated' : ''}`;
-                c.innerHTML = t.replace('(', '<br>(');
-                circleGrid.appendChild(c);
             });
 
             document.getElementById('dayParticipatedCount').textContent = dayPartCount;
-            const tbody = document.getElementById('dailyIndividualShareBody');
-            if (rowsHtml.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">선택한 날짜에 참여한 보스탐 기록이 없습니다.</td></tr>`;
-            } else {
-                const daySum = dayRecords.reduce((a, r) => a + analyzeRaidForMember(r, targetId).myShare, 0);
-                tbody.innerHTML = rowsHtml.join('') + `<tr style="background:rgba(245,158,11,0.12);">
-                    <td colspan="3" style="text-align:right; font-weight:800;">선택일 내 분배금 합계:</td>
-                    <td colspan="2" style="color:var(--accent-gold); font-weight:900;">${daySum.toLocaleString()} 아데나</td>
-                </tr>`;
+            document.getElementById('monthParticipatedCount').textContent = monthPartCount;
+
+            const dayRecords = allRaidsCache.filter(r => r.raid_date === dateVal);
+            const gridEl = document.getElementById('myCommonTimeGrid');
+
+            gridEl.innerHTML = ClanApp.RAID_TIMES.map(t => {
+                const rec = dayRecords.find(r => r.raid_time === t);
+                const pIds = rec ? ClanApp.extractParticipants(rec).map(p => p.id) : [];
+                const participated = pIds.includes(targetId);
+                const subText = participated ? '참여완료' : '미참여';
+
+                return `
+                    <div class="common-time-btn my-slot-btn ${participated ? 'participated' : ''}">
+                        <span>${t}</span>
+                        <span class="common-time-sub">${subText}</span>
+                    </div>
+                `;
+            }).join('');
+
+            renderHistoryItemsTable();
+        }
+
+        function matchesDateFilter(targetDateStr, periodMode, refDateVal, refMonthVal) {
+            if (periodMode === 'all') return true;
+            if (!targetDateStr) return false;
+
+            if (periodMode === 'day') {
+                return targetDateStr === refDateVal;
+            } else if (periodMode === 'week') {
+                const { start, end } = getPlusSevenDaysRange(refDateVal);
+                return targetDateStr >= start && targetDateStr <= end;
+            } else if (periodMode === 'month') {
+                return targetDateStr.startsWith(refMonthVal);
             }
+            return true;
+        }
 
-            // 월간 일별 & 주별 합산
-            const dailyMap = {};
-            const weeklyMap = { 1: { c: 0, s: 0 }, 2: { c: 0, s: 0 }, 3: { c: 0, s: 0 }, 4: { c: 0, s: 0 }, 5: { c: 0, s: 0 } };
-            let monthPartTotal = 0, monthShareTotal = 0;
+        function renderHistoryItemsTable() {
+            const targetId = getTargetMemberId();
+            const basis = document.getElementById('historyDateBasis').value;
+            const periodMode = document.getElementById('historyPeriodMode').value;
+            const refDateVal = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
+            const refMonthVal = document.getElementById('historyMonth').value || refDateVal.slice(0, 7);
+            const kw = document.getElementById('historyItemSearch').value.trim().toLowerCase();
 
-            monthRaidsCache.forEach(r => {
-                const info = analyzeRaidForMember(r, targetId);
-                if (!info.isParticipated) return;
-                monthPartTotal++;
-                monthShareTotal += info.myShare;
+            const allItemRows = [];
 
-                if (!dailyMap[r.raid_date]) dailyMap[r.raid_date] = { count: 0, share: 0, paidCount: 0, shareRaidCount: 0 };
-                dailyMap[r.raid_date].count++;
-                dailyMap[r.raid_date].share += info.myShare;
-                if (info.myShare > 0) {
-                    dailyMap[r.raid_date].shareRaidCount++;
-                    if (info.distInfo.status === '분배완료') dailyMap[r.raid_date].paidCount++;
-                }
+            allRaidsCache.forEach(r => {
+                const participants = ClanApp.extractParticipants(r);
+                const pIds = participants.map(p => p.id);
+                if (!pIds.includes(targetId)) return;
 
-                const w = Math.min(5, Math.ceil(parseInt(r.raid_date.slice(8, 10), 10) / 7));
-                weeklyMap[w].c++;
-                weeklyMap[w].s += info.myShare;
+                const memberCount = participants.length;
+                const details = ClanApp.extractItemDetails(r, itemPriceMap);
+                const distInfo = ((r.distributions || {})[targetId]) || {
+                    status: '분배대기',
+                    method: '본인수령',
+                    proxy_name: '',
+                    paid_date: ''
+                };
+                const isDone = distInfo.status === '분배완료';
+
+                details.forEach(item => {
+                    if (kw && !item.name.toLowerCase().includes(kw)) return;
+
+                    const clanDistDate = item.dist_date || '';
+                    const myPaidDate = distInfo.paid_date || '';
+
+                    let compareDate = r.raid_date;
+                    if (basis === 'dist_date') {
+                        compareDate = clanDistDate;
+                    } else if (basis === 'paid_date') {
+                        compareDate = myPaidDate;
+                    }
+
+                    if (!matchesDateFilter(compareDate, periodMode, refDateVal, refMonthVal)) return;
+
+                    // [핵심] 아이템 관리에서 설정된 전역 혈비율(currentTaxRate)을 일관되게 적용하여 혈비제외가 및 내 개별 분배금 산출
+                    const grossPrice = Number(item.price || 0);
+                    const netPrice = Math.floor(grossPrice * (1 - currentTaxRate / 100));
+                    const myItemShare = (memberCount > 0 && netPrice > 0) ? Math.floor(netPrice / memberCount) : 0;
+
+                    allItemRows.push({
+                        raid_date: r.raid_date,
+                        raid_time: r.raid_time,
+                        memberCount,
+                        item_name: item.name,
+                        net_price: netPrice,
+                        my_share: myItemShare,
+                        clan_dist_date: clanDistDate,
+                        is_done: isDone,
+                        method: distInfo.method || '본인수령',
+                        proxy_name: distInfo.proxy_name || '',
+                        paid_date: myPaidDate
+                    });
+                });
             });
 
-            document.getElementById('monthParticipatedCount').textContent = monthPartTotal;
+            const waitRows = allItemRows.filter(x => !x.is_done);
+            const doneRows = allItemRows.filter(x => x.is_done);
 
-            const sortedDates = Object.keys(dailyMap).sort((a, b) => b.localeCompare(a));
-            const dailyBody = document.getElementById('dailySummaryTableBody');
-            dailyBody.innerHTML = sortedDates.length === 0
-                ? `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">월 참여 내역 없음</td></tr>`
-                : sortedDates.map(d => {
-                    const dm = dailyMap[d];
-                    let badge = `<span style="color:var(--text-muted); font-size:0.75rem;">-</span>`;
-                    if (dm.shareRaidCount > 0) {
-                        badge = dm.paidCount === dm.shareRaidCount
-                            ? `<span class="status-badge badge-done">분배완료</span>`
-                            : `<span class="status-badge badge-wait">대기(${dm.paidCount}/${dm.shareRaidCount})</span>`;
-                    }
-                    return `<tr style="cursor:pointer;" onclick="document.getElementById('historyDate').value='${d}'; onHistoryDateChange();">
-                        <td style="font-weight:700;">${d}</td>
-                        <td>${dm.count}회</td>
-                        <td style="color:var(--accent-gold); font-weight:800;">${dm.share.toLocaleString()}</td>
-                        <td>${badge}</td>
-                    </tr>`;
-                }).join('');
+            document.getElementById('cntAllItems').textContent = allItemRows.length;
+            document.getElementById('cntWaitItems').textContent = waitRows.length;
+            document.getElementById('cntDoneItems').textContent = doneRows.length;
 
-            const weekLabels = { 1: "1주차 (1~7일)", 2: "2주차 (8~14일)", 3: "3주차 (15~21일)", 4: "4주차 (22~28일)", 5: "5주차 (29일~)" };
-            document.getElementById('weeklySummaryTableBody').innerHTML = [1, 2, 3, 4, 5].map(w => `
-                <tr>
-                    <td style="font-weight:700;">${weekLabels[w]}</td>
-                    <td>${weeklyMap[w].c}회</td>
-                    <td style="color:var(--accent-gold); font-weight:800;">${weeklyMap[w].s.toLocaleString()} 아데나</td>
+            let targetRows = allItemRows;
+            if (historyItemFilter === 'wait') targetRows = waitRows;
+            else if (historyItemFilter === 'done') targetRows = doneRows;
+
+            const tbody = document.getElementById('dailyIndividualShareBody');
+            if (targetRows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-party-msg">해당 검색 조건에 조회된 아이템 내역이 없습니다.</td></tr>`;
+                return;
+            }
+
+            const totalMyShare = targetRows.reduce((acc, cur) => acc + cur.my_share, 0);
+
+            // 열 구성: 보스탐 | 아이템 (혈비제외가) | 참여인원 | 내 개별 분배금 | 혈분배일 | 분배금 수령상태
+            const rowsHtml = targetRows.map(row => {
+                // 아이템 (혈비제외가) 표시: 예) 축젤(40,000)
+                const formattedItemHtml = `
+                    <span class="drop-item-formatted">${row.item_name}<span class="drop-item-price-part">(${row.net_price.toLocaleString()})</span></span>
+                `;
+
+                // 수령 상태: 본인수령 / 대리 (캐릭이름) 수령 / 분배 대기 + 수령일 26-11-15
+                let statusHtml = '';
+                if (row.is_done) {
+                    const methodLabel = (row.method === '대리수령' && row.proxy_name)
+                        ? `대리 (${row.proxy_name}) 수령`
+                        : '본인수령';
+                    const datePart = row.paid_date ? `<span class="done-paid-date">${toShortDate(row.paid_date)}</span>` : '';
+                    statusHtml = `
+                        <div class="history-status-cell">
+                            <span class="badge-gray-done">${methodLabel}</span>
+                            ${datePart}
+                        </div>
+                    `;
+                } else {
+                    statusHtml = `<span class="badge-orange-wait">분배 대기</span>`;
+                }
+
+                return `
+                    <tr>
+                        <td style="color:#ff5722; font-weight:800;">${toShortDate(row.raid_date)} ${row.raid_time}</td>
+                        <td>${formattedItemHtml}</td>
+                        <td>${row.memberCount}명</td>
+                        <td style="color:#fbbf24; font-weight:900;">${row.my_share.toLocaleString()}</td>
+                        <td class="clan-dist-date-cell">${row.clan_dist_date ? toShortDate(row.clan_dist_date) : '-'}</td>
+                        <td>${statusHtml}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // 맨 아래 조회 기간 내 분배금 합계를 맨 오른쪽 끝에 배치
+            tbody.innerHTML = rowsHtml + `
+                <tr class="history-sum-row">
+                    <td colspan="6">
+                        조회 기간 내 분배금 합계:
+                        <span class="history-sum-amount">${totalMyShare.toLocaleString()}</span>
+                    </td>
                 </tr>
-            `).join('') + `<tr style="background:rgba(16,185,129,0.12);">
-                <td style="font-weight:800;">월 총합계</td>
-                <td style="font-weight:800;">${monthPartTotal}회</td>
-                <td style="color:#34d399; font-weight:900;">${monthShareTotal.toLocaleString()} 아데나</td>
-            </tr>`;
+            `;
+        }
+
+        function exportHistoryExcel(kind) {
+            if (!ClanApp.isAdminModeOn) return;
+            const refDate = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
+            const refMonth = document.getElementById('historyMonth').value || ClanApp.formatYM(new Date());
+
+            if (kind === 'day') {
+                ClanApp.downloadExcel({ date: refDate });
+            } else if (kind === 'week') {
+                const { start, end } = getPlusSevenDaysRange(refDate);
+                ClanApp.downloadExcel({ start, end });
+            } else {
+                ClanApp.downloadExcel({ month: refMonth });
+            }
         }
     </script>
 </body>

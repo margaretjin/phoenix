@@ -5,11 +5,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from routers import auth_router, raid_router, admin_router
+from routers import auth_router, raid_router, admin_router, item_router
 
 app = FastAPI(title="혈맹 보스탐 체크기")
 
-# 서버 응답 압축 최적화 (모바일 로딩 속도 향상)
+# 서버 응답 압축 최적화
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -21,6 +21,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.include_router(auth_router.router)
 app.include_router(raid_router.router)
 app.include_router(admin_router.router)
+app.include_router(item_router.router)
 
 @app.get("/")
 async def root():
@@ -50,9 +51,17 @@ async def distribution_page(request: Request):
 async def my_history_page(request: Request):
     return templates.TemplateResponse(request, "my_history.html", {})
 
+@app.get("/attendance", response_class=HTMLResponse)
+async def attendance_page(request: Request):
+    return templates.TemplateResponse(request, "attendance.html", {})
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
     return templates.TemplateResponse(request, "admin.html", {})
+
+@app.get("/item-manage", response_class=HTMLResponse)
+async def item_manage_page(request: Request):
+    return templates.TemplateResponse(request, "item_manage.html", {})
 
 if __name__ == "__main__":
     import uvicorn

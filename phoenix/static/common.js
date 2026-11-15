@@ -1,4 +1,4 @@
-// 전역 상태 객체
+// 전역 상태 및 공통 유틸리티 모듈
 window.ClanApp = {
     user: null,
     role: '일반회원',
@@ -6,7 +6,15 @@ window.ClanApp = {
     hasAdminPrivilege: false,
     isAdminModeOn: false,
 
-    // 1. 로그인 세션 확인 (로그아웃 누르기 전까지 영구 유지) 및 상단 네비게이션 자동 렌더링
+    // 전체 페이지 고정 16개 보스탐 시간 배열 (8칸 x 2줄)
+    RAID_TIMES: [
+        '01시', '03시', '05시', '07시', '09시', '11시', '12시', '13시',
+        '15시', '17시', '18시', '19시', '21시', '22시(오만)', '23시', '24시'
+    ],
+
+    // 메인 보스탐 고정 4개 타임 (09시, 15시, 21시, 03시)
+    MAIN_RAID_TIMES: ['09시', '15시', '21시', '03시'],
+
     initPage(activePath, onAdminToggleCallback = null) {
         const saved = localStorage.getItem('clan_user');
         if (!saved) {
@@ -20,6 +28,7 @@ window.ClanApp = {
         this.isAdminModeOn = this.hasAdminPrivilege && (localStorage.getItem('clan_admin_mode') === 'true');
         this.onAdminToggle = onAdminToggleCallback;
 
+        document.body.classList.toggle('admin-mode', this.isAdminModeOn);
         this.renderNavbar(activePath);
         return this.user;
     },
@@ -28,33 +37,53 @@ window.ClanApp = {
         const nav = document.getElementById('appNavbar');
         if (!nav || !this.user) return;
 
+        // 상단 6개 메인 메뉴
         const links = [
-            { href: '/raid-record', label: '보스탐 기록' },
-            { href: '/raid-status', label: '일별기록현황' },
-            { href: '/item-status', label: '템 보유현황' },
-            { href: '/distribution', label: '분배금 관리' },
-            { href: '/my-history', label: `${this.user.active_id} 참여내역` }
+            { href: '/raid-record', label: '보스탐기록' },
+            { href: '/raid-status', label: '일별현황' },
+            { href: '/item-status', label: '템보유현황' },
+            { href: '/distribution', label: '분배금관리' },
+            { href: '/my-history', label: '내참여내역' },
+            { href: '/attendance', label: '참여도' }
         ];
 
-        const leftHtml = links.map(l =>
+        const adminTabs = [];
+        // 회원관리는 관리자 이상만 노출
+        if (this.hasAdminPrivilege && (this.isAdminModeOn || activePath === '/admin')) {
+            adminTabs.push({ href: '/admin', label: '회원관리' });
+        }
+        // '아이템관리' -> '아이템'으로 변경 (일반회원도 모두 열람 가능)
+        adminTabs.push({ href: '/item-manage', label: '아이템' });
+
+        const adminTabsHtml = adminTabs.map(l =>
+            `<a href="${l.href}" class="nav-admin-link ${activePath === l.href ? 'active' : ''}">${l.label}</a>`
+        ).join('');
+
+        const menuGridHtml = links.map(l =>
             `<a href="${l.href}" class="nav-link ${activePath === l.href ? 'active' : ''}">${l.label}</a>`
         ).join('');
 
         const adminToggleHtml = this.hasAdminPrivilege
-            ? `<button id="adminModeBtn" onclick="ClanApp.toggleAdminMode()" class="admin-mode-toggle ${this.isAdminModeOn ? 'active' : ''}">
-                 👑 관리자 모드: ${this.isAdminModeOn ? 'ON' : 'OFF'}
-               </button>
-               <a href="/admin" id="navAdminBtn" class="nav-link admin-btn ${activePath === '/admin' ? 'active' : ''} ${this.isAdminModeOn || activePath === '/admin' ? '' : 'hidden'}">회원관리</a>`
+            ? `<button id="adminModeBtn" type="button" onclick="ClanApp.toggleAdminMode()" class="admin-mode-toggle ${this.isAdminModeOn ? 'active' : ''}">
+                 👑 관리자 ${this.isAdminModeOn ? 'ON' : 'OFF'}
+               </button>`
             : '';
 
         nav.innerHTML = `
-            <div class="nav-left">${leftHtml}</div>
-            <div class="nav-right">
-                <span style="color: var(--accent-gold); font-weight: 700; font-size: 0.86rem; margin-right: 0.25rem; white-space: nowrap;">
-                    ${this.user.active_id} (${this.role})
-                </span>
-                ${adminToggleHtml}
-                <button onclick="ClanApp.logout()" class="btn btn-dark" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">로그아웃</button>
+            <div class="nav-inner-container">
+                <div class="nav-top-bar">
+                    <div class="nav-user-box">
+                        <span class="nav-user-name">${this.user.active_id} <small>(${this.role})</small></span>
+                        <button type="button" onclick="ClanApp.logout()" class="btn-logout-mini">로그아웃</button>
+                    </div>
+                    <div class="nav-admin-box">
+                        ${adminTabsHtml}
+                        ${adminToggleHtml}
+                    </div>
+                </div>
+                <div class="nav-menu-grid cols-${links.length}">
+                    ${menuGridHtml}
+                </div>
             </div>
         `;
     },
@@ -63,6 +92,7 @@ window.ClanApp = {
         if (!this.hasAdminPrivilege) return;
         this.isAdminModeOn = !this.isAdminModeOn;
         localStorage.setItem('clan_admin_mode', this.isAdminModeOn ? 'true' : 'false');
+        document.body.classList.toggle('admin-mode', this.isAdminModeOn);
         this.renderNavbar(window.location.pathname);
         if (typeof this.onAdminToggle === 'function') {
             this.onAdminToggle(this.isAdminModeOn);
@@ -90,20 +120,63 @@ window.ClanApp = {
         return `${yyyy}-${mm}`;
     },
 
-    // 레코드에서 아이템 상세 배열 추출 (분배일자 dist_date 포함)
-    extractItemDetails(record) {
+    getWeekRange(dateStr) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const dow = (new Date(y, m - 1, d).getDay() + 6) % 7;
+        const start = this.formatYMD(new Date(y, m - 1, d - dow));
+        const end = this.formatYMD(new Date(y, m - 1, d - dow + 6));
+        return { start, end };
+    },
+
+    parseRaidHour(timeLabel) {
+        const m = String(timeLabel || '').match(/^(\d{1,2})시/);
+        return m ? parseInt(m[1], 10) : 0;
+    },
+
+    getDefaultRaidTime(now = new Date()) {
+        const currentHour = now.getHours();
+        let selected = this.RAID_TIMES[0];
+
+        for (const slot of this.RAID_TIMES) {
+            const slotHour = this.parseRaidHour(slot);
+            if (slotHour <= currentHour) {
+                selected = slot;
+            }
+        }
+        return selected;
+    },
+
+    getSlotStatus(dateStr, timeLabel, now = new Date()) {
+        const hourNum = this.parseRaidHour(timeLabel);
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const slotTime = new Date(y, m - 1, d, hourNum, 0, 0);
+        const diffHours = (now - slotTime) / (1000 * 60 * 60);
+
+        if (diffHours < 0) return 'future';
+        if (diffHours <= 3.0) return 'open';
+        return 'expired';
+    },
+
+    extractItemDetails(record, priceMap = {}) {
         if (!record) return [];
         const rawTokens = (record.dropped_items || '').split(/[\s,，\n]+/).map(s => s.trim()).filter(Boolean);
         const savedDetails = Array.isArray(record.item_details) ? record.item_details : [];
 
         if (savedDetails.length > 0 && rawTokens.length === 0) {
-            return savedDetails.map(d => ({
-                name: d.name || '',
-                price: Number(d.price || 0),
-                winner: d.winner || '',
-                taken_date: d.taken_date || '',
-                dist_date: d.dist_date || ''
-            }));
+            return savedDetails.map(d => {
+                const name = d.name || '';
+                const savedPrice = Number(d.price || 0);
+                const distDate = d.dist_date || '';
+                return {
+                    name,
+                    sale_type: d.sale_type || '보유중',
+                    price: savedPrice > 0 ? savedPrice : Number(priceMap[name] || 0),
+                    winner: d.winner || '',
+                    taken_date: d.taken_date || '',
+                    dist_date: distDate,
+                    dist_checked: Boolean(d.dist_checked || distDate)
+                };
+            });
         }
 
         const usedIdx = new Set();
@@ -116,17 +189,20 @@ window.ClanApp = {
                     break;
                 }
             }
+            const savedPrice = found ? Number(found.price || 0) : 0;
+            const distDate = found ? (found.dist_date || '') : '';
             return {
                 name: token,
-                price: found ? Number(found.price || 0) : 0,
+                sale_type: found && found.sale_type ? found.sale_type : '보유중',
+                price: savedPrice > 0 ? savedPrice : Number(priceMap[token] || 0),
                 winner: found ? (found.winner || '') : '',
                 taken_date: found ? (found.taken_date || '') : '',
-                dist_date: found ? (found.dist_date || '') : ''
+                dist_date: distDate,
+                dist_checked: Boolean((found && found.dist_checked) || distDate)
             };
         });
     },
 
-    // 레코드에서 중복 제거된 참여자 목록 추출
     extractParticipants(record) {
         const ordered = [];
         const seen = new Set();
@@ -145,11 +221,15 @@ window.ClanApp = {
         return ordered;
     },
 
-    // 일별 또는 월별 엑셀(CSV) 다운로드 실행
-    downloadExcel({ date = '', month = '' } = {}) {
+    downloadExcel({ date = '', month = '', start = '', end = '' } = {}) {
         const params = new URLSearchParams();
         if (date) params.set('date', date);
-        else if (month) params.set('month', month);
+        else if (start && end) {
+            params.set('start', start);
+            params.set('end', end);
+        } else if (month) {
+            params.set('month', month);
+        }
         window.location.href = `/api/raids/export-excel?${params.toString()}`;
     }
 };

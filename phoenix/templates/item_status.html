@@ -2,167 +2,241 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>템 보유현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/style.css?v=7">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/common.css?v=18">
+    <link rel="stylesheet" href="/static/item_status.css?v=18">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
 
-    <main class="container">
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.9rem;">
-                <h2 class="section-title" style="margin-bottom: 0;">💎 혈맹 템 보유 및 판매·분배일자 현황</h2>
-                <button class="btn btn-blue" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" onclick="exportCurrentFilterExcel()">
-                    📥 현재 기준 엑셀 다운로드
-                </button>
+    <main class="main-container">
+        <!-- 상단 타이틀 & 관리자 전용 4종 엑셀 다운로드 -->
+        <div class="top-bar">
+            <h1 class="page-title">💎 혈맹 아이템 현황</h1>
+            <div class="excel-btn-group admin-only">
+                <button type="button" class="btn-excel-sm" onclick="exportItemExcel('day')">📥 일</button>
+                <button type="button" class="btn-excel-sm" onclick="exportItemExcel('week')">주</button>
+                <button type="button" class="btn-excel-sm" onclick="exportItemExcel('month')">월</button>
+                <button type="button" class="btn-excel-sm" onclick="exportItemExcel('all')">전체목록</button>
             </div>
+        </div>
 
-            <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem;">
-                <div>
-                    <label>조회 기준</label>
-                    <select id="viewModeSelect" onchange="onViewModeChange()" style="width: 125px;">
-                        <option value="month">월별 전체</option>
-                        <option value="date">특정 날짜별</option>
+        <!-- 1. 조회 기준 (월별 / 주별 / 일별 / 전체 / 특정일 5가지) 및 검색 필터 -->
+        <section class="card-box">
+            <div class="filter-grid-box">
+                <div class="filter-field">
+                    <label>조회 기준 (5종)</label>
+                    <select id="viewModeSelect" class="input-common" onchange="onViewModeChange()">
+                        <option value="month">월별</option>
+                        <option value="week">주별</option>
+                        <option value="today">일별 (오늘)</option>
+                        <option value="all">전체</option>
+                        <option value="custom_date">특정일</option>
                     </select>
                 </div>
-                <div id="monthPickerBox">
-                    <label>기준 월</label>
-                    <input type="month" id="filterMonth" onchange="loadItemStatusData()" style="width: auto;">
+
+                <div id="monthPickerBox" class="filter-field">
+                    <label>기준 월 선택</label>
+                    <input type="month" id="filterMonth" class="input-common" onchange="loadItemStatusData()">
                 </div>
-                <div id="datePickerBox" class="hidden">
-                    <label>획득 날짜</label>
-                    <input type="date" id="filterDate" onchange="loadItemStatusData()" style="width: auto;">
+
+                <div id="datePickerBox" class="filter-field hidden">
+                    <label id="datePickerLabel">기준 날짜 선택</label>
+                    <input type="date" id="filterDate" class="input-common" onchange="loadItemStatusData()">
                 </div>
-                <div>
-                    <label>판매 상태</label>
-                    <select id="saleTypeFilter" onchange="renderItemTable()" style="width: 135px;">
-                        <option value="all">전체 보기</option>
-                        <option value="holding">보유중</option>
-                        <option value="clan">혈원판매</option>
-                        <option value="external">외판</option>
+
+                <div id="allModeNoticeBox" class="filter-field hidden">
+                    <label>조회 범위</label>
+                    <input type="text" class="input-common" value="전체 기간 누적" disabled>
+                </div>
+
+                <div class="filter-field">
+                    <label>구분 필터</label>
+                    <select id="saleTypeFilter" class="input-common" onchange="renderItemTable()">
+                        <option value="all">전체 구분</option>
+                        <option value="보유중">보유중</option>
+                        <option value="내판">내판</option>
+                        <option value="외판">외판</option>
+                        <option value="이벤트">이벤트</option>
                     </select>
                 </div>
-                <div style="flex: 1; min-width: 140px;">
-                    <label>아이템 / 구매자 검색</label>
-                    <input type="text" id="keywordSearch" placeholder="아이템명 또는 구매자" oninput="renderItemTable()">
+
+                <div class="filter-field">
+                    <label>아이템 / 당첨자 검색</label>
+                    <input type="text" id="keywordSearch" class="input-common" placeholder="아이템명 또는 당첨자" oninput="renderItemTable()">
                 </div>
             </div>
+        </section>
 
-            <div class="summary-kpi-grid">
-                <div class="kpi-box">
-                    <div class="kpi-label">총 아이템 / 보유중</div>
-                    <div class="kpi-value" id="kpiTotalItems">0건</div>
-                </div>
-                <div class="kpi-box">
-                    <div class="kpi-label">총 판매 금액</div>
-                    <div class="kpi-value" id="kpiGrossAdena">0</div>
-                </div>
-                <div class="kpi-box">
-                    <div class="kpi-label">혈비 (<span id="kpiTaxLabel">20</span>%)</div>
-                    <div class="kpi-value" style="color: #60a5fa;" id="kpiTaxAdena">0</div>
-                </div>
-                <div class="kpi-box">
-                    <div class="kpi-label">분배 가능 총액</div>
-                    <div class="kpi-value" style="color: #34d399;" id="kpiNetAdena">0</div>
-                </div>
+        <!-- 2. 아이템 목록 테이블 -->
+        <section class="card-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span class="section-label">📋 아이템 목록</span>
+                <span id="itemTotalCountBadge" style="font-size: 12px; font-weight: bold; color: #60a5fa;">총 0건</span>
             </div>
 
-            <div class="table-scroll">
-                <table class="data-table">
+            <datalist id="clanMemberDatalist"></datalist>
+
+            <div class="status-table-wrap">
+                <table class="item-status-table">
                     <thead>
                         <tr>
                             <th>획득일</th>
-                            <th>보스탐</th>
+                            <th>시간</th>
                             <th>아이템명</th>
                             <th>구분</th>
-                            <th>판매 가격</th>
-                            <th>구매자(당첨자)</th>
-                            <th>수령일</th>
-                            <th>분배일자</th>
-                            <th id="adminEditCol" class="hidden">관리자 정산 설정</th>
+                            <th>판매가격</th>
+                            <th>당첨자</th>
+                            <th>판매<br>완료일</th>
+                            <th>분배<br>완료일</th>
+                            <th id="adminSaveHeader" class="hidden">관리</th>
                         </tr>
                     </thead>
-                    <tbody id="itemStatusTableBody"></tbody>
+                    <tbody id="itemStatusTableBody">
+                        <tr><td colspan="9" class="empty-party-msg">조회 중...</td></tr>
+                    </tbody>
                 </table>
             </div>
-        </div>
+        </section>
     </main>
 
-    <script src="/static/common.js?v=7"></script>
+    <script src="/static/common.js?v=18"></script>
     <script>
-        let currentTaxRate = 20;
         let allMembers = [];
+        let itemPriceMap = {};
         let flattenedItems = [];
+        let editingItemKeys = new Set(); // 디폴트는 모두 잠금(텍스트 표시), [수정] 버튼을 누른 행만 입력창 활성화
 
         window.onload = async () => {
             const user = ClanApp.initPage('/item-status', () => {
-                document.getElementById('adminEditCol').classList.toggle('hidden', !ClanApp.isAdminModeOn);
+                document.getElementById('adminSaveHeader').classList.toggle('hidden', !ClanApp.isAdminModeOn);
+                if (!ClanApp.isAdminModeOn) editingItemKeys.clear();
                 renderItemTable();
             });
             if (!user) return;
 
-            document.getElementById('adminEditCol').classList.toggle('hidden', !ClanApp.isAdminModeOn);
-
-            const [taxRes, memRes] = await Promise.all([
-                fetch('/api/raids/tax-rate'),
-                fetch('/api/auth/search-members')
-            ]);
-            currentTaxRate = (await taxRes.json()).tax_rate ?? 20;
-            allMembers = await memRes.json();
-            document.getElementById('kpiTaxLabel').textContent = currentTaxRate;
+            document.getElementById('adminSaveHeader').classList.toggle('hidden', !ClanApp.isAdminModeOn);
 
             const now = new Date();
             document.getElementById('filterMonth').value = ClanApp.formatYM(now);
             document.getElementById('filterDate').value = ClanApp.formatYMD(now);
+
+            await Promise.all([loadMembersForDatalist(), loadItemMasterPrices()]);
             await loadItemStatusData();
         };
 
-        function exportCurrentFilterExcel() {
-            const mode = document.getElementById('viewModeSelect').value;
-            if (mode === 'date') ClanApp.downloadExcel({ date: document.getElementById('filterDate').value });
-            else ClanApp.downloadExcel({ month: document.getElementById('filterMonth').value });
+        async function loadMembersForDatalist() {
+            try {
+                const res = await fetch('/api/auth/search-members');
+                allMembers = await res.json();
+                const dl = document.getElementById('clanMemberDatalist');
+                dl.innerHTML = allMembers.map(m => `<option value="${m.active_id}">${m.char_class} (${m.clan})</option>`).join('');
+            } catch (e) {
+                allMembers = [];
+            }
+        }
+
+        async function loadItemMasterPrices() {
+            itemPriceMap = {};
+            try {
+                const res = await fetch('/api/items');
+                if (!res.ok) return;
+                const list = await res.json();
+                list.forEach(it => {
+                    if (it.item_name) itemPriceMap[it.item_name] = Number(it.default_price || 0);
+                });
+            } catch (e) {
+                itemPriceMap = {};
+            }
         }
 
         function onViewModeChange() {
-            const isMonth = document.getElementById('viewModeSelect').value === 'month';
-            document.getElementById('monthPickerBox').classList.toggle('hidden', !isMonth);
-            document.getElementById('datePickerBox').classList.toggle('hidden', isMonth);
+            const mode = document.getElementById('viewModeSelect').value;
+            const monthBox = document.getElementById('monthPickerBox');
+            const dateBox = document.getElementById('datePickerBox');
+            const allBox = document.getElementById('allModeNoticeBox');
+            const dateLabel = document.getElementById('datePickerLabel');
+
+            monthBox.classList.add('hidden');
+            dateBox.classList.add('hidden');
+            allBox.classList.add('hidden');
+
+            if (mode === 'month') {
+                monthBox.classList.remove('hidden');
+            } else if (mode === 'week') {
+                dateLabel.textContent = '주간 기준일 선택';
+                dateBox.classList.remove('hidden');
+            } else if (mode === 'today') {
+                document.getElementById('filterDate').value = ClanApp.formatYMD(new Date());
+                dateLabel.textContent = '오늘 날짜';
+                dateBox.classList.remove('hidden');
+            } else if (mode === 'custom_date') {
+                dateLabel.textContent = '특정일 선택';
+                dateBox.classList.remove('hidden');
+            } else {
+                allBox.classList.remove('hidden');
+            }
+
             loadItemStatusData();
         }
 
         async function loadItemStatusData() {
             const mode = document.getElementById('viewModeSelect').value;
-            const query = mode === 'month'
-                ? `?month=${document.getElementById('filterMonth').value}`
-                : `?date=${document.getElementById('filterDate').value}`;
+            const dateVal = document.getElementById('filterDate').value || ClanApp.formatYMD(new Date());
+            const monthVal = document.getElementById('filterMonth').value || ClanApp.formatYM(new Date());
+
+            let query = '';
+            if (mode === 'month') {
+                query = `?month=${encodeURIComponent(monthVal)}`;
+            } else if (mode === 'week') {
+                const { start, end } = ClanApp.getWeekRange(dateVal);
+                query = `?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+            } else if (mode === 'today' || mode === 'custom_date') {
+                query = `?date=${encodeURIComponent(dateVal)}`;
+            } else {
+                query = '';
+            }
+
             const res = await fetch(`/api/raids${query}`);
             const raids = await res.json();
-            const memberSet = new Set(allMembers.map(m => m.active_id));
+            const todayStr = ClanApp.formatYMD(new Date());
 
             flattenedItems = [];
             raids.forEach(r => {
-                const details = ClanApp.extractItemDetails(r);
+                const details = ClanApp.extractItemDetails(r, itemPriceMap);
                 details.forEach((item, idx) => {
-                    const buyer = (item.winner || '').trim();
-                    const price = Number(item.price || 0);
-                    let saleType = 'holding';
-                    if (buyer || price > 0) saleType = (buyer && memberSet.has(buyer)) ? 'clan' : 'external';
+                    let sType = item.sale_type || '보유중';
+                    if (!['보유중', '내판', '외판', '이벤트'].includes(sType)) {
+                        sType = '보유중';
+                    }
 
                     flattenedItems.push({
-                        raid_id: r.id, item_idx: idx, raid_date: r.raid_date, raid_time: r.raid_time,
-                        name: item.name, price, winner: buyer,
-                        taken_date: item.taken_date || '', dist_date: item.dist_date || '',
-                        sale_type: saleType, full_details_ref: details
+                        key: `${r.id}_${idx}`,
+                        raid_id: r.id,
+                        item_idx: idx,
+                        raid_date: r.raid_date,
+                        raid_time: r.raid_time,
+                        name: item.name,
+                        sale_type: sType,
+                        price: Number(item.price || 0),
+                        winner: item.winner || '',
+                        taken_date: item.taken_date || '',
+                        default_taken_date: item.taken_date || todayStr,
+                        dist_date: item.dist_date || '',
+                        dist_checked: Boolean(item.dist_checked || item.dist_date),
+                        full_details_ref: details
                     });
                 });
             });
+
             renderItemTable();
         }
 
         function getFilteredItems() {
             const typeFilter = document.getElementById('saleTypeFilter').value;
             const kw = document.getElementById('keywordSearch').value.trim().toLowerCase();
+
             return flattenedItems.filter(row => {
                 if (typeFilter !== 'all' && row.sale_type !== typeFilter) return false;
                 if (kw && !row.name.toLowerCase().includes(kw) && !row.winner.toLowerCase().includes(kw)) return false;
@@ -170,72 +244,211 @@
             });
         }
 
+        function startEditItemRow(key) {
+            if (!ClanApp.isAdminModeOn) return;
+            editingItemKeys.add(key);
+            renderItemTable();
+        }
+
         function renderItemTable() {
             const filtered = getFilteredItems();
-            const holding = filtered.filter(x => x.sale_type === 'holding').length;
-            const gross = filtered.reduce((a, c) => a + c.price, 0);
-            const tax = Math.floor(gross * (currentTaxRate / 100));
-
-            document.getElementById('kpiTotalItems').textContent = `${filtered.length}건 (보유 ${holding})`;
-            document.getElementById('kpiGrossAdena').textContent = `${gross.toLocaleString()}`;
-            document.getElementById('kpiTaxAdena').textContent = `${tax.toLocaleString()}`;
-            document.getElementById('kpiNetAdena').textContent = `${(gross - tax).toLocaleString()}`;
+            document.getElementById('itemTotalCountBadge').textContent = `총 ${filtered.length}건`;
 
             const tbody = document.getElementById('itemStatusTableBody');
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted);">내역이 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="empty-party-msg">조회된 아이템 내역이 없습니다.</td></tr>`;
                 return;
             }
 
+            const isAdmin = ClanApp.isAdminModeOn;
+
             tbody.innerHTML = filtered.map((row, i) => {
-                const badge = row.sale_type === 'holding'
-                    ? `<span class="status-badge badge-holding">보유중</span>`
-                    : (row.sale_type === 'clan' ? `<span class="status-badge badge-clan">혈원판매</span>` : `<span class="status-badge badge-external">외판</span>`);
+                const shortDate = row.raid_date.slice(2);
+                const badgeHtml = `<span class="sale-badge type-${row.sale_type}">${row.sale_type}</span>`;
 
-                const adminCol = ClanApp.isAdminModeOn ? `
-                    <td>
-                        <div style="display:flex; gap:0.25rem; flex-wrap:wrap; align-items:center;">
-                            <input type="number" id="stPrice_${i}" value="${row.price || ''}" placeholder="가격" style="width:80px; padding:0.2rem; font-size:0.75rem;">
-                            <input type="text" id="stBuyer_${i}" value="${row.winner}" placeholder="구매자" style="width:75px; padding:0.2rem; font-size:0.75rem;">
-                            <input type="date" id="stTaken_${i}" value="${row.taken_date}" title="수령일" style="width:110px; padding:0.18rem; font-size:0.72rem;">
-                            <input type="date" id="stDist_${i}" value="${row.dist_date}" title="분배일자" style="width:110px; padding:0.18rem; font-size:0.72rem;">
-                            <button class="btn btn-green" style="padding:0.2rem 0.45rem; font-size:0.74rem;" onclick="saveRow(${i})">저장</button>
-                        </div>
-                    </td>` : '';
+                // 1. 일반 모드: 전체 조회 전용
+                if (!isAdmin) {
+                    return `
+                        <tr>
+                            <td>${shortDate}</td>
+                            <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
+                            <td style="color:#fbbf24; font-weight:800;">${row.name}</td>
+                            <td>${badgeHtml}</td>
+                            <td style="color:#4ade80; font-weight:700;">${row.price > 0 ? row.price.toLocaleString() : '-'}</td>
+                            <td style="color:#a7f3d0; font-weight:700;">${row.winner || '-'}</td>
+                            <td>${row.taken_date || '-'}</td>
+                            <td style="color:#60a5fa; font-weight:700;">${row.dist_date || '-'}</td>
+                        </tr>
+                    `;
+                }
 
-                return `<tr>
-                    <td>${row.raid_date}</td>
-                    <td style="color:var(--accent-gold); font-weight:700;">${row.raid_time}</td>
-                    <td style="font-weight:800;">${row.name}</td>
-                    <td>${badge}</td>
-                    <td>${row.price > 0 ? `<b style="color:var(--accent-gold);">${row.price.toLocaleString()}</b>` : '-'}</td>
-                    <td><b style="color:#a7f3d0;">${row.winner || '-'}</b></td>
-                    <td>${row.taken_date || '-'}</td>
-                    <td style="color:#93c5fd; font-weight:700;">${row.dist_date || '-'}</td>
-                    ${adminCol}
-                </tr>`;
+                const hasDistDate = Boolean(row.dist_date && row.dist_date.trim());
+                const isEditing = editingItemKeys.has(row.key);
+
+                // 분배완료일 칸: 분배완료일이 있으면 날짜만 깔끔하게 표시(체크박스 숨김), 미분배 상태면 분배 체크박스 표시
+                const distCellHtml = hasDistDate
+                    ? `<span class="dist-date-text">${row.dist_date}</span>`
+                    : `<div class="dist-check-cell">
+                           <span class="dist-date-text empty">미분배</span>
+                           <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
+                                  ${row.dist_checked ? 'checked' : ''}
+                                  title="체크 시 분배금 관리에 표시됩니다."
+                                  onchange="onDistCheckToggle(${i})">
+                       </div>`;
+
+                // 2. 관리자 모드 (기본 상태 = 저장된 내용 텍스트 표시 + 우측 [수정] 버튼)
+                if (!isEditing) {
+                    return `
+                        <tr>
+                            <td>${shortDate}</td>
+                            <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
+                            <td style="color:#fbbf24; font-weight:800;">${row.name}</td>
+                            <td>${badgeHtml}</td>
+                            <td style="color:#4ade80; font-weight:700;">${row.price > 0 ? row.price.toLocaleString() : '-'}</td>
+                            <td style="color:#a7f3d0; font-weight:700;">${row.winner || '-'}</td>
+                            <td>${row.taken_date || '-'}</td>
+                            <td>${distCellHtml}</td>
+                            <td>
+                                <button type="button" class="btn-row-edit" onclick="startEditItemRow('${row.key}')">수정</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                // 3. 관리자 모드 ([수정] 버튼을 누른 행만 입력창 + [저장] 버튼 활성화)
+                return `
+                    <tr>
+                        <td>${shortDate}</td>
+                        <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
+                        <td style="color:#fbbf24; font-weight:800;">${row.name}</td>
+                        <td>
+                            <select id="stType_${i}" class="tbl-select">
+                                <option value="보유중" ${row.sale_type === '보유중' ? 'selected' : ''}>보유중</option>
+                                <option value="내판" ${row.sale_type === '내판' ? 'selected' : ''}>내판</option>
+                                <option value="외판" ${row.sale_type === '외판' ? 'selected' : ''}>외판</option>
+                                <option value="이벤트" ${row.sale_type === '이벤트' ? 'selected' : ''}>이벤트</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" id="stPrice_${i}" class="tbl-input tbl-price-input" value="${row.price || 0}" min="0">
+                        </td>
+                        <td>
+                            <input type="text" id="stWinner_${i}" class="tbl-input tbl-winner-input" list="clanMemberDatalist"
+                                   value="${row.winner}" placeholder="당첨자 검색">
+                        </td>
+                        <td>
+                            <input type="date" id="stTaken_${i}" class="tbl-input tbl-date-input" value="${row.default_taken_date}">
+                        </td>
+                        <td>${distCellHtml}</td>
+                        <td>
+                            <button type="button" class="btn-sm btn-sm-green" style="padding: 4px 8px; font-size: 11px;" onclick="saveItemRow(${i})">저장</button>
+                        </td>
+                    </tr>
+                `;
             }).join('');
         }
 
-        async function saveRow(i) {
+        // 미분배 상태에서 체크박스만 바로 토글했을 때 즉시 반영
+        async function onDistCheckToggle(i) {
+            if (!ClanApp.isAdminModeOn) return;
             const target = getFilteredItems()[i];
             if (!target) return;
-            const price = Number(document.getElementById(`stPrice_${i}`).value.trim() || 0);
-            const winner = document.getElementById(`stBuyer_${i}`).value.trim();
-            const taken_date = document.getElementById(`stTaken_${i}`).value || (winner ? ClanApp.formatYMD() : '');
-            const dist_date = document.getElementById(`stDist_${i}`).value || '';
 
-            const updated = [...target.full_details_ref];
-            updated[target.item_idx] = { name: target.name, price, winner, taken_date, dist_date };
+            const chkEl = document.getElementById(`stDistChk_${i}`);
+            const dist_checked = chkEl ? chkEl.checked : target.dist_checked;
+
+            // 만약 현재 수정 모드 열려있는 상태라면 입력창 값도 함께 가져옴
+            const typeEl = document.getElementById(`stType_${i}`);
+            const priceEl = document.getElementById(`stPrice_${i}`);
+            const winnerEl = document.getElementById(`stWinner_${i}`);
+            const takenEl = document.getElementById(`stTaken_${i}`);
+
+            const updatedDetails = [...target.full_details_ref];
+            updatedDetails[target.item_idx] = {
+                name: target.name,
+                sale_type: typeEl ? typeEl.value : target.sale_type,
+                price: priceEl ? Number(priceEl.value || 0) : target.price,
+                winner: winnerEl ? winnerEl.value.trim() : target.winner,
+                taken_date: takenEl ? takenEl.value : target.taken_date,
+                dist_date: target.dist_date || '',
+                dist_checked
+            };
 
             const res = await fetch('/api/raids/item-details', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ raid_id: target.raid_id, item_details: updated, requester_role: ClanApp.role })
+                body: JSON.stringify({
+                    raid_id: target.raid_id,
+                    item_details: updatedDetails,
+                    requester_role: ClanApp.role
+                })
             });
+
             if (res.ok) {
-                alert('저장되었습니다.');
                 await loadItemStatusData();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '체크 저장 실패');
+            }
+        }
+
+        // [저장] 버튼 클릭 시 저장 후 다시 조회 전용(잠금 + [수정] 버튼) 상태로 복귀
+        async function saveItemRow(i) {
+            if (!ClanApp.isAdminModeOn) return;
+            const target = getFilteredItems()[i];
+            if (!target) return;
+
+            const sale_type = document.getElementById(`stType_${i}`).value;
+            const price = Number(document.getElementById(`stPrice_${i}`).value || 0);
+            const winner = document.getElementById(`stWinner_${i}`).value.trim();
+            const taken_date = document.getElementById(`stTaken_${i}`).value || ClanApp.formatYMD(new Date());
+            const chkEl = document.getElementById(`stDistChk_${i}`);
+            const dist_checked = chkEl ? chkEl.checked : target.dist_checked;
+
+            const updatedDetails = [...target.full_details_ref];
+            updatedDetails[target.item_idx] = {
+                name: target.name,
+                sale_type,
+                price,
+                winner,
+                taken_date,
+                dist_date: target.dist_date || '',
+                dist_checked
+            };
+
+            const res = await fetch('/api/raids/item-details', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_id: target.raid_id,
+                    item_details: updatedDetails,
+                    requester_role: ClanApp.role
+                })
+            });
+
+            if (res.ok) {
+                editingItemKeys.delete(target.key);
+                await loadItemStatusData();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '저장 실패');
+            }
+        }
+
+        function exportItemExcel(kind) {
+            if (!ClanApp.isAdminModeOn) return;
+            const refDate = document.getElementById('filterDate').value || ClanApp.formatYMD(new Date());
+            const refMonth = document.getElementById('filterMonth').value || ClanApp.formatYM(new Date());
+
+            if (kind === 'day') {
+                ClanApp.downloadExcel({ date: refDate });
+            } else if (kind === 'week') {
+                const { start, end } = ClanApp.getWeekRange(refDate);
+                ClanApp.downloadExcel({ start, end });
+            } else if (kind === 'month') {
+                ClanApp.downloadExcel({ month: refMonth });
+            } else {
+                ClanApp.downloadExcel({});
             }
         }
     </script>

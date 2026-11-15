@@ -1,0 +1,143 @@
+/* =========================================================
+   [item_manage.css] 아이템 목록 및 시세 페이지 전용 스타일
+   (일반회원 열람 가능 / 관리자 모드에서 추가·수정·삭제)
+   ========================================================= */
+
+.item-count-badge {
+    font-size: 12px;
+    font-weight: bold;
+    color: #60a5fa;
+}
+
+.item-guide-text {
+    font-size: 12px;
+    color: #9ca3af;
+    margin: 6px 0 10px;
+}
+
+/* 혈비(%) 설정 박스 (관리자 전용) */
+.tax-config-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.tax-input-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tax-rate-input {
+    width: 90px;
+    text-align: right;
+    font-weight: 800;
+    color: #fbbf24;
+}
+
+.item-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 6px;
+}
+
+.item-add-btn {
+    min-width: 56px;
+}
+
+.item-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.item-search {
+    width: 180px;
+}
+
+/* 등록된 아이템 테이블 (아이템명 | 내판가 | 혈비제외가 | 관리) */
+.item-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.item-master-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.item-master-table th,
+.item-master-table td {
+    padding: 9px 8px;
+    border-bottom: 1px solid #2e2e32;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.item-master-table th {
+    background-color: #27272a;
+    color: #fbbf24;
+    font-weight: 800;
+    font-size: 12px;
+}
+
+.item-name-cell {
+    font-weight: 800;
+    color: #fbbf24;
+    font-size: 13.5px;
+}
+
+.item-alias-sub {
+    display: block;
+    font-size: 11px;
+    color: #9ca3af;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.item-gross-cell {
+    font-weight: 800;
+    color: #ffffff;
+    font-size: 13px;
+}
+
+.item-net-cell {
+    font-weight: 800;
+    color: #4ade80;
+    font-size: 13px;
+}
+
+.item-row-actions {
+    display: inline-flex;
+    gap: 4px;
+    justify-content: center;
+}
+
+.edit-inline-input {
+    width: 100%;
+    max-width: 140px;
+    padding: 5px 7px;
+    font-size: 12px;
+    text-align: center;
+}
+
+@media (max-width: 520px) {
+    .item-form-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .item-add-btn {
+        grid-column: 1 / -1;
+        padding: 9px;
+    }
+    .item-search {
+        width: 130px;
+    }
+}

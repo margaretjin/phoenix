@@ -9,9 +9,10 @@ from database import supabase
 
 router = APIRouter(prefix="/api/raids", tags=["Raids"])
 
+# 고정 16개 보스탐 시간 배열 (20시 제외)
 RAID_TIMES = [
-    "09시", "11시", "12시", "13시", "15시", "17시", "18시", "19시",
-    "21시", "22시(오만)", "23시", "24시", "01시", "03시", "05시", "07시"
+    "01시", "03시", "05시", "07시", "09시", "11시", "12시", "13시",
+    "15시", "17시", "18시", "19시", "21시", "22시(오만)", "23시", "24시"
 ]
 
 class PartyInfo(BaseModel):
@@ -22,16 +23,19 @@ class RaidSaveRequest(BaseModel):
     raid_date: str
     raid_time: str
     parties: List[PartyInfo]
-    dropped_items: Optional[str] = ""
+    dropped_items: Optional[str] = None
+    add_items: Optional[str] = None
     requester_role: str
     requester_id: str
 
 class ItemDetailEntry(BaseModel):
     name: str
+    sale_type: str = "보유중"       # "보유중" | "내판" | "외판" | "이벤트"
     price: int = 0
     winner: str = ""
-    taken_date: str = ""
-    dist_date: str = ""  # 아이템별 분배일자
+    taken_date: str = ""            # 판매완료일
+    dist_date: str = ""             # 분배완료일
+    dist_checked: bool = False      # 템보유현황에서 분배금 관리 대상으로 체크 여부
 
 class ItemDetailsUpdateRequest(BaseModel):
     raid_id: int
@@ -39,10 +43,10 @@ class ItemDetailsUpdateRequest(BaseModel):
     requester_role: str
 
 class MemberDistributionEntry(BaseModel):
-    status: str = "분배대기"     # "분배대기" | "분배완료"
-    method: str = "본인수령"     # "본인수령" | "대리수령"
-    proxy_name: str = ""        # 대리수령자 아이디
-    paid_date: str = ""         # 분배 완료 처리일 (YYYY-MM-DD)
+    status: str = "분배대기"
+    method: str = "본인수령"
+    proxy_name: str = ""
+    paid_date: str = ""
 
 class DistributionUpdateRequest(BaseModel):
     raid_id: int
@@ -62,8 +66,16 @@ def get_global_tax_rate() -> float:
         pass
     return 20.0
 
+def get_item_master_price_map() -> Dict[str, int]:
+    try:
+        res = supabase.table("item_master").select("item_name, default_price").execute()
+        return {row["item_name"]: int(row.get("default_price") or 0) for row in (res.data or []) if row.get("item_name")}
+    except Exception:
+        return {}
+
 def sync_item_details_from_text(dropped_text: str, existing_details: list) -> list:
     tokens = [t.strip() for t in re.split(r'[\s,，\n]+', (dropped_text or '').strip()) if t.strip()]
+    price_map = get_item_master_price_map()
     used_indices = set()
     synced = []
 
@@ -74,23 +86,32 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
                 matched_item = ex
                 used_indices.add(idx)
                 break
+        default_p = price_map.get(token, 0)
         if matched_item:
+            saved_p = int(matched_item.get("price") or 0)
             synced.append({
                 "name": token,
-                "price": int(matched_item.get("price") or 0),
+                "sale_type": matched_item.get("sale_type") or "보유중",
+                "price": saved_p if saved_p > 0 else default_p,
                 "winner": matched_item.get("winner") or "",
                 "taken_date": matched_item.get("taken_date") or "",
-                "dist_date": matched_item.get("dist_date") or ""
+                "dist_date": matched_item.get("dist_date") or "",
+                "dist_checked": bool(matched_item.get("dist_checked") or False)
             })
         else:
             synced.append({
                 "name": token,
-                "price": 0,
+                "sale_type": "보유중",
+                "price": default_p,
                 "winner": "",
                 "taken_date": "",
-                "dist_date": ""
+                "dist_date": "",
+                "dist_checked": False
             })
     return synced
+
+def tokenize_items(text: Optional[str]) -> List[str]:
+    return [t.strip() for t in re.split(r'[\s,，\n]+', (text or '').strip()) if t.strip()]
 
 def extract_unique_participants(parties: list) -> List[str]:
     seen = set()
@@ -133,8 +154,22 @@ def save_raid(req: RaidSaveRequest):
     is_admin = req.requester_role in ["슈퍼관리자", "관리자"]
     new_parties_data = [p.model_dump() for p in req.parties]
 
-    if not is_admin and not new_parties_data:
-        raise HTTPException(status_code=403, detail="일반회원은 참여 인원을 입력해야 합니다.")
+    add_tokens = tokenize_items(req.add_items)
+
+    if not is_admin and not new_parties_data and not add_tokens:
+        raise HTTPException(status_code=403, detail="참여 인원 또는 드랍 아이템을 입력해야 합니다.")
+
+    seen_new = set()
+    for p in new_parties_data:
+        for name in [p.get("leader")] + (p.get("members") or []):
+            if name in seen_new:
+                raise HTTPException(status_code=400, detail=f"[{name}] 아이디가 중복 입력되었습니다.")
+            seen_new.add(name)
+
+    for p in new_parties_data:
+        party_size = 1 + len(p.get("members") or [])
+        if party_size > 8:
+            raise HTTPException(status_code=400, detail=f"[{p.get('leader')}] 파티 인원이 8명을 초과했습니다. (현재 {party_size}명)")
 
     if existing.data:
         row = existing.data[0]
@@ -146,14 +181,30 @@ def save_raid(req: RaidSaveRequest):
                 raise HTTPException(status_code=403, detail="이미 등록된 파티입니다. 수정은 관리자에게 문의하세요.")
 
             leader_set = {p["leader"] for p in new_parties_data}
-            merged_parties = [p for p in existing_parties if p.get("leader") not in leader_set] + new_parties_data
+            kept_parties = [p for p in existing_parties if p.get("leader") not in leader_set]
+
+            already = set(extract_unique_participants(kept_parties))
+            dup_names = [n for n in seen_new if n in already]
+            if dup_names:
+                raise HTTPException(status_code=400, detail=f"이미 등록된 참여자입니다: {', '.join(dup_names)}")
+
+            merged_parties = kept_parties + new_parties_data
         else:
             merged_parties = existing_parties
 
-        existing_items = row.get("dropped_items", "")
-        new_items = req.dropped_items if is_admin else existing_items
+        existing_items = row.get("dropped_items") or ""
         existing_details = row.get("item_details") or []
-        synced_details = sync_item_details_from_text(new_items, existing_details) if is_admin else existing_details
+
+        new_items = existing_items
+        if is_admin and req.dropped_items is not None:
+            new_items = req.dropped_items
+        if add_tokens:
+            new_items = " ".join(tokenize_items(new_items) + add_tokens)
+
+        if new_items != existing_items:
+            synced_details = sync_item_details_from_text(new_items, existing_details)
+        else:
+            synced_details = existing_details
 
         update_payload = {
             "parties": merged_parties,
@@ -164,8 +215,10 @@ def save_raid(req: RaidSaveRequest):
         res = supabase.table("raid_logs").update(update_payload).eq("id", row["id"]).execute()
         return {"status": "updated", "data": res.data[0]}
     else:
-        new_items = req.dropped_items if is_admin else ""
-        synced_details = sync_item_details_from_text(new_items, []) if is_admin else []
+        new_items = req.dropped_items if (is_admin and req.dropped_items is not None) else ""
+        if add_tokens:
+            new_items = " ".join(tokenize_items(new_items) + add_tokens)
+        synced_details = sync_item_details_from_text(new_items, []) if new_items else []
         current_tax = get_global_tax_rate()
 
         insert_payload = {
@@ -222,11 +275,40 @@ def delete_single_party(date: str, time: str, leader: str, role: str):
     supabase.table("raid_logs").update({"parties": updated_parties}).eq("id", row["id"]).execute()
     return {"status": "party_deleted"}
 
+@router.delete("/member")
+def delete_single_member(date: str, time: str, name: str, role: str):
+    if role not in ["슈퍼관리자", "관리자"]:
+        raise HTTPException(status_code=403, detail="관리자 이상만 삭제할 수 있습니다.")
+
+    existing = supabase.table("raid_logs").select("*").eq("raid_date", date).eq("raid_time", time).execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="기록을 찾을 수 없습니다.")
+
+    row = existing.data[0]
+    new_parties = []
+    for p in (row.get("parties") or []):
+        leader = p.get("leader")
+        members = [m for m in (p.get("members") or []) if m != leader]
+        if leader == name:
+            if members:
+                new_parties.append({"leader": members[0], "members": members[1:]})
+        elif name in members:
+            new_parties.append({"leader": leader, "members": [m for m in members if m != name]})
+        else:
+            new_parties.append(p)
+
+    supabase.table("raid_logs").update({"parties": new_parties}).eq("id", row["id"]).execute()
+    return {"status": "member_deleted"}
+
 @router.get("")
-def get_raids(month: Optional[str] = None, date: Optional[str] = None, member_id: Optional[str] = None):
+def get_raids(month: Optional[str] = None, date: Optional[str] = None,
+              start: Optional[str] = None, end: Optional[str] = None,
+              member_id: Optional[str] = None):
     query = supabase.table("raid_logs").select("*").order("raid_date", desc=True).order("id", desc=True)
     if date:
         query = query.eq("raid_date", date)
+    elif start and end:
+        query = query.gte("raid_date", start).lte("raid_date", end)
     elif month:
         query = query.like("raid_date", f"{month}%")
 
@@ -241,11 +323,15 @@ def get_raids(month: Optional[str] = None, date: Optional[str] = None, member_id
     return rows
 
 @router.get("/export-excel")
-def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None):
+def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
+                       start: Optional[str] = None, end: Optional[str] = None):
     query = supabase.table("raid_logs").select("*").order("raid_date", desc=False).order("id", desc=False)
     if date:
         query = query.eq("raid_date", date)
         filename_label = date
+    elif start and end:
+        query = query.gte("raid_date", start).lte("raid_date", end)
+        filename_label = f"{start}_{end}"
     elif month:
         query = query.like("raid_date", f"{month}%")
         filename_label = month
@@ -254,14 +340,15 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None):
 
     rows = query.execute().data or []
     default_tax = get_global_tax_rate()
+    price_map = get_item_master_price_map()
 
     output = io.StringIO()
-    output.write('\ufeff')  # 엑셀 한글 깨짐 방지용 UTF-8 BOM
+    output.write('\ufeff')
     writer = csv.writer(output)
 
     writer.writerow([
-        "날짜", "보스탐 시간", "참여 인원수", "참여 명단",
-        "드랍 아이템명", "판매 가격(아데나)", "구매자(당첨자)", "아이템 수령일", "아이템 분배일자",
+        "획득일", "보스탐 시간", "참여 인원수", "참여 명단",
+        "아이템명", "구분", "판매 가격(아데나)", "당첨자(구매자)", "판매완료일", "분배완료일",
         "혈비 공제율(%)", "혈비 제외 분배풀", "1인당 분배금", "분배완료 인원", "미분배 인원"
     ])
 
@@ -274,7 +361,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None):
 
         details = r.get("item_details") or []
         tax_rate = float(r.get("clan_tax_rate") if r.get("clan_tax_rate") is not None else default_tax)
-        gross_total = sum(int(d.get("price") or 0) for d in details)
+        gross_total = sum((int(d.get("price") or 0) or price_map.get(d.get("name", ""), 0)) for d in details)
         net_pool = int(gross_total * (1 - tax_rate / 100.0))
         per_share = (net_pool // p_count) if (p_count > 0 and net_pool > 0) else 0
 
@@ -294,15 +381,17 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None):
         if not details:
             writer.writerow([
                 r_date, r_time, p_count, p_names,
-                "득템 없음", 0, "-", "-", "-",
+                "득템 없음", "-", 0, "-", "-", "-",
                 tax_rate, net_pool, per_share,
                 ", ".join(done_list), ", ".join(wait_list)
             ])
         else:
             for item in details:
+                it_name = item.get("name", "")
+                it_price = int(item.get("price") or 0) or price_map.get(it_name, 0)
                 writer.writerow([
                     r_date, r_time, p_count, p_names,
-                    item.get("name", ""), int(item.get("price") or 0),
+                    it_name, item.get("sale_type", "보유중"), it_price,
                     item.get("winner", ""), item.get("taken_date", ""), item.get("dist_date", ""),
                     tax_rate, net_pool, per_share,
                     ", ".join(done_list), ", ".join(wait_list)
@@ -320,3 +409,16 @@ def delete_raid(raid_id: int, role: str):
         raise HTTPException(status_code=403, detail="관리자 이상만 삭제할 수 있습니다.")
     supabase.table("raid_logs").delete().eq("id", raid_id).execute()
     return {"status": "deleted"}
+
+@router.post("/tax-rate")
+def update_tax_rate(req: TaxRateUpdateRequest):
+    if req.requester_role not in ["슈퍼관리자", "관리자"]:
+        raise HTTPException(status_code=403, detail="혈비 비율은 관리자 이상만 수정할 수 있습니다.")
+    if req.tax_rate < 0 or req.tax_rate > 100:
+        raise HTTPException(status_code=400, detail="혈비 비율은 0~100% 사이여야 합니다.")
+
+    supabase.table("clan_settings").upsert({
+        "setting_key": "clan_tax_rate",
+        "setting_value": str(req.tax_rate)
+    }).execute()
+    return {"status": "updated", "tax_rate": req.tax_rate}

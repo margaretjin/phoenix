@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>아이템 관리 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/common.css?v=28">
+    <link rel="stylesheet" href="/static/item_manage.css?v=28">
+</head>
+<body>
+    <nav class="navbar" id="appNavbar"></nav>
+
+    <main class="main-container">
+        <div class="top-bar">
+            <h1 class="page-title">🧰 혈맹 아이템 내판가 및 혈비제외가 목록</h1>
+            <span id="itemCountBadge" class="item-count-badge">총 0개</span>
+        </div>
+
+        <!-- 1. 혈비(%) 공제율 설정 카드 (관리자 모드 ON일 때만 표시) -->
+        <section id="taxConfigCard" class="card-box hidden">
+            <div class="tax-config-row">
+                <div>
+                    <span class="section-label">⚖️ 혈맹 혈비 공제율(%) 설정 (관리자 전용)</span>
+                    <p class="item-guide-text" style="margin-bottom: 0;">
+                        일별현황, 분배금관리, 내참여내역 및 아래 혈비제외가 계산에 이 공제율이 동일하게 적용됩니다.
+                    </p>
+                </div>
+                <div class="tax-input-group">
+                    <input type="number" id="clanTaxRateInput" class="input-common tax-rate-input" value="20" min="0" max="100" step="1">
+                    <span style="font-weight: 800; color: #e5e7eb;">%</span>
+                    <button type="button" class="btn-sm btn-sm-green" onclick="saveGlobalTaxRate()">혈비율 저장</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 아이템 추가 카드 (관리자 모드 ON일 때만 표시) -->
+        <section id="itemAddCard" class="card-box hidden">
+            <span class="section-label">➕ 아이템 및 내판가 추가 (관리자 전용)</span>
+            <p class="item-guide-text">
+                보스탐 드랍 아이템 입력 시 이 목록의 <b>아이템명·별칭·내판가</b>가 자동으로 매칭됩니다.
+            </p>
+            <div class="item-form-grid">
+                <input type="text" id="newItemName" class="input-common" placeholder="아이템명 (예: 발터모)">
+                <input type="text" id="newItemAliases" class="input-common" placeholder="별칭 (예: 발터, 발라카스투구)">
+                <input type="number" id="newItemPrice" class="input-common" placeholder="내판가 (예: 40000)" min="0">
+                <button type="button" class="btn-sm btn-sm-blue item-add-btn" onclick="addItem()">+ 추가</button>
+            </div>
+        </section>
+
+        <!-- 3. 등록된 아이템 목록 (일반회원/관리자 모두 조회 가능: 아이템명 | 내판가 | 혈비제외가) -->
+        <section class="card-box">
+            <div class="item-list-header">
+                <span class="section-label">📋 등록된 아이템 (<span id="taxRateLabelText" style="color:#4ade80;">혈비 20% 제외 기준</span>)</span>
+                <input type="search" id="itemSearch" class="input-common item-search" placeholder="아이템명 검색" oninput="renderItems()">
+            </div>
+
+            <div class="item-table-wrap">
+                <table class="item-master-table">
+                    <thead>
+                        <tr>
+                            <th>아이템명</th>
+                            <th>내판가</th>
+                            <th>혈비제외가</th>
+                            <th id="itemAdminColHeader" class="hidden">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemTableBody">
+                        <tr><td colspan="4" class="empty-party-msg">불러오는 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/common.js?v=28"></script>
+    <script>
+        let items = [];
+        let editingId = null;
+        let currentTaxRate = 20;
+
+        window.onload = async () => {
+            // 일반회원도 접근 가능, 관리자 토글 전환 시 UI 즉시 반영
+            const user = ClanApp.initPage('/item-manage', () => {
+                editingId = null;
+                applyItemAdminUI();
+                renderItems();
+            });
+            if (!user) return;
+
+            applyItemAdminUI();
+            await Promise.all([loadGlobalTaxRate(), loadItems()]);
+        };
+
+        function applyItemAdminUI() {
+            const isAdminOn = ClanApp.hasAdminPrivilege && ClanApp.isAdminModeOn;
+            document.getElementById('taxConfigCard').classList.toggle('hidden', !isAdminOn);
+            document.getElementById('itemAddCard').classList.toggle('hidden', !isAdminOn);
+            document.getElementById('itemAdminColHeader').classList.toggle('hidden', !isAdminOn);
+        }
+
+        function esc(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        async function loadGlobalTaxRate() {
+            try {
+                const res = await fetch('/api/raids/tax-rate');
+                if (res.ok) {
+                    const data = await res.json();
+                    currentTaxRate = Number(data.tax_rate ?? 20);
+                    document.getElementById('clanTaxRateInput').value = currentTaxRate;
+                    document.getElementById('taxRateLabelText').textContent = `혈비 ${currentTaxRate}% 제외 기준`;
+                }
+            } catch (e) {
+                currentTaxRate = 20;
+            }
+        }
+
+        async function saveGlobalTaxRate() {
+            if (!ClanApp.hasAdminPrivilege || !ClanApp.isAdminModeOn) return;
+            const val = Number(document.getElementById('clanTaxRateInput').value);
+            if (isNaN(val) || val < 0 || val > 100) {
+                return alert('혈비율은 0~100% 사이로 입력해 주세요.');
+            }
+            const res = await fetch('/api/raids/tax-rate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tax_rate: val,
+                    requester_role: ClanApp.role
+                })
+            });
+            if (res.ok) {
+                currentTaxRate = val;
+                document.getElementById('taxRateLabelText').textContent = `혈비 ${currentTaxRate}% 제외 기준`;
+                renderItems();
+                alert(`혈맹 혈비 공제율이 ${val}%로 저장되었습니다.`);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '혈비 저장 실패');
+            }
+        }
+
+        async function loadItems() {
+            try {
+                const res = await fetch('/api/items');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                items = await res.json();
+            } catch (e) {
+                items = [];
+                document.getElementById('itemTableBody').innerHTML =
+                    `<tr><td colspan="4" class="empty-party-msg">아이템 목록을 불러오지 못했습니다. (${esc(e.message)})</td></tr>`;
+                return;
+            }
+            renderItems();
+        }
+
+        function renderItems() {
+            const isAdminOn = ClanApp.hasAdminPrivilege && ClanApp.isAdminModeOn;
+            const q = document.getElementById('itemSearch').value.trim().toLowerCase();
+            const list = items.filter(it =>
+                !q || it.item_name.toLowerCase().includes(q) || (it.aliases || '').toLowerCase().includes(q)
+            );
+            document.getElementById('itemCountBadge').textContent = `총 ${items.length}개`;
+
+            const tbody = document.getElementById('itemTableBody');
+            const colSpan = isAdminOn ? 4 : 3;
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty-party-msg">${items.length === 0 ? '등록된 아이템이 없습니다.' : '검색 결과가 없습니다.'}</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map(it => {
+                const grossPrice = Number(it.default_price || 0);
+                const netPrice = Math.floor(grossPrice * (1 - currentTaxRate / 100));
+
+                // 관리자 모드에서 [수정] 버튼을 누른 행
+                if (isAdminOn && it.id === editingId) {
+                    return `
+                        <tr>
+                            <td>
+                                <input type="text" id="editName" class="input-common edit-inline-input" value="${esc(it.item_name)}" placeholder="아이템명">
+                                <input type="text" id="editAliases" class="input-common edit-inline-input" style="margin-top:4px;" value="${esc(it.aliases)}" placeholder="별칭(콤마 구분)">
+                            </td>
+                            <td>
+                                <input type="number" id="editPrice" class="input-common edit-inline-input" value="${grossPrice}" placeholder="내판가" min="0"
+                                       oninput="updateLiveNetPreview(this.value)">
+                            </td>
+                            <td id="editNetPreview" class="item-net-cell">${netPrice.toLocaleString()}</td>
+                            <td>
+                                <div class="item-row-actions">
+                                    <button type="button" class="btn-sm btn-sm-green" onclick="saveEdit(${it.id})">저장</button>
+                                    <button type="button" class="btn-sm btn-sm-dark" onclick="cancelEdit()">취소</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                // 관리자 모드에서만 별칭 서브텍스트와 수정/삭제 버튼 노출
+                const aliasSubHtml = (isAdminOn && it.aliases)
+                    ? `<span class="item-alias-sub">별칭: ${esc(it.aliases)}</span>`
+                    : '';
+
+                const adminActionCell = isAdminOn ? `
+                    <td>
+                        <div class="item-row-actions">
+                            <button type="button" class="btn-sm btn-sm-dark" onclick="startEdit(${it.id})">수정</button>
+                            <button type="button" class="btn-sm btn-sm-red" onclick="deleteItem(${it.id})">삭제</button>
+                        </div>
+                    </td>
+                ` : '';
+
+                return `
+                    <tr>
+                        <td class="item-name-cell">
+                            ${esc(it.item_name)}
+                            ${aliasSubHtml}
+                        </td>
+                        <td class="item-gross-cell">${grossPrice.toLocaleString()}</td>
+                        <td class="item-net-cell">${netPrice.toLocaleString()}</td>
+                        ${adminActionCell}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateLiveNetPreview(val) {
+            const el = document.getElementById('editNetPreview');
+            if (!el) return;
+            const gross = Number(val || 0);
+            const net = Math.floor(gross * (1 - currentTaxRate / 100));
+            el.textContent = net.toLocaleString();
+        }
+
+        async function addItem() {
+            if (!ClanApp.hasAdminPrivilege || !ClanApp.isAdminModeOn) return;
+            const nameEl = document.getElementById('newItemName');
+            const aliasEl = document.getElementById('newItemAliases');
+            const priceEl = document.getElementById('newItemPrice');
+            const name = nameEl.value.trim();
+            if (!name) return alert('아이템명을 입력해 주세요.');
+
+            const res = await fetch('/api/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    item_name: name,
+                    aliases: aliasEl.value.trim(),
+                    default_price: Number(priceEl.value || 0),
+                    requester_role: ClanApp.role
+                })
+            });
+            if (res.ok) {
+                nameEl.value = '';
+                aliasEl.value = '';
+                priceEl.value = '';
+                await loadItems();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '추가 중 오류가 발생했습니다.');
+            }
+        }
+
+        function startEdit(id) {
+            if (!ClanApp.hasAdminPrivilege || !ClanApp.isAdminModeOn) return;
+            editingId = id;
+            renderItems();
+        }
+
+        function cancelEdit() {
+            editingId = null;
+            renderItems();
+        }
+
+        async function saveEdit(id) {
+            if (!ClanApp.hasAdminPrivilege || !ClanApp.isAdminModeOn) return;
+            const name = document.getElementById('editName').value.trim();
+            if (!name) return alert('아이템명을 입력해 주세요.');
+
+            const res = await fetch(`/api/items/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    item_name: name,
+                    aliases: document.getElementById('editAliases').value.trim(),
+                    default_price: Number(document.getElementById('editPrice').value || 0),
+                    requester_role: ClanApp.role
+                })
+            });
+            if (res.ok) {
+                editingId = null;
+                await loadItems();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '수정 중 오류가 발생했습니다.');
+            }
+        }
+
+        async function deleteItem(id) {
+            if (!ClanApp.hasAdminPrivilege || !ClanApp.isAdminModeOn) return;
+            const it = items.find(x => x.id === id);
+            if (!it || !confirm(`[${it.item_name}] 아이템을 삭제하시겠습니까?`)) return;
+
+            const res = await fetch(`/api/items/${id}?role=${encodeURIComponent(ClanApp.role)}`, { method: 'DELETE' });
+            if (res.ok) {
+                await loadItems();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '삭제 실패');
+            }
+        }
+    </script>
+</body>
+</html>

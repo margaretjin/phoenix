@@ -2,393 +2,942 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>분배금 관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/style.css?v=7">
+    <link rel="stylesheet" href="/static/common.css?v=25">
+    <link rel="stylesheet" href="/static/distribution.css?v=25">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
 
-    <main class="container">
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.9rem;">
-                <h2 class="section-title" style="margin-bottom: 0;">💰 보스탐 분배금 설정 및 수령 관리</h2>
-                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                    <button class="btn btn-blue" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" onclick="ClanApp.downloadExcel({ date: document.getElementById('distDateFilter').value })">
-                        📥 선택일 엑셀 다운로드
-                    </button>
-                    <button class="btn btn-dark" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" onclick="ClanApp.downloadExcel({ month: document.getElementById('distMonthFilter').value })">
-                        📥 월 전체 엑셀
-                    </button>
-                </div>
-            </div>
-
-            <div id="distAdminNotice" class="hidden" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.12); border: 1px solid var(--accent-gold); border-radius: 8px; font-size: 0.85rem; color: var(--accent-gold); font-weight: 700;">
-                🔒 분배금 설정 및 수령 완료 처리는 관리자만 가능합니다. (관리자라면 우측 상단 [👑 관리자 모드: ON]을 켜주세요)
-            </div>
-
-            <!-- 날짜 및 필터 선택 -->
-            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem;">
-                <div>
-                    <label>조회 월</label>
-                    <input type="month" id="distMonthFilter" onchange="onDistMonthChange()" style="width: auto;">
-                </div>
-                <div>
-                    <label>보스탐 날짜 선택</label>
-                    <input type="date" id="distDateFilter" onchange="onDistDateChange()" style="width: auto;">
-                </div>
-                <div>
-                    <label>보스탐 시간 선택 (득템/참여 있는 타임)</label>
-                    <select id="distTimeSelect" onchange="renderSelectedRaidDistribution()" style="min-width: 160px;"></select>
-                </div>
-                <div style="flex: 1; min-width: 150px;">
-                    <label>참여자 검색 필터</label>
-                    <input type="search" id="participantFilterInput" placeholder="캐릭터명 검색" oninput="renderParticipantDistTable()">
-                </div>
-            </div>
-
-            <!-- 1. 선택된 보스탐의 아이템별 가격 및 분배일자 설정 -->
-            <div class="detail-col-box" style="margin-bottom: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.4rem;">
-                    <span style="font-weight: 800; color: var(--accent-gold);">💎 드랍 아이템 및 아이템별 분배일자 설정</span>
-                    <button id="saveItemDistDatesBtn" class="btn btn-green hidden" style="padding: 0.3rem 0.7rem; font-size: 0.78rem;" onclick="saveAllItemDistDates()">
-                        💾 아이템 가격/분배일자 일괄 저장
-                    </button>
-                </div>
-                <div id="distItemListArea" style="font-size: 0.88rem;"></div>
-            </div>
-
-            <!-- 2. 분배금 요약 KPI -->
-            <div class="summary-kpi-grid">
-                <div class="kpi-box">
-                    <div class="kpi-label">총 판매액 / 혈비 제외 풀</div>
-                    <div class="kpi-value" id="distKpiPool" style="font-size: 0.95rem;">0 / 0</div>
-                </div>
-                <div class="kpi-box">
-                    <div class="kpi-label">참여 인원 / 1인당 분배금</div>
-                    <div class="kpi-value" id="distKpiPerPerson" style="color: #34d399; font-size: 0.95rem;">0명 / 0</div>
-                </div>
-                <div class="kpi-box">
-                    <div class="kpi-label">분배완료 인원</div>
-                    <div class="kpi-value" id="distKpiDoneCount" style="color: #6ee7b7;">0명</div>
-                </div>
-                <div class="kpi-box">
-                    <div class="kpi-label">미분배(대기) 인원</div>
-                    <div class="kpi-value" id="distKpiWaitCount" style="color: #fbbf24;">0명</div>
-                </div>
-            </div>
-
-            <!-- 3. 참여자별 분배금 수령 방식(본인/대리) 및 분배완료 설정 테이블 -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.4rem;">
-                <span style="font-weight: 800; color: #a7f3d0;">👥 참여자별 개별 분배금 수령 현황</span>
-                <div id="distBulkActionBox" class="hidden" style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                    <button class="btn btn-blue" style="padding: 0.32rem 0.65rem; font-size: 0.78rem;" onclick="markAllParticipants('분배완료')">✔ 전체 분배완료 선택</button>
-                    <button class="btn btn-dark" style="padding: 0.32rem 0.65rem; font-size: 0.78rem;" onclick="markAllParticipants('분배대기')">↺ 전체 대기 초기화</button>
-                    <button class="btn btn-green" style="padding: 0.32rem 0.8rem; font-size: 0.82rem;" onclick="saveDistributionsToServer()">💾 분배 설정 전체 저장</button>
-                </div>
-            </div>
-
-            <div class="table-scroll">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>참여 캐릭터</th>
-                            <th>1인당 분배금</th>
-                            <th>분배 상태</th>
-                            <th>수령 방식 (본인/대리)</th>
-                            <th>대리수령자 아이디</th>
-                            <th>분배완료 일자</th>
-                            <th id="distSingleSaveHeader" class="hidden">개별 저장</th>
-                        </tr>
-                    </thead>
-                    <tbody id="distParticipantTableBody"></tbody>
-                </table>
+    <main class="main-container">
+        <!-- 상단 타이틀 & 관리자 전용 엑셀 다운로드 -->
+        <div class="top-bar">
+            <h1 class="page-title">💰 보스탐 분배금 설정 및 수령 관리</h1>
+            <div class="excel-btn-group admin-only">
+                <button type="button" class="btn-excel-sm" onclick="exportDistExcel('day')">📥 일별</button>
+                <button type="button" class="btn-excel-sm" onclick="exportDistExcel('week')">주별(+7일)</button>
+                <button type="button" class="btn-excel-sm" onclick="exportDistExcel('month')">월별</button>
             </div>
         </div>
+
+        <div id="distAdminNotice" class="admin-notice-banner hidden">
+            🔒 혈분배일 확정 및 분배금 수령 완료 처리는 관리자만 가능합니다. (우측 상단 [👑 관리자 ON]을 켜주세요)
+        </div>
+
+        <!-- 1. 상단 조회 기준 : 혈분배일 -->
+        <section class="card-box">
+            <div class="dist-filter-grid">
+                <div class="dist-filter-field">
+                    <label>조회기준 : 혈분배일</label>
+                    <select id="distPeriodMode" class="input-common" onchange="onPeriodModeChange()">
+                        <option value="all">전체 기간</option>
+                        <option value="month">월별</option>
+                        <option value="week">주별 (+7일)</option>
+                        <option value="day">일별</option>
+                    </select>
+                </div>
+
+                <div id="distAllBox" class="dist-filter-field">
+                    <label>혈분배일 범위</label>
+                    <input type="text" class="input-common" value="전체 분배 내역" disabled>
+                </div>
+
+                <div id="distMonthBox" class="dist-filter-field hidden">
+                    <label>혈분배 월 선택</label>
+                    <input type="month" id="distMonthFilter" class="input-common" onchange="renderAllDistViews()">
+                </div>
+
+                <div id="distDateBox" class="dist-filter-field hidden">
+                    <label><span id="distDateLabel">혈분배일 선택</span><span id="topWeekRangeHint" class="week-range-hint"></span></label>
+                    <input type="date" id="distDateFilter" class="input-common" onchange="onTopDateFilterChange()">
+                </div>
+
+                <div class="dist-filter-field">
+                    <label>아이템 상태 보기</label>
+                    <select id="distStatusFilter" class="input-common" onchange="onItemStatusFilterChange(this.value)">
+                        <option value="all">전체 분배</option>
+                        <option value="wait">분배 대기</option>
+                        <option value="done">분배 완료</option>
+                    </select>
+                </div>
+
+                <div class="dist-filter-field">
+                    <label>분배 아이템 검색</label>
+                    <input type="search" id="distItemSearch" class="input-common" placeholder="아이템명 검색" oninput="renderAllDistViews()">
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 💎 분배해야 할 아이템 및 혈분배일 설정 (획득일시 | 아이템 | 가격 | 혈비제외 가격 | 분배인원 | 분배상태 | 혈분배일 | 저장) -->
+        <section class="card-box">
+            <div class="checked-item-header">
+                <span class="section-label">💎 분배해야 할 아이템 및 혈분배일 설정</span>
+                <div class="status-tab-bar">
+                    <button type="button" id="tabBtn_all" class="status-tab-btn active" onclick="setItemStatusFilter('all')">전체 분배</button>
+                    <button type="button" id="tabBtn_wait" class="status-tab-btn" onclick="setItemStatusFilter('wait')">분배 대기</button>
+                    <button type="button" id="tabBtn_done" class="status-tab-btn" onclick="setItemStatusFilter('done')">분배 완료</button>
+                </div>
+            </div>
+
+            <div class="dist-table-wrap">
+                <table class="checked-item-table">
+                    <thead>
+                        <tr>
+                            <th>획득일시</th>
+                            <th>아이템</th>
+                            <th>가격</th>
+                            <th>혈비제외 가격</th>
+                            <th>분배인원</th>
+                            <th>분배상태</th>
+                            <th>혈분배일</th>
+                            <th id="checkedItemSaveHeader" class="hidden">저장</th>
+                        </tr>
+                    </thead>
+                    <tbody id="checkedItemTableBody">
+                        <tr><td colspan="8" class="empty-party-msg">불러오는 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 3. 요약 KPI 5칸: 혈분배일 선택 시 해당 날에 분배하는 아이템 & 하단 참여자별 수령현황 동시 연동 -->
+        <section class="card-box">
+            <div class="dist-kpi-strip-5">
+                <div class="dist-kpi-box">
+                    <div class="dist-kpi-label">혈분배일 선택 (기준일)</div>
+                    <input type="date" id="kpiDistDatePicker" class="kpi-date-picker" onchange="onKpiDistDateChange(this.value)">
+                </div>
+                <div class="dist-kpi-box">
+                    <div class="dist-kpi-label">혈비 제외 총 분배금</div>
+                    <div id="kpiNetPoolTotal" class="dist-kpi-val net-pool">0</div>
+                </div>
+                <div class="dist-kpi-box">
+                    <div class="dist-kpi-label">분배 하는 템 (선택 혈분배일)</div>
+                    <div id="kpiDistItemsList" class="dist-kpi-val items-list">-</div>
+                </div>
+                <div class="dist-kpi-box">
+                    <div class="dist-kpi-label">분배 완료 인원</div>
+                    <div id="kpiDoneCount" class="dist-kpi-val done">0명</div>
+                </div>
+                <div class="dist-kpi-box">
+                    <div class="dist-kpi-label">미분배 인원</div>
+                    <div id="kpiWaitCount" class="dist-kpi-val wait">0명</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 (모바일 1줄 배치: 왼쪽 컴팩트 검색창 / 오른쪽 전체보기·분배대기·분배완료) -->
+        <section class="card-box">
+            <div class="dist-member-header">
+                <span class="section-label">👥 참여자별 개별 분배금 수령 현황</span>
+                <div id="distBulkActionBox" class="admin-only">
+                    <button type="button" class="btn-sm btn-sm-blue" onclick="markAllMergedParticipantsDone()">✔ 전체 분배 완료</button>
+                </div>
+            </div>
+
+            <!-- 모바일에서도 1줄 유지: 왼쪽 작은 검색창 / 오른쪽 전체보기 · 분배대기 · 분배완료 -->
+            <div class="dist-member-oneline-bar">
+                <input type="search" id="participantSearchInput" class="input-common member-search-left"
+                       placeholder="캐릭/아이템 검색" oninput="renderMergedParticipantsTable()">
+                <div class="status-tab-bar">
+                    <button type="button" id="memTab_all" class="status-tab-btn" onclick="setMemberStatusFilter('all')">전체 보기</button>
+                    <button type="button" id="memTab_wait" class="status-tab-btn active" onclick="setMemberStatusFilter('wait')">분배 대기</button>
+                    <button type="button" id="memTab_done" class="status-tab-btn" onclick="setMemberStatusFilter('done')">분배 완료</button>
+                </div>
+            </div>
+
+            <div class="dist-table-wrap">
+                <table class="dist-member-table">
+                    <thead>
+                        <tr>
+                            <th>참여캐릭</th>
+                            <th>분배 아이템</th>
+                            <th>분배 상태</th>
+                            <th>1인당 분배금</th>
+                            <th>수령방식</th>
+                            <th>대리수령 아이디</th>
+                            <th>분배받아간일</th>
+                        </tr>
+                    </thead>
+                    <tbody id="distParticipantTableBody">
+                        <tr><td colspan="7" class="empty-party-msg">분배할 아이템 내역이 없습니다.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </main>
 
-    <script src="/static/common.js?v=7"></script>
+    <script src="/static/common.js?v=25"></script>
     <script>
         let currentTaxRate = 20;
-        let monthRaids = [];
-        let dayRaids = [];
-        let currentRaidRecord = null;
-        let workingItems = [];
-        let workingDistributions = {};
+        let itemPriceMap = {};
+        let allRaids = [];
+        let checkedEntries = [];             // 템보유현황에서 체크된 모든 아이템
+        let editingDistDateKeys = new Set(); // 상단 아이템 혈분배일 [수정] 버튼을 누른 키
+        let unlockedMembers = new Set();     // 하단 참여자 테이블에서 [수정] 버튼을 누른 캐릭터명
+        let memberInputDrafts = {};          // 참여자별 수령방식/대리인/분배받아간일 입력 임시 보관
+        let memberStatusFilter = 'wait';     // 하단 참여자 테이블 디폴트 = '분배 대기' ('wait')
 
         window.onload = async () => {
             const user = ClanApp.initPage('/distribution', () => {
                 applyDistAdminUI();
-                renderSelectedRaidDistribution();
+                renderAllDistViews();
             });
             if (!user) return;
 
-            const taxRes = await fetch('/api/raids/tax-rate');
-            currentTaxRate = (await taxRes.json()).tax_rate ?? 20;
-
             const now = new Date();
-            document.getElementById('distMonthFilter').value = ClanApp.formatYM(now);
-            document.getElementById('distDateFilter').value = ClanApp.formatYMD(now);
+            const todayStr = ClanApp.formatYMD(now);
+            const ymStr = ClanApp.formatYM(now);
 
+            document.getElementById('distMonthFilter').value = ymStr;
+            document.getElementById('distDateFilter').value = todayStr;
+            document.getElementById('kpiDistDatePicker').value = todayStr;
+
+            await Promise.all([loadTaxRate(), loadItemMasterPrices()]);
             applyDistAdminUI();
-            await loadMonthRaidsForDist();
+            await loadAllRaidsForDistribution();
         };
+
+        // 날짜 포맷을 26-11-15 형태로 변환
+        function toShortDate(dateStr) {
+            if (!dateStr || dateStr.length < 8) return '-';
+            return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
+        }
+
+        function getPlusSevenDaysRange(startDateStr) {
+            const [y, m, d] = startDateStr.split('-').map(Number);
+            const startObj = new Date(y, m - 1, d);
+            const endObj = new Date(y, m - 1, d + 7);
+            const start = ClanApp.formatYMD(startObj);
+            const end = ClanApp.formatYMD(endObj);
+            const shortLabel = `${start.slice(2).replace(/-/g, '.')}~${end.slice(2).replace(/-/g, '.')}`;
+            return { start, end, shortLabel };
+        }
+
+        async function loadTaxRate() {
+            try {
+                const res = await fetch('/api/raids/tax-rate');
+                currentTaxRate = Number((await res.json()).tax_rate ?? 20);
+            } catch (e) {
+                currentTaxRate = 20;
+            }
+        }
+
+        async function loadItemMasterPrices() {
+            itemPriceMap = {};
+            try {
+                const res = await fetch('/api/items');
+                if (!res.ok) return;
+                const items = await res.json();
+                items.forEach(it => {
+                    if (it.item_name) itemPriceMap[it.item_name] = Number(it.default_price || 0);
+                });
+            } catch (e) {
+                itemPriceMap = {};
+            }
+        }
 
         function applyDistAdminUI() {
             const isOn = ClanApp.isAdminModeOn;
             document.getElementById('distAdminNotice').classList.toggle('hidden', isOn);
-            document.getElementById('saveItemDistDatesBtn').classList.toggle('hidden', !isOn);
-            document.getElementById('distBulkActionBox').classList.toggle('hidden', !isOn);
-            document.getElementById('distSingleSaveHeader').classList.toggle('hidden', !isOn);
+            document.getElementById('checkedItemSaveHeader').classList.toggle('hidden', !isOn);
         }
 
-        async function onDistMonthChange() {
-            const ym = document.getElementById('distMonthFilter').value;
-            if (!ym) return;
-            document.getElementById('distDateFilter').value = `${ym}-01`;
-            await loadMonthRaidsForDist();
+        function onKpiDistDateChange(newDateVal) {
+            if (!newDateVal) return;
+            renderFiveKpiSummary();
+            renderMergedParticipantsTable();
         }
 
-        async function onDistDateChange() {
-            const d = document.getElementById('distDateFilter').value;
-            if (!d) return;
-            const ym = d.slice(0, 7);
-            if (document.getElementById('distMonthFilter').value !== ym) {
-                document.getElementById('distMonthFilter').value = ym;
-                await loadMonthRaidsForDist();
+        function onPeriodModeChange() {
+            const mode = document.getElementById('distPeriodMode').value;
+            const allBox = document.getElementById('distAllBox');
+            const monthBox = document.getElementById('distMonthBox');
+            const dateBox = document.getElementById('distDateBox');
+            const dateLabel = document.getElementById('distDateLabel');
+            const hintEl = document.getElementById('topWeekRangeHint');
+
+            allBox.classList.add('hidden');
+            monthBox.classList.add('hidden');
+            dateBox.classList.add('hidden');
+            hintEl.textContent = '';
+
+            if (mode === 'all') {
+                allBox.classList.remove('hidden');
+            } else if (mode === 'month') {
+                monthBox.classList.remove('hidden');
+            } else if (mode === 'week') {
+                dateLabel.textContent = '주간 시작일';
+                dateBox.classList.remove('hidden');
+                updateTopWeekHint();
             } else {
-                filterDayAndPopulateTimes();
+                dateLabel.textContent = '혈분배일 선택';
+                dateBox.classList.remove('hidden');
             }
+            renderAllDistViews();
         }
 
-        async function loadMonthRaidsForDist() {
-            const ym = document.getElementById('distMonthFilter').value;
-            const res = await fetch(`/api/raids?month=${ym}`);
-            monthRaids = await res.json();
-            filterDayAndPopulateTimes();
+        function onTopDateFilterChange() {
+            updateTopWeekHint();
+            const dVal = document.getElementById('distDateFilter').value;
+            if (dVal) {
+                document.getElementById('kpiDistDatePicker').value = dVal;
+            }
+            renderAllDistViews();
         }
 
-        function filterDayAndPopulateTimes() {
-            const d = document.getElementById('distDateFilter').value;
-            dayRaids = monthRaids.filter(r => r.raid_date === d);
-
-            const select = document.getElementById('distTimeSelect');
-            select.innerHTML = '';
-
-            if (dayRaids.length === 0) {
-                select.add(new Option('해당 날짜 기록 없음', ''));
-                currentRaidRecord = null;
-                renderSelectedRaidDistribution();
+        function updateTopWeekHint() {
+            const mode = document.getElementById('distPeriodMode').value;
+            const hintEl = document.getElementById('topWeekRangeHint');
+            if (mode !== 'week') {
+                hintEl.textContent = '';
                 return;
             }
+            const dVal = document.getElementById('distDateFilter').value || ClanApp.formatYMD(new Date());
+            const { shortLabel } = getPlusSevenDaysRange(dVal);
+            hintEl.textContent = `(${shortLabel})`;
+        }
 
-            dayRaids.forEach(r => {
-                const items = ClanApp.extractItemDetails(r);
-                const pCount = ClanApp.extractParticipants(r).length;
-                const label = `${r.raid_time} (참여 ${pCount}명 / 템 ${items.length}개)`;
-                select.add(new Option(label, r.id));
+        function setItemStatusFilter(statusVal) {
+            document.getElementById('distStatusFilter').value = statusVal;
+            syncItemStatusTabUI(statusVal);
+            renderAllDistViews();
+        }
+
+        function onItemStatusFilterChange(statusVal) {
+            syncItemStatusTabUI(statusVal);
+            renderAllDistViews();
+        }
+
+        function syncItemStatusTabUI(statusVal) {
+            ['all', 'wait', 'done'].forEach(k => {
+                const btn = document.getElementById(`tabBtn_${k}`);
+                if (btn) btn.classList.toggle('active', k === statusVal);
             });
-
-            select.selectedIndex = 0;
-            renderSelectedRaidDistribution();
         }
 
-        function renderSelectedRaidDistribution() {
-            const raidId = Number(document.getElementById('distTimeSelect').value);
-            currentRaidRecord = dayRaids.find(r => r.id === raidId) || null;
-
-            const itemArea = document.getElementById('distItemListArea');
-            const tbody = document.getElementById('distParticipantTableBody');
-
-            if (!currentRaidRecord) {
-                itemArea.innerHTML = `<span style="color:var(--text-muted);">선택된 날짜에 보스탐 기록이 없습니다.</span>`;
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">보스탐 기록이 없습니다.</td></tr>`;
-                document.getElementById('distKpiPool').textContent = '0 / 0';
-                document.getElementById('distKpiPerPerson').textContent = '0명 / 0';
-                document.getElementById('distKpiDoneCount').textContent = '0명';
-                document.getElementById('distKpiWaitCount').textContent = '0명';
-                return;
-            }
-
-            workingItems = ClanApp.extractItemDetails(currentRaidRecord);
-            workingDistributions = JSON.parse(JSON.stringify(currentRaidRecord.distributions || {}));
-
-            // 1. 아이템 목록 및 아이템별 분배일자 렌더링
-            if (workingItems.length === 0) {
-                itemArea.innerHTML = `<span style="color:var(--text-muted);">해당 타임에 등록된 드랍 아이템이 없습니다.</span>`;
-            } else {
-                itemArea.innerHTML = workingItems.map((it, idx) => {
-                    if (!ClanApp.isAdminModeOn) {
-                        return `<div style="padding:0.4rem 0; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; gap:0.75rem; flex-wrap:wrap;">
-                            <b style="color:var(--text-light);">${it.name}</b>
-                            <span style="color:var(--accent-gold); font-weight:700;">${it.price.toLocaleString()} 아데나</span>
-                            <span style="color:#a7f3d0;">구매자: ${it.winner || '-'}</span>
-                            <span style="color:#93c5fd; font-weight:700;">분배일자: ${it.dist_date || '미지정'}</span>
-                        </div>`;
-                    }
-                    return `<div style="padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-                        <b style="min-width:90px; color:var(--accent-gold);">${it.name}</b>
-                        <span style="font-size:0.78rem; color:var(--text-muted);">판매가:</span>
-                        <input type="number" id="distItemPrice_${idx}" value="${it.price || ''}" style="width:105px; padding:0.25rem 0.4rem; font-size:0.8rem;">
-                        <span style="font-size:0.78rem; color:var(--text-muted);">구매자:</span>
-                        <input type="text" id="distItemWinner_${idx}" value="${it.winner || ''}" style="width:90px; padding:0.25rem 0.4rem; font-size:0.8rem;">
-                        <span style="font-size:0.78rem; color:#93c5fd; font-weight:700;">분배일자:</span>
-                        <input type="date" id="distItemDate_${idx}" value="${it.dist_date || ''}" style="width:135px; padding:0.22rem 0.4rem; font-size:0.8rem;">
-                    </div>`;
-                }).join('');
-            }
-
-            renderParticipantDistTable();
-        }
-
-        function renderParticipantDistTable() {
-            if (!currentRaidRecord) return;
-            const participants = ClanApp.extractParticipants(currentRaidRecord);
-            const taxRate = currentRaidRecord.clan_tax_rate ?? currentTaxRate;
-            const gross = workingItems.reduce((a, c) => a + (Number(c.price) || 0), 0);
-            const net = Math.floor(gross * (1 - taxRate / 100));
-            const perShare = (participants.length > 0 && net > 0) ? Math.floor(net / participants.length) : 0;
-
-            let doneCount = 0;
-            participants.forEach(p => {
-                if ((workingDistributions[p.id] || {}).status === '분배완료') doneCount++;
+        function setMemberStatusFilter(statusVal) {
+            memberStatusFilter = statusVal;
+            ['all', 'wait', 'done'].forEach(k => {
+                const btn = document.getElementById(`memTab_${k}`);
+                if (btn) btn.classList.toggle('active', k === statusVal);
             });
+            renderMergedParticipantsTable();
+        }
 
-            document.getElementById('distKpiPool').textContent = `${gross.toLocaleString()} / ${net.toLocaleString()}`;
-            document.getElementById('distKpiPerPerson').textContent = `${participants.length}명 / ${perShare.toLocaleString()} 아데나`;
-            document.getElementById('distKpiDoneCount').textContent = `${doneCount}명`;
-            document.getElementById('distKpiWaitCount').textContent = `${participants.length - doneCount}명`;
+        async function loadAllRaidsForDistribution() {
+            const res = await fetch('/api/raids');
+            allRaids = await res.json();
+            buildCheckedEntries();
+            renderAllDistViews();
+        }
 
-            const kw = document.getElementById('participantFilterInput').value.trim().toLowerCase();
-            const filtered = participants.filter(p => !kw || p.id.toLowerCase().includes(kw));
+        function buildCheckedEntries() {
+            checkedEntries = [];
+            allRaids.forEach(r => {
+                const details = ClanApp.extractItemDetails(r, itemPriceMap);
+                const participants = ClanApp.extractParticipants(r);
+                const pCount = participants.length;
+                const distMap = r.distributions || {};
 
-            const tbody = document.getElementById('distParticipantTableBody');
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">참여 인원이 없습니다.</td></tr>`;
-                return;
-            }
+                let doneMemberCount = 0;
+                participants.forEach(p => {
+                    if ((distMap[p.id] || {}).status === '분배완료') doneMemberCount++;
+                });
+                const isFullyDone = (pCount > 0 && doneMemberCount === pCount);
 
-            tbody.innerHTML = filtered.map(p => {
-                const info = workingDistributions[p.id] || { status: '분배대기', method: '본인수령', proxy_name: '', paid_date: '' };
-                const isDone = info.status === '분배완료';
-                const statusBadge = isDone
-                    ? `<span class="status-badge badge-done">분배완료</span>`
-                    : `<span class="status-badge badge-wait">분배대기</span>`;
+                details.forEach((item, idx) => {
+                    if (!item.dist_checked) return;
 
-                if (!ClanApp.isAdminModeOn) {
-                    return `<tr>
-                        <td style="font-weight:800; color:${p.isLeader ? '#a7f3d0' : 'var(--text-light)'};">${p.id}</td>
-                        <td style="color:var(--accent-gold); font-weight:800;">${perShare.toLocaleString()} 아데나</td>
-                        <td>${statusBadge}</td>
-                        <td>${info.method || '본인수령'}</td>
-                        <td>${info.method === '대리수령' ? (info.proxy_name || '-') : '-'}</td>
-                        <td>${info.paid_date || '-'}</td>
-                    </tr>`;
+                    // [핵심] 아이템 관리에서 설정된 전역 혈비율(currentTaxRate)을 모든 아이템에 일관 적용하여 혈비제외 가격 산출
+                    const price = Number(item.price || 0);
+                    const netPool = Math.floor(price * (1 - currentTaxRate / 100));
+                    const perItemShare = (pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
+
+                    checkedEntries.push({
+                        key: `${r.id}_${idx}`,
+                        raid_id: r.id,
+                        item_idx: idx,
+                        raid_date: r.raid_date,
+                        raid_time: r.raid_time,
+                        name: item.name,
+                        price,
+                        net_pool: netPool,
+                        per_share: perItemShare,
+                        dist_date: item.dist_date || '',
+                        is_done: isFullyDone,
+                        done_count: doneMemberCount,
+                        participants,
+                        raid_ref: r,
+                        full_details_ref: details
+                    });
+                });
+            });
+        }
+
+        function getPeriodFilteredEntries() {
+            const mode = document.getElementById('distPeriodMode').value;
+            const mVal = document.getElementById('distMonthFilter').value || ClanApp.formatYM(new Date());
+            const dVal = document.getElementById('distDateFilter').value || ClanApp.formatYMD(new Date());
+            const kw = document.getElementById('distItemSearch').value.trim().toLowerCase();
+            const todayStr = ClanApp.formatYMD(new Date());
+
+            return checkedEntries.filter(entry => {
+                const effectiveDistDate = entry.dist_date || todayStr;
+
+                if (mode === 'month') {
+                    if (!effectiveDistDate.startsWith(mVal)) return false;
+                } else if (mode === 'week') {
+                    const { start, end } = getPlusSevenDaysRange(dVal);
+                    if (effectiveDistDate < start || effectiveDistDate > end) return false;
+                } else if (mode === 'day') {
+                    if (effectiveDistDate !== dVal) return false;
                 }
 
-                return `<tr>
-                    <td style="font-weight:800; color:${p.isLeader ? '#a7f3d0' : 'var(--text-light)'};">${p.id}</td>
-                    <td style="color:var(--accent-gold); font-weight:800;">${perShare.toLocaleString()} 아데나</td>
-                    <td>
-                        <select onchange="onMemberDistFieldChange('${p.id}', 'status', this.value)" style="width:105px; padding:0.25rem; font-size:0.8rem; font-weight:700; color:${isDone ? '#34d399' : '#94a3b8'};">
-                            <option value="분배대기" ${!isDone ? 'selected' : ''}>분배대기</option>
-                            <option value="분배완료" ${isDone ? 'selected' : ''}>분배완료</option>
-                        </select>
-                    </td>
-                    <td>
-                        <select onchange="onMemberDistFieldChange('${p.id}', 'method', this.value)" style="width:105px; padding:0.25rem; font-size:0.8rem;">
-                            <option value="본인수령" ${info.method !== '대리수령' ? 'selected' : ''}>본인수령</option>
-                            <option value="대리수령" ${info.method === '대리수령' ? 'selected' : ''}>대리수령</option>
-                        </select>
-                    </td>
-                    <td>
-                        <input type="text" value="${info.proxy_name || ''}" placeholder="${info.method === '대리수령' ? '대리인 아이디' : '-'}"
-                               ${info.method === '대리수령' ? '' : 'disabled'}
-                               oninput="onMemberDistFieldChange('${p.id}', 'proxy_name', this.value)"
-                               style="width:110px; padding:0.25rem 0.4rem; font-size:0.8rem;">
-                    </td>
-                    <td>
-                        <input type="date" value="${info.paid_date || ''}"
-                               onchange="onMemberDistFieldChange('${p.id}', 'paid_date', this.value)"
-                               style="width:130px; padding:0.22rem; font-size:0.78rem;">
-                    </td>
-                    <td>
-                        <button class="btn btn-green" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="saveDistributionsToServer('${p.id}')">저장</button>
-                    </td>
-                </tr>`;
+                if (kw) {
+                    const matchItem = entry.name.toLowerCase().includes(kw);
+                    const matchMember = entry.participants.some(p => p.id.toLowerCase().includes(kw));
+                    if (!matchItem && !matchMember) return false;
+                }
+                return true;
+            });
+        }
+
+        function getStatusFilteredEntries() {
+            const statusFilter = document.getElementById('distStatusFilter').value;
+            const baseList = getPeriodFilteredEntries();
+
+            return baseList.filter(entry => {
+                if (statusFilter === 'wait') return !entry.is_done;
+                if (statusFilter === 'done') return entry.is_done;
+                return true;
+            });
+        }
+
+        function getSelectedKpiDateEntries() {
+            const selectedKpiDate = document.getElementById('kpiDistDatePicker').value || ClanApp.formatYMD(new Date());
+            const todayStr = ClanApp.formatYMD(new Date());
+
+            return checkedEntries.filter(e => {
+                const itemDistDate = (e.dist_date && e.dist_date.trim()) ? e.dist_date.trim() : todayStr;
+                return itemDistDate === selectedKpiDate;
+            });
+        }
+
+        function renderAllDistViews() {
+            renderCheckedItemsTable();
+            renderFiveKpiSummary();
+            renderMergedParticipantsTable();
+        }
+
+        // 1. 상단 💎 분배해야 할 아이템 및 혈분배일 설정 렌더링 (선물 아이콘 제거, 가격 옆에 혈비제외 가격 표시, 혈분배일 26-11-15 형태)
+        function renderCheckedItemsTable() {
+            const list = getStatusFilteredEntries();
+            const tbody = document.getElementById('checkedItemTableBody');
+            const isAdmin = ClanApp.isAdminModeOn;
+            const selectedKpiDate = document.getElementById('kpiDistDatePicker').value || ClanApp.formatYMD(new Date());
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${isAdmin ? 8 : 7}" class="empty-party-msg">해당 조건의 분배 아이템 내역이 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map(entry => {
+                const pCount = entry.participants.length;
+                const hasDistDate = Boolean(entry.dist_date && entry.dist_date.trim());
+                const isEditingDate = editingDistDateKeys.has(entry.key);
+                const dateVal = entry.dist_date || selectedKpiDate;
+                const slotText = `${toShortDate(entry.raid_date)} ${entry.raid_time}`;
+                const shortDistDate = hasDistDate ? toShortDate(entry.dist_date) : '미확정';
+
+                const statusBadgeHtml = entry.is_done
+                    ? `<span class="status-badge-done">분배완료 (${entry.done_count}/${pCount})</span>`
+                    : `<span class="status-badge-wait">분배대기 (${entry.done_count}/${pCount})</span>`;
+
+                if (!isAdmin) {
+                    return `
+                        <tr>
+                            <td class="checked-item-slot">${slotText}</td>
+                            <td class="checked-item-name">${entry.name}</td>
+                            <td class="checked-item-price">${entry.price.toLocaleString()}</td>
+                            <td class="checked-item-net-price">${entry.net_pool.toLocaleString()}</td>
+                            <td class="checked-item-pcount">${pCount}명</td>
+                            <td>${statusBadgeHtml}</td>
+                            <td>${hasDistDate ? `<span class="confirmed-dist-date">${shortDistDate}</span>` : '미확정'}</td>
+                        </tr>
+                    `;
+                }
+
+                if (hasDistDate && !isEditingDate) {
+                    return `
+                        <tr>
+                            <td class="checked-item-slot">${slotText}</td>
+                            <td class="checked-item-name">${entry.name}</td>
+                            <td class="checked-item-price">${entry.price.toLocaleString()}</td>
+                            <td class="checked-item-net-price">${entry.net_pool.toLocaleString()}</td>
+                            <td class="checked-item-pcount">${pCount}명</td>
+                            <td>${statusBadgeHtml}</td>
+                            <td><span class="confirmed-dist-date">${shortDistDate}</span></td>
+                            <td>
+                                <button type="button" class="btn-row-edit" onclick="enableDistDateEdit('${entry.key}')">수정</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                return `
+                    <tr>
+                        <td class="checked-item-slot">${slotText}</td>
+                        <td class="checked-item-name">${entry.name}</td>
+                        <td class="checked-item-price">${entry.price.toLocaleString()}</td>
+                        <td class="checked-item-net-price">${entry.net_pool.toLocaleString()}</td>
+                        <td class="checked-item-pcount">${pCount}명</td>
+                        <td>${statusBadgeHtml}</td>
+                        <td>
+                            <input type="date" id="chkDistDate_${entry.key}" class="dist-tbl-input" value="${dateVal}">
+                        </td>
+                        <td>
+                            <button type="button" class="btn-sm btn-sm-green" style="padding: 4px 10px; font-size: 11.5px;"
+                                    onclick="saveCheckedItemDistDate('${entry.key}')">저장</button>
+                        </td>
+                    </tr>
+                `;
             }).join('');
         }
 
-        function onMemberDistFieldChange(memberId, field, value) {
-            if (!workingDistributions[memberId]) {
-                workingDistributions[memberId] = { status: '분배대기', method: '본인수령', proxy_name: '', paid_date: '' };
-            }
-            workingDistributions[memberId][field] = value;
-
-            if (field === 'status' && value === '분배완료' && !workingDistributions[memberId].paid_date) {
-                workingDistributions[memberId].paid_date = ClanApp.formatYMD();
-            }
-            if (field === 'method' && value === '본인수령') {
-                workingDistributions[memberId].proxy_name = '';
-            }
-            renderParticipantDistTable();
+        function enableDistDateEdit(key) {
+            if (!ClanApp.isAdminModeOn) return;
+            editingDistDateKeys.add(key);
+            renderCheckedItemsTable();
         }
 
-        function markAllParticipants(statusVal) {
-            if (!currentRaidRecord) return;
-            const today = ClanApp.formatYMD();
-            ClanApp.extractParticipants(currentRaidRecord).forEach(p => {
-                const prev = workingDistributions[p.id] || { method: '본인수령', proxy_name: '' };
-                workingDistributions[p.id] = {
-                    status: statusVal,
-                    method: prev.method || '본인수령',
-                    proxy_name: prev.proxy_name || '',
-                    paid_date: statusVal === '분배완료' ? (prev.paid_date || today) : ''
-                };
-            });
-            renderParticipantDistTable();
-        }
+        async function saveCheckedItemDistDate(key) {
+            if (!ClanApp.isAdminModeOn) return;
+            const entry = checkedEntries.find(e => e.key === key);
+            if (!entry) return;
 
-        async function saveAllItemDistDates() {
-            if (!currentRaidRecord || !ClanApp.isAdminModeOn) return;
-            workingItems.forEach((it, idx) => {
-                it.price = Number(document.getElementById(`distItemPrice_${idx}`).value.trim() || 0);
-                it.winner = document.getElementById(`distItemWinner_${idx}`).value.trim();
-                it.dist_date = document.getElementById(`distItemDate_${idx}`).value || '';
-            });
+            const dateEl = document.getElementById(`chkDistDate_${key}`);
+            const dist_date = (dateEl && dateEl.value) ? dateEl.value : ClanApp.formatYMD(new Date());
+            document.getElementById('kpiDistDatePicker').value = dist_date;
+
+            const updatedDetails = entry.full_details_ref.map((it, idx) => ({
+                name: it.name,
+                sale_type: it.sale_type || '보유중',
+                price: Number(it.price || 0),
+                winner: it.winner || '',
+                taken_date: it.taken_date || '',
+                dist_date: idx === entry.item_idx ? dist_date : (it.dist_date || ''),
+                dist_checked: idx === entry.item_idx ? true : Boolean(it.dist_checked)
+            }));
 
             const res = await fetch('/api/raids/item-details', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    raid_id: currentRaidRecord.id,
-                    item_details: workingItems,
+                    raid_id: entry.raid_id,
+                    item_details: updatedDetails,
                     requester_role: ClanApp.role
                 })
             });
+
             if (res.ok) {
-                alert('아이템 가격 및 분배일자가 저장되었습니다.');
-                await loadMonthRaidsForDist();
+                editingDistDateKeys.delete(key);
+                await loadAllRaidsForDistribution();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '저장 실패');
             }
         }
 
-        async function saveDistributionsToServer(singleMemberId = null) {
-            if (!currentRaidRecord || !ClanApp.isAdminModeOn) return;
-            const res = await fetch('/api/raids/distributions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    raid_id: currentRaidRecord.id,
-                    distributions: workingDistributions,
-                    requester_role: ClanApp.role
-                })
-            });
-            if (res.ok) {
-                alert(singleMemberId ? `[${singleMemberId}] 분배 상태가 저장되었습니다.` : '전체 분배 설정이 저장되었습니다.');
-                await loadMonthRaidsForDist();
+        // 2. 중간 5칸 요약 KPI: '혈분배일 선택(kpiDistDatePicker)' 날짜의 분배 아이템 기준
+        function renderFiveKpiSummary() {
+            const dateMatchedEntries = getSelectedKpiDateEntries();
+
+            const totalNetPool = dateMatchedEntries.reduce((acc, e) => acc + Number(e.net_pool || 0), 0);
+            document.getElementById('kpiNetPoolTotal').textContent = totalNetPool.toLocaleString();
+
+            if (dateMatchedEntries.length === 0) {
+                document.getElementById('kpiDistItemsList').textContent = '해당 혈분배일 아이템 없음';
             } else {
-                const err = await res.json();
-                alert(err.detail || '저장 실패');
+                const countMap = new Map();
+                dateMatchedEntries.forEach(e => countMap.set(e.name, (countMap.get(e.name) || 0) + 1));
+                const itemsText = [...countMap.entries()]
+                    .map(([n, c]) => c > 1 ? `${n} ×${c}` : n)
+                    .join(', ');
+                document.getElementById('kpiDistItemsList').textContent = itemsText;
+            }
+
+            const allMemberStatus = new Map();
+            dateMatchedEntries.forEach(entry => {
+                const distObj = entry.raid_ref.distributions || {};
+                entry.participants.forEach(p => {
+                    const isDone = (distObj[p.id] || {}).status === '분배완료';
+                    if (!allMemberStatus.has(p.id)) {
+                        allMemberStatus.set(p.id, isDone);
+                    } else if (!isDone) {
+                        allMemberStatus.set(p.id, false);
+                    }
+                });
+            });
+
+            let done = 0;
+            let wait = 0;
+            allMemberStatus.forEach(isDone => {
+                if (isDone) done++;
+                else wait++;
+            });
+
+            document.getElementById('kpiDoneCount').textContent = `${done}명`;
+            document.getElementById('kpiWaitCount').textContent = `${wait}명`;
+        }
+
+        // 3. 하단 👥 참여자별 개별 분배금 수령 현황 (혈비제외 가격 ÷ 인원으로 산출된 per_share 합산)
+        function buildMergedParticipantsList() {
+            const targetEntries = getSelectedKpiDateEntries();
+            const selectedKpiDate = document.getElementById('kpiDistDatePicker').value || ClanApp.formatYMD(new Date());
+            const memberMap = new Map();
+
+            targetEntries.forEach(entry => {
+                const raid = entry.raid_ref;
+                const distObj = raid.distributions || {};
+
+                entry.participants.forEach(p => {
+                    const pDist = distObj[p.id] || {};
+                    const isMemberDoneForThisRaid = (pDist.status === '분배완료');
+
+                    if (!memberMap.has(p.id)) {
+                        memberMap.set(p.id, {
+                            id: p.id,
+                            isLeader: p.isLeader,
+                            items: [],
+                            totalShare: 0,
+                            raidIds: new Set(),
+                            allDone: true,
+                            method: '본인수령',
+                            proxy_name: '',
+                            paid_date: selectedKpiDate
+                        });
+                    }
+                    const mData = memberMap.get(p.id);
+                    if (p.isLeader) mData.isLeader = true;
+                    mData.items.push(entry.name);
+                    mData.totalShare += entry.per_share;
+                    mData.raidIds.add(entry.raid_id);
+
+                    if (!isMemberDoneForThisRaid) {
+                        mData.allDone = false;
+                    }
+                    if (pDist.method) mData.method = pDist.method;
+                    if (pDist.proxy_name) mData.proxy_name = pDist.proxy_name;
+                    if (pDist.paid_date) mData.paid_date = pDist.paid_date;
+                });
+            });
+
+            return [...memberMap.values()];
+        }
+
+        function renderMergedParticipantsTable() {
+            const mergedMembers = buildMergedParticipantsList();
+            const tbody = document.getElementById('distParticipantTableBody');
+            const selectedKpiDate = document.getElementById('kpiDistDatePicker').value || ClanApp.formatYMD(new Date());
+
+            const topItemKw = document.getElementById('distItemSearch').value.trim().toLowerCase();
+            const memberKw = document.getElementById('participantSearchInput').value.trim().toLowerCase();
+
+            const visibleMembers = mergedMembers.filter(m => {
+                if (memberStatusFilter === 'wait' && m.allDone) return false;
+                if (memberStatusFilter === 'done' && !m.allDone) return false;
+
+                if (topItemKw) {
+                    const matchTop = m.id.toLowerCase().includes(topItemKw) || m.items.some(it => it.toLowerCase().includes(topItemKw));
+                    if (!matchTop) return false;
+                }
+
+                if (memberKw) {
+                    const draft = memberInputDrafts[m.id] || {};
+                    const proxyStr = (draft.proxy_name || m.proxy_name || '').toLowerCase();
+                    const matchMem = m.id.toLowerCase().includes(memberKw) ||
+                                     m.items.some(it => it.toLowerCase().includes(memberKw)) ||
+                                     proxyStr.includes(memberKw);
+                    if (!matchMem) return false;
+                }
+                return true;
+            });
+
+            if (visibleMembers.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="empty-party-msg">선택한 혈분배일(${toShortDate(selectedKpiDate)})에 해당하는 참여자 내역이 없습니다.</td></tr>`;
+                return;
+            }
+
+            const isAdmin = ClanApp.isAdminModeOn;
+
+            tbody.innerHTML = visibleMembers.map((m, rowIdx) => {
+                const draft = memberInputDrafts[m.id] || {
+                    method: m.method || '본인수령',
+                    proxy_name: m.proxy_name || '',
+                    paid_date: m.paid_date || selectedKpiDate
+                };
+                memberInputDrafts[m.id] = draft;
+
+                const itemCountMap = new Map();
+                m.items.forEach(name => itemCountMap.set(name, (itemCountMap.get(name) || 0) + 1));
+                const mergedItemsText = [...itemCountMap.entries()]
+                    .map(([n, c]) => c > 1 ? `${n} ×${c}` : n)
+                    .join(', ');
+
+                const isDone = m.allDone;
+                const isLocked = isDone && !unlockedMembers.has(m.id);
+                const nameColorClass = m.isLeader ? 'party-leader-name' : 'party-member-name';
+
+                const statusBadgeHtml = isDone
+                    ? `<span class="status-badge-done">분배완료</span>`
+                    : `<span class="status-badge-wait">분배대기</span>`;
+
+                if (!isAdmin) {
+                    return `
+                        <tr>
+                            <td><span class="${nameColorClass}">${m.id}</span></td>
+                            <td class="merged-items-cell">${mergedItemsText}</td>
+                            <td>${statusBadgeHtml}</td>
+                            <td style="color:#fbbf24; font-weight:800;">${m.totalShare.toLocaleString()}</td>
+                            <td>${draft.method}</td>
+                            <td>${draft.method === '대리수령' ? (draft.proxy_name || '-') : '-'}</td>
+                            <td>${isDone ? toShortDate(draft.paid_date) : '-'}</td>
+                        </tr>
+                    `;
+                }
+
+                const rightActionHtml = isLocked
+                    ? `<button type="button" class="btn-row-edit" onclick="unlockMemberRow('${m.id}')">수정</button>`
+                    : `<input type="checkbox" class="save-check-input" ${isDone ? 'checked' : ''}
+                              title="체크 시 분배완료로 저장 및 잠금됩니다."
+                              onchange="onCheckSaveMergedMember('${m.id}', ${rowIdx}, this.checked)">`;
+
+                const proxyDisabled = isLocked || draft.method !== '대리수령';
+
+                return `
+                    <tr>
+                        <td><span class="${nameColorClass}">${m.id}</span></td>
+                        <td class="merged-items-cell">${mergedItemsText}</td>
+                        <td>${statusBadgeHtml}</td>
+                        <td style="color:#fbbf24; font-weight:800;">${m.totalShare.toLocaleString()}</td>
+                        <td>
+                            <select id="memMethod_${rowIdx}" class="dist-tbl-select"
+                                    ${isLocked ? 'disabled' : ''}
+                                    onchange="onMethodSelectChange('${m.id}', ${rowIdx}, this.value)">
+                                <option value="본인수령" ${draft.method !== '대리수령' ? 'selected' : ''}>본인수령</option>
+                                <option value="대리수령" ${draft.method === '대리수령' ? 'selected' : ''}>대리수령</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="text" id="memProxy_${rowIdx}" class="dist-tbl-input" style="width:105px;"
+                                   value="${draft.proxy_name || ''}"
+                                   placeholder="${draft.method === '대리수령' ? '대리인 아이디' : '-'}"
+                                   ${proxyDisabled ? 'disabled' : ''}
+                                   oninput="onProxyInputSilent('${m.id}', this.value)">
+                        </td>
+                        <td>
+                            <div class="paid-date-action-cell">
+                                <input type="date" id="memPaidDate_${rowIdx}" class="dist-tbl-input" style="width:124px;"
+                                       value="${draft.paid_date}"
+                                       ${isLocked ? 'disabled' : ''}
+                                       onchange="onPaidDateChangeSilent('${m.id}', this.value)">
+                                <span class="action-slot-box">
+                                    ${rightActionHtml}
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function onMethodSelectChange(memberId, rowIdx, val) {
+            if (!memberInputDrafts[memberId]) {
+                memberInputDrafts[memberId] = { method: '본인수령', proxy_name: '', paid_date: ClanApp.formatYMD(new Date()) };
+            }
+            memberInputDrafts[memberId].method = val;
+
+            const proxyInput = document.getElementById(`memProxy_${rowIdx}`);
+            if (!proxyInput) return;
+
+            if (val === '대리수령') {
+                proxyInput.disabled = false;
+                proxyInput.placeholder = '대리인 아이디';
+                proxyInput.focus();
+            } else {
+                memberInputDrafts[memberId].proxy_name = '';
+                proxyInput.value = '';
+                proxyInput.disabled = true;
+                proxyInput.placeholder = '-';
+            }
+        }
+
+        function onProxyInputSilent(memberId, val) {
+            if (!memberInputDrafts[memberId]) {
+                memberInputDrafts[memberId] = { method: '대리수령', proxy_name: '', paid_date: ClanApp.formatYMD(new Date()) };
+            }
+            memberInputDrafts[memberId].proxy_name = val.trim();
+        }
+
+        function onPaidDateChangeSilent(memberId, val) {
+            if (!memberInputDrafts[memberId]) {
+                memberInputDrafts[memberId] = { method: '본인수령', proxy_name: '', paid_date: val };
+            }
+            memberInputDrafts[memberId].paid_date = val;
+        }
+
+        function unlockMemberRow(memberId) {
+            if (!ClanApp.isAdminModeOn) return;
+            unlockedMembers.add(memberId);
+            renderMergedParticipantsTable();
+        }
+
+        async function onCheckSaveMergedMember(memberId, rowIdx, isChecked) {
+            if (!ClanApp.isAdminModeOn) return;
+
+            const selectedKpiDate = document.getElementById('kpiDistDatePicker').value || ClanApp.formatYMD(new Date());
+            const methodEl = document.getElementById(`memMethod_${rowIdx}`);
+            const proxyEl = document.getElementById(`memProxy_${rowIdx}`);
+            const dateEl = document.getElementById(`memPaidDate_${rowIdx}`);
+
+            const method = methodEl ? methodEl.value : '본인수령';
+            const proxy_name = (method === '대리수령' && proxyEl) ? proxyEl.value.trim() : '';
+            const paid_date = (dateEl && dateEl.value) ? dateEl.value : selectedKpiDate;
+
+            if (isChecked && method === '대리수령' && !proxy_name) {
+                alert('대리수령을 선택한 경우 대리수령 아이디를 입력해 주세요.');
+                renderMergedParticipantsTable();
+                return;
+            }
+
+            memberInputDrafts[memberId] = { method, proxy_name, paid_date };
+
+            const targetEntries = getSelectedKpiDateEntries();
+            const targetRaidIds = [...new Set(
+                targetEntries.filter(e => e.participants.some(p => p.id === memberId)).map(e => e.raid_id)
+            )];
+
+            for (const rId of targetRaidIds) {
+                const raid = allRaids.find(r => r.id === rId);
+                if (!raid) continue;
+
+                const distMap = JSON.parse(JSON.stringify(raid.distributions || {}));
+                distMap[memberId] = {
+                    status: isChecked ? '분배완료' : '분배대기',
+                    method,
+                    proxy_name,
+                    paid_date: isChecked ? paid_date : ''
+                };
+
+                await fetch('/api/raids/distributions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        raid_id: rId,
+                        distributions: distMap,
+                        requester_role: ClanApp.role
+                    })
+                });
+
+                if (isChecked) {
+                    await ensureRaidItemsDistDateFilled(raid, paid_date);
+                }
+            }
+
+            if (isChecked) {
+                unlockedMembers.delete(memberId);
+            }
+            await loadAllRaidsForDistribution();
+        }
+
+        async function markAllMergedParticipantsDone() {
+            if (!ClanApp.isAdminModeOn) return;
+            const targetEntries = getSelectedKpiDateEntries();
+            if (targetEntries.length === 0) return alert('선택한 혈분배일에 분배 처리할 대상 아이템이 없습니다.');
+
+            const selectedDistDate = document.getElementById('kpiDistDatePicker').value || ClanApp.formatYMD(new Date());
+            if (!confirm(`선택한 혈분배일(${toShortDate(selectedDistDate)})의 모든 참여자를 [분배완료] 처리하시겠습니까?`)) return;
+
+            const uniqueRaidIds = [...new Set(targetEntries.map(e => e.raid_id))];
+
+            for (const rId of uniqueRaidIds) {
+                const raid = allRaids.find(r => r.id === rId);
+                if (!raid) continue;
+
+                const distMap = JSON.parse(JSON.stringify(raid.distributions || {}));
+                const participants = ClanApp.extractParticipants(raid);
+
+                participants.forEach(p => {
+                    const draft = memberInputDrafts[p.id] || distMap[p.id] || {};
+                    distMap[p.id] = {
+                        status: '분배완료',
+                        method: draft.method || '본인수령',
+                        proxy_name: draft.proxy_name || '',
+                        paid_date: selectedDistDate
+                    };
+                    memberInputDrafts[p.id] = {
+                        method: distMap[p.id].method,
+                        proxy_name: distMap[p.id].proxy_name,
+                        paid_date: selectedDistDate
+                    };
+                });
+
+                await fetch('/api/raids/distributions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        raid_id: rId,
+                        distributions: distMap,
+                        requester_role: ClanApp.role
+                    })
+                });
+
+                await ensureRaidItemsDistDateFilled(raid, selectedDistDate);
+            }
+
+            unlockedMembers.clear();
+            await loadAllRaidsForDistribution();
+            alert(`${toShortDate(selectedDistDate)} 혈분배일 기준 전체 분배 완료 처리되었습니다.`);
+        }
+
+        async function ensureRaidItemsDistDateFilled(raid, fallbackDate) {
+            const details = ClanApp.extractItemDetails(raid, itemPriceMap);
+            let changed = false;
+            const updated = details.map(it => {
+                if (it.dist_checked && (!it.dist_date || !it.dist_date.trim())) {
+                    changed = true;
+                    return { ...it, dist_date: fallbackDate };
+                }
+                return it;
+            });
+
+            if (changed) {
+                await fetch('/api/raids/item-details', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        raid_id: raid.id,
+                        item_details: updated,
+                        requester_role: ClanApp.role
+                    })
+                });
+            }
+        }
+
+        function exportDistExcel(kind) {
+            if (!ClanApp.isAdminModeOn) return;
+            const refDate = document.getElementById('distDateFilter').value || ClanApp.formatYMD(new Date());
+            const refMonth = document.getElementById('distMonthFilter').value || ClanApp.formatYM(new Date());
+
+            if (kind === 'day') {
+                ClanApp.downloadExcel({ date: refDate });
+            } else if (kind === 'week') {
+                const { start, end } = getPlusSevenDaysRange(refDate);
+                ClanApp.downloadExcel({ start, end });
+            } else {
+                ClanApp.downloadExcel({ month: refMonth });
             }
         }
     </script>

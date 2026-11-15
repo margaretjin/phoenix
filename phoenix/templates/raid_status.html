@@ -2,567 +2,547 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>일별기록현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/style.css?v=7">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>일별 기록 현황 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/common.css?v=16">
+    <link rel="stylesheet" href="/static/raid_status.css?v=16">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
 
-    <main class="container">
-        <!-- 1. 월 선택 + 혈비 공제율 + 엑셀 다운로드 + 달력 -->
-        <div class="card">
-            <div class="week-selector-row">
-                <input type="month" id="statusMonth" onchange="onMonthChange()" style="width: auto; font-weight: 700;">
-
-                <div class="tax-setting-box">
-                    <span>💰 혈비: <b id="taxRateDisplay" style="color: var(--accent-gold);">20%</b></span>
-                    <span id="superAdminTaxEditor" class="hidden" style="display: inline-flex; align-items: center; gap: 0.25rem;">
-                        <input type="number" id="taxRateInput" min="0" max="100" style="width: 55px; padding: 0.15rem 0.3rem; font-size: 0.78rem;">%
-                        <button class="btn btn-green" style="padding: 0.15rem 0.45rem; font-size: 0.74rem;" onclick="saveTaxRate()">저장</button>
-                    </span>
-                </div>
-
-                <div style="margin-left: auto; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                    <button class="btn btn-blue" style="padding: 0.32rem 0.65rem; font-size: 0.78rem;" onclick="ClanApp.downloadExcel({ date: selectedDateStr })">📥 선택일 엑셀</button>
-                    <button class="btn btn-dark" style="padding: 0.32rem 0.65rem; font-size: 0.78rem;" onclick="ClanApp.downloadExcel({ month: document.getElementById('statusMonth').value })">📥 월 전체 엑셀</button>
-                    <button id="toggleCalendarBtn" class="btn btn-dark" style="padding: 0.32rem 0.65rem; font-size: 0.78rem;" onclick="toggleCalendarSection()">달력 닫기 ▲</button>
-                </div>
-            </div>
-
-            <div id="calendarCollapsibleArea" style="margin-top: 0.8rem;">
-                <div class="calendar-header-row">
-                    <div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div>
-                </div>
-                <div id="fullCalendarGrid" class="full-calendar-grid"></div>
+    <main class="main-container">
+        <!-- 상단 타이틀 & 관리자 모드 전용 엑셀 다운로드 버튼 -->
+        <div class="top-bar">
+            <h1 class="page-title">📅 일별 기록 현황</h1>
+            <div class="excel-btn-group admin-only">
+                <button type="button" class="btn-excel-sm" onclick="downloadExcelRange('day')">📥 일별</button>
+                <button type="button" class="btn-excel-sm" onclick="downloadExcelRange('week')">주별</button>
+                <button type="button" class="btn-excel-sm" onclick="downloadExcelRange('month')">월별</button>
             </div>
         </div>
 
-        <!-- 2. 해당 일자 총 득템 요약 -->
-        <div class="card">
-            <div class="summary-toggle-header" onclick="toggleDailyDropSummary()">
-                <span style="font-weight: 800; color: var(--accent-gold); font-size: 0.95rem;">
-                    🎁 [<span id="selectedDateLabel">-</span>] 총 득템 현황 (<span id="dailyDropCount">0</span>건)
-                </span>
-                <button id="toggleSummaryBtn" class="btn btn-dark" style="padding: 0.25rem 0.6rem; font-size: 0.76rem;">펼치기 ▼</button>
-            </div>
-            <div id="dailyDropSummaryBody" class="hidden" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); font-size: 0.88rem; line-height: 1.7;"></div>
-        </div>
-
-        <!-- 3. 16타임 원형 그리드 & 아이템 가격/당첨자/분배일자 설정 -->
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
-                <h3 class="section-title" style="margin-bottom: 0; font-size: 1rem;">⏱️ 보스탐 시간별 상세 및 정산</h3>
-                <button id="statusDeleteRaidBtn" class="btn btn-red hidden" style="padding: 0.28rem 0.65rem; font-size: 0.76rem;" onclick="deleteCurrentTimeRaid()">🗑️ 이 시간 기록 삭제</button>
-            </div>
-
-            <div id="circleTimeGrid" class="circle-time-grid"></div>
-
-            <!-- 관리자 일괄 아이템 텍스트 입력 -->
-            <div id="statusAdminItemBar" class="hidden" style="margin-bottom: 0.9rem; padding: 0.65rem; background: rgba(245, 158, 11, 0.12); border: 1px solid var(--accent-gold); border-radius: 8px; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
-                <span style="color: var(--accent-gold); font-weight: 700; font-size: 0.82rem;">👑 득템 일괄 입력:</span>
-                <input type="text" id="statusDroppedItemsInput" placeholder="예: 축젤 발터모 (띄어쓰기로 입력)" style="flex: 1; min-width: 160px;">
-                <button class="btn btn-green" style="padding: 0.35rem 0.7rem; font-size: 0.8rem;" onclick="saveDroppedItemsFromStatus()">저장</button>
-            </div>
-
-            <div class="raid-detail-two-col">
-                <!-- 왼쪽: 득템 아이템 가격 / 당첨자 / 분배일자 -->
-                <div class="detail-col-box">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem;">
-                        <span style="font-weight: 800; color: var(--accent-gold);">💎 득템 아이템 (<span id="detailSelectedTimeLabel">-</span>)</span>
-                        <button id="btnShowAddSingleItem" class="btn btn-green hidden" style="padding: 0.2rem 0.5rem; font-size: 0.74rem;" onclick="document.getElementById('addSingleItemBox').classList.toggle('hidden')">+ 아이템 추가</button>
-                    </div>
-
-                    <div id="addSingleItemBox" class="inline-add-box hidden">
-                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
-                            <input type="text" id="newSingleItemName" placeholder="아이템명" style="flex: 1; min-width: 90px;">
-                            <input type="number" id="newSingleItemPrice" placeholder="가격(아데나)" style="width: 110px;">
-                            <button class="btn btn-green" onclick="addSingleItemToRaid()">추가</button>
-                        </div>
-                    </div>
-
-                    <div id="detailPoolSummaryBox" class="pool-summary-box hidden">
-                        <div>• 총 판매액: <b id="totalGrossAdena" style="color: var(--accent-gold);">0 아데나</b></div>
-                        <div>• 혈비(<span id="appliedTaxRateLabel">20</span>%) 제외 분배풀: <b id="totalNetAdena" style="color: #34d399;">0 아데나</b></div>
-                    </div>
-
-                    <div id="detailItemsArea"></div>
-                </div>
-
-                <!-- 오른쪽: 참여 혈맹원 및 개별 분배금 -->
-                <div class="detail-col-box">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem;">
-                        <span style="font-weight: 800; color: #a7f3d0;">👥 참여 인원 (<span id="detailMemberCount">0</span>명)</span>
-                        <div style="display: flex; align-items: center; gap: 0.35rem;">
-                            <span id="detailPerPersonBadge" style="font-size: 0.78rem; color: var(--accent-gold); font-weight: 800;"></span>
-                            <button id="btnShowAddMember" class="btn btn-green hidden" style="padding: 0.2rem 0.5rem; font-size: 0.74rem;" onclick="document.getElementById('addMemberBox').classList.toggle('hidden')">+ 인원 추가</button>
-                        </div>
-                    </div>
-
-                    <div id="addMemberBox" class="inline-add-box hidden">
-                        <div style="display: flex; gap: 0.35rem;">
-                            <input type="text" id="addMemberSearchInput" placeholder="혈맹원 아이디 검색" oninput="filterAddMemberCandidates()" style="flex: 1;">
-                            <button class="btn btn-green" onclick="addSelectedMemberToRaid()">추가</button>
-                        </div>
-                        <div id="addMemberCandidates" class="winner-search-chips"></div>
-                    </div>
-
-                    <div id="detailMembersArea"></div>
+        <!-- 1. 날짜 선택 및 일별 요약 카드 (8칸 x 2줄 그리드) -->
+        <section class="card-box">
+            <div class="status-date-row">
+                <div id="displaySelectedDate" class="status-selected-date">00-00-00 일 00시</div>
+                <div class="status-date-controls">
+                    <button type="button" class="btn-day-move" onclick="moveDay(-1)">◀ 전날</button>
+                    <button type="button" class="btn-day-move today" onclick="setToday()">오늘</button>
+                    <button type="button" class="btn-day-move" onclick="moveDay(1)">다음날 ▶</button>
+                    <input type="date" id="statusDatePicker" class="date-picker-input" onchange="onDateInputChange()">
                 </div>
             </div>
+
+            <div class="day-summary-strip day-summary-split">
+                <div class="summary-mini-box">
+                    <div class="summary-mini-label">드랍 아이템</div>
+                    <div id="sumDropCount" class="summary-mini-val">0개</div>
+                </div>
+                <div class="summary-mini-box summary-items-box">
+                    <div class="summary-mini-label">이날 나온 아이템</div>
+                    <div id="sumDropList" class="summary-drop-list"><span class="summary-none">없음</span></div>
+                </div>
+            </div>
+
+            <!-- 고정 16개 보스탐 시간 선택 그리드 (8칸 x 2줄) -->
+            <div id="statusTimeGrid" class="common-time-grid"></div>
+        </section>
+
+        <!-- 선택된 보스탐 상세: 왼쪽 드랍 아이템 / 오른쪽 파티원 -->
+        <div class="raid-detail-columns">
+            <!-- 왼쪽: 드랍 아이템 -->
+            <section class="card-box raid-detail-items">
+                <div class="item-section-header">
+                    <span class="section-label">🎁 드랍 아이템 내역</span>
+                    <span id="slotItemTotalBadge" class="slot-green-meta">총 0 (단위:아데나)</span>
+                </div>
+
+                <div id="slotItemList" class="item-list-wrap">
+                    <div class="empty-party-msg">드랍된 아이템이 없습니다.</div>
+                </div>
+
+                <!-- 관리자 모드에서만 보이는 하단 아이템 추가 -->
+                <div class="admin-item-add-row">
+                    <input type="text" id="newDropItemName" class="input-common" placeholder="아이템명 (띄어쓰기로 여러 개)">
+                    <button type="button" class="btn-sm btn-sm-blue" onclick="addDropItemRow()">+ 아이템 추가</button>
+                </div>
+            </section>
+
+            <!-- 오른쪽: 파티원 명단(좌) + 혈비 20% 제외 분배금(우) -->
+            <section class="card-box raid-detail-parties">
+                <div class="item-section-header">
+                    <span id="slotParticipantCount" class="section-label">총 0파티 (0명)</span>
+                    <div class="header-right-group">
+                        <span class="slot-gray-note">혈비 20% 제외 분배</span>
+                        <button type="button" id="deleteEntireRaidBtn" class="btn-sm btn-sm-red admin-only" style="padding: 2px 6px; font-size: 10px;" onclick="deleteEntireRaidSlot()">
+                            전체삭제
+                        </button>
+                    </div>
+                </div>
+
+                <div id="slotPartyList" class="party-list-stack">
+                    <div class="empty-party-msg">해당 보스탐에 등록된 파티 기록이 없습니다.</div>
+                </div>
+
+                <!-- 관리자 모드에서만 보이는 하단 파티원 추가 -->
+                <div class="admin-party-add">
+                    <select id="addPartyTarget" class="input-common"></select>
+                    <input type="text" id="addMemberInput" class="input-common" placeholder="아이디 (띄어쓰기로 여러 명)">
+                    <button type="button" class="btn-sm btn-sm-blue" onclick="addPartyMembers()">+ 파티원 추가</button>
+                </div>
+            </section>
         </div>
     </main>
 
-    <script src="/static/common.js?v=7"></script>
+    <script src="/static/common.js?v=16"></script>
     <script>
-        let currentTaxRate = 20;
-        let raidTimes = [];
-        let allMembers = [];
-        let selectedDateStr = "";
-        let selectedTime = "09시";
-        let monthRaidsData = [];
-        let dayRaidsData = [];
-        let activeItemDetails = [];
+        let selectedDate = '';
+        let selectedTime = '';
+        let dayRaids = [];
+        let editableItems = [];
+        let aliasMap = {};
+        let itemAliasMap = {};
+        let itemPriceMap = {};
 
         window.onload = async () => {
             const user = ClanApp.initPage('/raid-status', () => {
-                applyAdminUI();
-                renderSelectedTimeDetail();
+                renderTimeGrid();
+                renderSlotDetails();
             });
             if (!user) return;
 
-            const [timeRes, taxRes, memRes] = await Promise.all([
-                fetch('/api/raids/times'),
-                fetch('/api/raids/tax-rate'),
-                fetch('/api/auth/search-members')
-            ]);
-            raidTimes = (await timeRes.json()).times;
-            currentTaxRate = (await taxRes.json()).tax_rate ?? 20;
-            allMembers = await memRes.json();
-
-            document.getElementById('taxRateDisplay').textContent = `${currentTaxRate}%`;
-            document.getElementById('taxRateInput').value = currentTaxRate;
-
             const now = new Date();
-            document.getElementById('statusMonth').value = ClanApp.formatYM(now);
-            selectedDateStr = ClanApp.formatYMD(now);
+            selectedDate = ClanApp.formatYMD(now);
+            selectedTime = ClanApp.getDefaultRaidTime(now);
 
-            applyAdminUI();
-            await refreshMonthAndDay();
+            document.getElementById('statusDatePicker').value = selectedDate;
+            updateDateDisplay();
+            await Promise.all([loadMemberDirectory(), loadItemDirectory()]);
+            await loadDateRaids();
         };
 
-        function applyAdminUI() {
-            const isOn = ClanApp.isAdminModeOn;
-            document.getElementById('statusAdminItemBar').classList.toggle('hidden', !isOn);
-            document.getElementById('btnShowAddSingleItem').classList.toggle('hidden', !isOn);
-            document.getElementById('btnShowAddMember').classList.toggle('hidden', !isOn);
-            document.getElementById('superAdminTaxEditor').classList.toggle('hidden', !(isOn && ClanApp.isSuperAdmin));
+        async function loadMemberDirectory() {
+            aliasMap = {};
+            try {
+                const res = await fetch('/api/auth/search-members');
+                const members = await res.json();
+                members.forEach(m => {
+                    const activeId = (m.active_id || '').trim();
+                    if (!activeId) return;
+                    aliasMap[activeId.toLowerCase()] = activeId;
+                    (m.sub_chars || '').split(',').map(s => s.trim()).filter(Boolean).forEach(sub => {
+                        aliasMap[sub.toLowerCase()] = activeId;
+                    });
+                });
+            } catch (e) { aliasMap = {}; }
         }
 
-        function toggleCalendarSection() {
-            const area = document.getElementById('calendarCollapsibleArea');
-            const hidden = area.classList.toggle('hidden');
-            document.getElementById('toggleCalendarBtn').textContent = hidden ? '달력 펼치기 ▼' : '달력 닫기 ▲';
+        async function loadItemDirectory() {
+            itemAliasMap = {};
+            itemPriceMap = {};
+            try {
+                const res = await fetch('/api/items');
+                if (!res.ok) return;
+                const items = await res.json();
+                items.forEach(it => {
+                    const name = (it.item_name || '').trim();
+                    if (!name) return;
+                    const price = Number(it.default_price || 0);
+                    itemPriceMap[name] = price;
+                    itemAliasMap[name.toLowerCase()] = name;
+                    (it.aliases || '').split(/[,，]+/).map(s => s.trim()).filter(Boolean).forEach(a => {
+                        itemAliasMap[a.toLowerCase()] = name;
+                    });
+                });
+            } catch (e) {
+                itemAliasMap = {};
+                itemPriceMap = {};
+            }
         }
 
-        function toggleDailyDropSummary() {
-            const body = document.getElementById('dailyDropSummaryBody');
-            const hidden = body.classList.toggle('hidden');
-            document.getElementById('toggleSummaryBtn').textContent = hidden ? '펼치기 ▼' : '감추기 ▲';
+        function formatHeaderLabel(dateStr, timeLabel) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const wd = ['일', '월', '화', '수', '목', '금', '토'][new Date(y, m - 1, d).getDay()];
+            const hh = String(ClanApp.parseRaidHour(timeLabel)).padStart(2, '0');
+            return `${String(y).slice(2)}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} ${wd} ${hh}시`;
         }
 
-        async function saveTaxRate() {
-            const val = parseFloat(document.getElementById('taxRateInput').value);
-            if (isNaN(val) || val < 0 || val > 100) return alert('0~100 사이 숫자를 입력하세요.');
-            const res = await fetch('/api/raids/tax-rate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tax_rate: val, requester_role: ClanApp.role })
+        function uniqueMembers(leader, members) {
+            const seen = new Set([leader]);
+            const out = [];
+            (members || []).forEach(m => {
+                if (m && !seen.has(m)) { seen.add(m); out.push(m); }
             });
-            if (res.ok) {
-                currentTaxRate = val;
-                document.getElementById('taxRateDisplay').textContent = `${val}%`;
-                alert('혈비 공제율이 저장되었습니다.');
-                renderDailyDropSummary();
-                renderSelectedTimeDetail();
-            }
+            return out;
         }
 
-        async function onMonthChange() {
-            const val = document.getElementById('statusMonth').value;
+        function updateDateDisplay() {
+            document.getElementById('displaySelectedDate').textContent = formatHeaderLabel(selectedDate, selectedTime);
+            document.getElementById('statusDatePicker').value = selectedDate;
+        }
+
+        function onDateInputChange() {
+            const val = document.getElementById('statusDatePicker').value;
             if (!val) return;
-            selectedDateStr = `${val}-01`;
-            await refreshMonthAndDay();
+            selectedDate = val;
+            updateDateDisplay();
+            loadDateRaids();
         }
 
-        async function refreshMonthAndDay() {
-            const monthVal = document.getElementById('statusMonth').value;
-            const res = await fetch(`/api/raids?month=${monthVal}`);
-            monthRaidsData = await res.json();
-            renderCalendar();
-            dayRaidsData = monthRaidsData.filter(r => r.raid_date === selectedDateStr);
-            renderDailyDropSummary();
-            renderCircleTimeGrid();
-            renderSelectedTimeDetail();
+        function moveDay(offset) {
+            const [y, m, d] = selectedDate.split('-').map(Number);
+            const target = new Date(y, m - 1, d);
+            target.setDate(target.getDate() + offset);
+            selectedDate = ClanApp.formatYMD(target);
+            updateDateDisplay();
+            loadDateRaids();
         }
 
-        function renderCalendar() {
-            document.getElementById('selectedDateLabel').textContent = selectedDateStr;
-            const [year, monthNum] = document.getElementById('statusMonth').value.split('-').map(Number);
-            const firstDay = new Date(year, monthNum - 1, 1);
-            const lastDay = new Date(year, monthNum, 0);
-            const startSunday = new Date(firstDay);
-            startSunday.setDate(firstDay.getDate() - firstDay.getDay());
-
-            const datesWithRecords = new Set(
-                monthRaidsData.filter(r => (r.parties && r.parties.length > 0) || (r.dropped_items && r.dropped_items.trim())).map(r => r.raid_date)
-            );
-
-            const grid = document.getElementById('fullCalendarGrid');
-            grid.innerHTML = '';
-            let cursor = new Date(startSunday);
-            while (cursor <= lastDay || cursor.getDay() !== 0) {
-                const ymd = ClanApp.formatYMD(cursor);
-                const isCur = cursor.getMonth() === (monthNum - 1);
-                const cell = document.createElement('div');
-                cell.className = `cal-day-cell ${cursor.getDay() === 0 ? 'sun' : ''} ${cursor.getDay() === 6 ? 'sat' : ''} ${!isCur ? 'other-month' : ''} ${ymd === selectedDateStr ? 'selected' : ''}`;
-                cell.innerHTML = `<span>${cursor.getDate()}</span>${datesWithRecords.has(ymd) ? '<span class="cal-day-dot"></span>' : ''}`;
-                cell.onclick = () => {
-                    selectedDateStr = ymd;
-                    if (!isCur) {
-                        document.getElementById('statusMonth').value = ymd.slice(0, 7);
-                        refreshMonthAndDay();
-                    } else {
-                        renderCalendar();
-                        dayRaidsData = monthRaidsData.filter(r => r.raid_date === selectedDateStr);
-                        renderDailyDropSummary();
-                        renderCircleTimeGrid();
-                        renderSelectedTimeDetail();
-                    }
-                };
-                grid.appendChild(cell);
-                cursor.setDate(cursor.getDate() + 1);
-                if (cursor > lastDay && cursor.getDay() === 0) break;
-            }
+        function setToday() {
+            const now = new Date();
+            selectedDate = ClanApp.formatYMD(now);
+            selectedTime = ClanApp.getDefaultRaidTime(now);
+            updateDateDisplay();
+            loadDateRaids();
         }
 
-        function renderDailyDropSummary() {
-            const entries = [];
-            let gross = 0;
-            dayRaidsData.forEach(r => {
-                ClanApp.extractItemDetails(r).forEach(d => {
-                    gross += (d.price || 0);
-                    entries.push(`<div>• <b style="color:var(--accent-gold);">[${r.raid_time}]</b> ${d.name} ${d.price > 0 ? `<b style="color:var(--accent-gold);">${d.price.toLocaleString()}</b>` : ''} ${d.winner ? `<span style="color:#a7f3d0;">(${d.winner})</span>` : ''} ${d.dist_date ? `<small style="color:#93c5fd;">[분배일:${d.dist_date}]</small>` : ''}</div>`);
+        async function loadDateRaids() {
+            const res = await fetch(`/api/raids?date=${encodeURIComponent(selectedDate)}`);
+            dayRaids = await res.json();
+
+            updateDaySummaryKPI();
+            renderTimeGrid();
+            syncEditableItemsFromRecord();
+            renderSlotDetails();
+        }
+
+        function updateDaySummaryKPI() {
+            const countMap = new Map();
+            let totalDrops = 0;
+
+            dayRaids.forEach(r => {
+                ClanApp.extractItemDetails(r, itemPriceMap).forEach(it => {
+                    totalDrops += 1;
+                    countMap.set(it.name, (countMap.get(it.name) || 0) + 1);
                 });
             });
-            document.getElementById('dailyDropCount').textContent = entries.length;
-            const body = document.getElementById('dailyDropSummaryBody');
-            if (entries.length === 0) {
-                body.innerHTML = `<span style="color:var(--text-muted);">득템 내역이 없습니다.</span>`;
+
+            document.getElementById('sumDropCount').textContent = `${totalDrops}개`;
+
+            const listEl = document.getElementById('sumDropList');
+            if (countMap.size === 0) {
+                listEl.innerHTML = `<span class="summary-none">없음</span>`;
             } else {
-                const net = Math.floor(gross * (1 - currentTaxRate / 100));
-                body.innerHTML = `<div style="margin-bottom:0.4rem;">총액: <b style="color:var(--accent-gold);">${gross.toLocaleString()}</b> | 혈비제외: <b style="color:#34d399;">${net.toLocaleString()} 아데나</b></div>` + entries.join('');
+                listEl.innerHTML = [...countMap.entries()].map(([name, cnt]) =>
+                    `<span class="summary-drop-chip">${name}${cnt > 1 ? ` ×${cnt}` : ''}</span>`
+                ).join('');
             }
         }
 
-        function renderCircleTimeGrid() {
-            const grid = document.getElementById('circleTimeGrid');
-            grid.innerHTML = '';
-            raidTimes.forEach(t => {
-                const rec = dayRaidsData.find(r => r.raid_time === t);
-                const hasParties = rec && rec.parties && rec.parties.length > 0;
-                const hasDrop = ClanApp.extractItemDetails(rec).length > 0;
-                const div = document.createElement('div');
-                div.className = `time-circle ${hasParties || hasDrop ? 'has-record' : ''} ${hasDrop ? 'has-drop' : ''} ${t === selectedTime ? 'selected' : ''}`;
-                div.innerHTML = t.replace('(', '<br>(');
-                div.onclick = () => { selectedTime = t; renderCircleTimeGrid(); renderSelectedTimeDetail(); };
-                grid.appendChild(div);
-            });
+        function renderTimeGrid() {
+            const grid = document.getElementById('statusTimeGrid');
+
+            grid.innerHTML = ClanApp.RAID_TIMES.map(t => {
+                const rec = dayRaids.find(r => r.raid_time === t);
+                const participants = rec ? ClanApp.extractParticipants(rec) : [];
+                const items = rec ? ClanApp.extractItemDetails(rec, itemPriceMap) : [];
+
+                const hasRecord = participants.length > 0 || items.length > 0;
+                const isActive = t === selectedTime;
+                const subText = hasRecord ? `${participants.length}명` : '기록없음';
+
+                return `
+                    <button type="button"
+                            class="common-time-btn status-time-btn ${hasRecord ? 'has-record' : ''} ${isActive ? 'active' : ''}"
+                            onclick="selectRaidTime('${t}')">
+                        <span>${t}</span>
+                        <span class="common-time-sub status-time-sub">${subText}</span>
+                    </button>
+                `;
+            }).join('');
         }
 
-        function renderSelectedTimeDetail() {
-            document.getElementById('detailSelectedTimeLabel').textContent = selectedTime;
-            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
-            const itemsArea = document.getElementById('detailItemsArea');
-            const membersArea = document.getElementById('detailMembersArea');
-            const poolBox = document.getElementById('detailPoolSummaryBox');
+        function selectRaidTime(t) {
+            selectedTime = t;
+            updateDateDisplay();
+            renderTimeGrid();
+            syncEditableItemsFromRecord();
+            renderSlotDetails();
+        }
 
-            if (!record) {
-                document.getElementById('statusDeleteRaidBtn').classList.add('hidden');
-                poolBox.classList.add('hidden');
-                document.getElementById('statusDroppedItemsInput').value = '';
-                document.getElementById('detailMemberCount').textContent = '0';
-                document.getElementById('detailPerPersonBadge').textContent = '';
-                itemsArea.innerHTML = `<span style="color:var(--text-muted);">득템 내역이 없습니다.</span>`;
-                membersArea.innerHTML = `<span style="color:var(--text-muted);">참여 기록이 없습니다.</span>`;
+        function getCurrentRecord() {
+            return dayRaids.find(r => r.raid_time === selectedTime) || null;
+        }
+
+        function syncEditableItemsFromRecord() {
+            const rec = getCurrentRecord();
+            editableItems = ClanApp.extractItemDetails(rec, itemPriceMap);
+        }
+
+        function getEffectiveItemPrice(item) {
+            const saved = Number(item.price || 0);
+            return saved > 0 ? saved : Number(itemPriceMap[item.name] || 0);
+        }
+
+        function renderSlotDetails() {
+            const rec = getCurrentRecord();
+            const parties = (rec && rec.parties) ? rec.parties : [];
+            const participants = ClanApp.extractParticipants(rec);
+            const pCount = participants.length;
+
+            document.getElementById('slotParticipantCount').textContent = `총 ${parties.length}파티 (${pCount}명)`;
+
+            // 아이템 총액 및 혈비 20% 제외 후 1인당 분배금 계산
+            const totalItemPrice = editableItems.reduce((acc, it) => acc + getEffectiveItemPrice(it), 0);
+            const netPool = Math.floor(totalItemPrice * 0.8);
+            const perMemberShare = (pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
+
+            document.getElementById('slotItemTotalBadge').textContent = `총 ${totalItemPrice.toLocaleString()} (단위:아데나)`;
+
+            const partyContainer = document.getElementById('slotPartyList');
+            if (parties.length === 0) {
+                partyContainer.innerHTML = `<div class="empty-party-msg">해당 보스탐에 등록된 파티 기록이 없습니다.</div>`;
+            } else {
+                partyContainer.innerHTML = parties.map(p => {
+                    const names = [{ id: p.leader, isLeader: true }]
+                        .concat(uniqueMembers(p.leader, p.members).map(m => ({ id: m, isLeader: false })));
+
+                    const rows = names.map(n => {
+                        const delBtn = ClanApp.isAdminModeOn
+                            ? `<button type="button" class="btn-person-del" title="삭제" onclick="deleteMember('${n.id}')">✕</button>`
+                            : '';
+                        return `
+                            <div class="party-person-row">
+                                <span class="${n.isLeader ? 'party-leader-name' : 'party-member-name'}">${n.id}</span>
+                                <span class="party-person-share">${perMemberShare.toLocaleString()}</span>
+                                ${delBtn}
+                            </div>`;
+                    }).join('');
+
+                    return `
+                        <div class="party-row-item">
+                            <div class="party-member-stack">${rows}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            renderPartyTargetOptions(parties);
+            renderItemDetailsSection();
+        }
+
+        function renderPartyTargetOptions(parties) {
+            const sel = document.getElementById('addPartyTarget');
+            if (!sel) return;
+            const prev = sel.value;
+            sel.innerHTML = `<option value="">새 파티 만들기</option>` + parties.map(p =>
+                `<option value="${p.leader}">${p.leader} 파티에 추가</option>`
+            ).join('');
+            if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+        }
+
+        // 드랍 아이템 내역: 각 아이템 가격 옆에 '아데나' 빼고 숫자만 표시
+        function renderItemDetailsSection() {
+            const itemContainer = document.getElementById('slotItemList');
+
+            if (editableItems.length === 0) {
+                itemContainer.innerHTML = `<div class="empty-party-msg">드랍된 아이템이 없습니다.</div>`;
                 return;
             }
 
-            document.getElementById('statusDeleteRaidBtn').classList.toggle('hidden', !ClanApp.isAdminModeOn);
-            activeItemDetails = ClanApp.extractItemDetails(record);
-            document.getElementById('statusDroppedItemsInput').value = activeItemDetails.map(d => d.name).join(' ');
-
-            const gross = activeItemDetails.reduce((a, c) => a + (Number(c.price) || 0), 0);
-            const net = Math.floor(gross * (1 - currentTaxRate / 100));
-
-            if (activeItemDetails.length > 0) {
-                poolBox.classList.remove('hidden');
-                document.getElementById('totalGrossAdena').textContent = `${gross.toLocaleString()} 아데나`;
-                document.getElementById('appliedTaxRateLabel').textContent = currentTaxRate;
-                document.getElementById('totalNetAdena').textContent = `${net.toLocaleString()} 아데나`;
-            } else {
-                poolBox.classList.add('hidden');
-            }
-
-            const participants = ClanApp.extractParticipants(record);
-            document.getElementById('detailMemberCount').textContent = participants.length;
-            const perShare = (participants.length > 0 && net > 0) ? Math.floor(net / participants.length) : 0;
-            document.getElementById('detailPerPersonBadge').textContent = perShare > 0 ? `1인당 ${perShare.toLocaleString()} 아데나` : '';
-
-            if (activeItemDetails.length === 0) {
-                itemsArea.innerHTML = `<span style="color:var(--text-muted);">득템 내역이 없습니다.</span>`;
-            } else {
-                itemsArea.innerHTML = activeItemDetails.map((item, idx) => {
-                    const priceStr = item.price > 0 ? `${item.price.toLocaleString()} 아데나` : '가격 미입력';
-                    const subDates = [
-                        item.taken_date ? `구매/수령일: ${item.taken_date}` : '',
-                        item.dist_date ? `분배일자: ${item.dist_date}` : ''
-                    ].filter(Boolean).join(' | ');
-
-                    if (!ClanApp.isAdminModeOn) {
-                        return `<div class="item-detail-card">
-                            <div class="item-view-main-line">
-                                <span class="item-view-name">${item.name}</span>
-                                <span class="item-view-price">${priceStr}</span>
-                                <span class="item-view-winner">${item.winner || ''}</span>
-                            </div>
-                            ${subDates ? `<div class="item-taken-date-sub">↳ ${subDates}</div>` : ''}
-                        </div>`;
-                    }
-
-                    return `<div class="item-detail-card">
-                        <div class="item-view-main-line">
-                            <span class="item-view-name">${item.name}</span>
-                            <span class="item-view-price">${priceStr}</span>
-                            <span class="item-view-winner">${item.winner || ''}</span>
-                        </div>
-                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.4rem; align-items:center;">
-                            <input type="number" id="itemPrice_${idx}" value="${item.price || ''}" placeholder="판매가격" style="width:105px; padding:0.25rem 0.4rem; font-size:0.8rem;">
-                            <input type="text" id="winnerSearch_${idx}" value="${item.winner || ''}" placeholder="구매자/당첨자" oninput="filterWinnerCandidates(${idx})" style="width:100px; padding:0.25rem 0.4rem; font-size:0.8rem;">
-                            <button class="btn btn-red" style="padding:0.22rem 0.45rem; font-size:0.74rem;" onclick="deleteSingleItem(${record.id}, ${idx})">삭제</button>
-                        </div>
-                        <div id="winnerCandidates_${idx}" class="winner-search-chips"></div>
-                        <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.35rem; align-items:center; font-size:0.76rem; color:var(--text-muted);">
-                            <span>수령일:</span>
-                            <input type="date" id="takenDate_${idx}" value="${item.taken_date || ''}" style="width:125px; padding:0.2rem; font-size:0.75rem;">
-                            <span>분배일:</span>
-                            <input type="date" id="distDate_${idx}" value="${item.dist_date || ''}" style="width:125px; padding:0.2rem; font-size:0.75rem;">
-                            <button class="btn btn-green" style="padding:0.25rem 0.6rem; font-size:0.76rem;" onclick="saveItemFullDetail(${record.id}, ${idx})">💾 저장</button>
-                        </div>
-                    </div>`;
-                }).join('');
-            }
-
-            const distMap = record.distributions || {};
-            membersArea.innerHTML = participants.length === 0
-                ? `<span style="color:var(--text-muted);">참여 인원이 없습니다.</span>`
-                : participants.map(m => {
-                    const dInfo = distMap[m.id] || {};
-                    const isPaid = dInfo.status === '분배완료';
-                    const paidBadge = isPaid
-                        ? `<span class="status-badge badge-done" style="margin-left:0.3rem;">분배완료(${dInfo.method || '본인수령'})</span>`
-                        : '';
-                    const delBtn = ClanApp.isAdminModeOn
-                        ? `<button class="btn btn-red" style="padding:0.15rem 0.4rem; font-size:0.7rem;" onclick="removeMemberFromRaid('${m.id}')">삭제</button>`
-                        : '';
-                    return `<div class="member-share-row">
-                        <span><b style="color:${m.isLeader ? '#a7f3d0' : 'var(--text-light)'};">${m.id}</b>${paidBadge}</span>
-                        <div style="display:flex; align-items:center; gap:0.35rem;">
-                            <span class="member-share-badge">${perShare > 0 ? perShare.toLocaleString() + ' 아데나' : '-'}</span>
+            itemContainer.innerHTML = editableItems.map((item, idx) => {
+                const effectivePrice = getEffectiveItemPrice(item);
+                const priceLabel = effectivePrice.toLocaleString();
+                const delBtn = ClanApp.isAdminModeOn
+                    ? `<button type="button" class="btn-sm btn-sm-red" style="padding: 2px 6px; font-size: 10px;" onclick="removeDropItemRow(${idx})">삭제</button>`
+                    : '';
+                return `
+                    <div class="item-row-card">
+                        <div class="item-view-line">
+                            <span class="item-badge-name">🎁 ${item.name}</span>
+                            <span class="item-matched-price">${priceLabel}</span>
                             ${delBtn}
                         </div>
-                    </div>`;
-                }).join('');
+                    </div>
+                `;
+            }).join('');
         }
 
-        function filterWinnerCandidates(idx) {
-            const val = document.getElementById(`winnerSearch_${idx}`).value.trim();
-            const box = document.getElementById(`winnerCandidates_${idx}`);
-            box.innerHTML = '';
-            if (!val) return;
+        function findSuggestedItem(token) {
+            const lower = token.toLowerCase();
+            for (const key of Object.keys(itemAliasMap)) {
+                if (key.includes(lower) || lower.includes(key)) return itemAliasMap[key];
+            }
+            return null;
+        }
 
-            const ext = document.createElement('span');
-            ext.className = 'winner-chip';
-            ext.style.background = '#1d4ed8';
-            ext.textContent = '🌐 외판';
-            ext.onclick = () => {
-                document.getElementById(`winnerSearch_${idx}`).value = '외판';
-                if (!document.getElementById(`takenDate_${idx}`).value) document.getElementById(`takenDate_${idx}`).value = ClanApp.formatYMD();
-                box.innerHTML = '';
-            };
-            box.appendChild(ext);
+        async function addDropItemRow() {
+            if (!ClanApp.isAdminModeOn) return;
+            const input = document.getElementById('newDropItemName');
+            const tokens = input.value.split(/[\s,，]+/).map(t => t.trim()).filter(Boolean);
+            if (tokens.length === 0) return alert('추가할 아이템 이름을 입력해 주세요.');
 
-            allMembers.filter(m => m.active_id.includes(val)).slice(0, 6).forEach(m => {
-                const c = document.createElement('span');
-                c.className = 'winner-chip';
-                c.textContent = m.active_id;
-                c.onclick = () => {
-                    document.getElementById(`winnerSearch_${idx}`).value = m.active_id;
-                    if (!document.getElementById(`takenDate_${idx}`).value) document.getElementById(`takenDate_${idx}`).value = ClanApp.formatYMD();
-                    box.innerHTML = '';
-                };
-                box.appendChild(c);
+            const hasMaster = Object.keys(itemAliasMap).length > 0;
+            const names = [];
+            for (const tok of tokens) {
+                const main = itemAliasMap[tok.toLowerCase()] || null;
+                if (main) { names.push(main); continue; }
+                if (!hasMaster) { names.push(tok); continue; }
+                const sug = findSuggestedItem(tok);
+                return alert(`[${tok}] 아이템은 아이템 목록에 없습니다.` + (sug ? `\n혹시 [${sug}] 인가요?` : ''));
+            }
+
+            const res = await fetch('/api/raids', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_date: selectedDate,
+                    raid_time: selectedTime,
+                    parties: [],
+                    add_items: names.join(' '),
+                    requester_role: ClanApp.role,
+                    requester_id: ClanApp.user.active_id
+                })
             });
+            if (res.ok) {
+                input.value = '';
+                await loadDateRaids();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '아이템 추가 실패');
+            }
         }
 
-        async function saveItemFullDetail(raidId, idx) {
-            const price = Number(document.getElementById(`itemPrice_${idx}`).value.trim() || 0);
-            const winner = document.getElementById(`winnerSearch_${idx}`).value.trim();
-            const taken_date = document.getElementById(`takenDate_${idx}`).value || (winner ? ClanApp.formatYMD() : '');
-            const dist_date = document.getElementById(`distDate_${idx}`).value || '';
+        async function removeDropItemRow(idx) {
+            if (!ClanApp.isAdminModeOn) return;
+            const rec = getCurrentRecord();
+            const target = editableItems[idx];
+            if (!rec || !target) return;
+            if (!confirm(`[${target.name}] 아이템을 삭제하시겠습니까?`)) return;
 
-            activeItemDetails[idx] = {
-                ...activeItemDetails[idx],
-                price,
-                winner,
-                taken_date,
-                dist_date
-            };
-
+            const remain = editableItems.filter((_, i) => i !== idx);
             const res = await fetch('/api/raids/item-details', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ raid_id: raidId, item_details: activeItemDetails, requester_role: ClanApp.role })
+                body: JSON.stringify({
+                    raid_id: rec.id,
+                    item_details: remain,
+                    requester_role: ClanApp.role
+                })
             });
             if (res.ok) {
-                alert(`[${activeItemDetails[idx].name}] 정산 정보가 저장되었습니다.`);
-                await refreshMonthAndDay();
-            }
-        }
-
-        async function deleteSingleItem(raidId, idx) {
-            if (!confirm(`[${activeItemDetails[idx].name}] 아이템을 삭제하시겠습니까?`)) return;
-            activeItemDetails.splice(idx, 1);
-            await fetch('/api/raids/item-details', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ raid_id: raidId, item_details: activeItemDetails, requester_role: ClanApp.role })
-            });
-            await refreshMonthAndDay();
-        }
-
-        async function addSingleItemToRaid() {
-            const name = document.getElementById('newSingleItemName').value.trim();
-            const price = Number(document.getElementById('newSingleItemPrice').value.trim() || 0);
-            if (!name) return alert('아이템명을 입력하세요.');
-
-            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
-            const updated = [...activeItemDetails, { name, price, winner: '', taken_date: '', dist_date: '' }];
-
-            if (!record) {
-                const cRes = await fetch('/api/raids', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        raid_date: selectedDateStr, raid_time: selectedTime, parties: [],
-                        dropped_items: name, requester_role: ClanApp.role, requester_id: ClanApp.user.active_id
-                    })
-                });
-                const created = (await cRes.json()).data;
-                await fetch('/api/raids/item-details', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ raid_id: created.id, item_details: updated, requester_role: ClanApp.role })
-                });
+                await loadDateRaids();
             } else {
-                await fetch('/api/raids/item-details', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ raid_id: record.id, item_details: updated, requester_role: ClanApp.role })
-                });
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '삭제 실패');
             }
-            document.getElementById('newSingleItemName').value = '';
-            document.getElementById('newSingleItemPrice').value = '';
-            await refreshMonthAndDay();
         }
 
-        async function saveDroppedItemsFromStatus() {
-            const dropped_items = document.getElementById('statusDroppedItemsInput').value.trim();
-            await fetch('/api/raids', {
+        async function deleteMember(name) {
+            if (!ClanApp.isAdminModeOn) return;
+            if (!confirm(`[${name}] 님을 이 보스탐 참여 명단에서 삭제하시겠습니까?`)) return;
+
+            const params = new URLSearchParams({
+                date: selectedDate,
+                time: selectedTime,
+                name: name,
+                role: ClanApp.role
+            });
+            const res = await fetch(`/api/raids/member?${params.toString()}`, { method: 'DELETE' });
+            if (res.ok) {
+                await loadDateRaids();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '삭제 실패');
+            }
+        }
+
+        async function addPartyMembers() {
+            if (!ClanApp.isAdminModeOn) return;
+            const input = document.getElementById('addMemberInput');
+            const tokens = input.value.split(/[\s,，]+/).map(t => t.trim()).filter(Boolean);
+            if (tokens.length === 0) return alert('추가할 아이디를 입력해 주세요.');
+
+            const names = [];
+            for (const tok of tokens) {
+                const main = aliasMap[tok.toLowerCase()];
+                if (!main) return alert(`[${tok}] 아이디는 등록되지 않은 회원입니다.`);
+                if (!names.includes(main)) names.push(main);
+            }
+
+            const rec = getCurrentRecord();
+            const parties = (rec && rec.parties) || [];
+            const targetLeader = document.getElementById('addPartyTarget').value;
+
+            let partyToSave;
+            if (!targetLeader) {
+                const used = new Set(ClanApp.extractParticipants(rec).map(x => x.id));
+                const dup = names.find(n => used.has(n));
+                if (dup) return alert(`[${dup}] 님은 이미 이 보스탐에 등록되어 있습니다.`);
+                if (names.length > 8) return alert('1파티에는 최대 8명까지만 들어갈 수 있습니다.');
+                partyToSave = { leader: names[0], members: names.slice(1) };
+            } else {
+                const party = parties.find(p => p.leader === targetLeader);
+                if (!party) return alert('대상 파티를 찾을 수 없습니다.');
+                const inParty = new Set([party.leader].concat(party.members || []));
+                const others = new Set(ClanApp.extractParticipants({
+                    parties: parties.filter(p => p.leader !== targetLeader)
+                }).map(x => x.id));
+                const dup = names.find(n => inParty.has(n) || others.has(n));
+                if (dup) return alert(`[${dup}] 님은 이미 이 보스탐에 등록되어 있습니다.`);
+                const members = uniqueMembers(party.leader, (party.members || []).concat(names));
+                if (1 + members.length > 8) return alert('1파티에는 최대 8명까지만 들어갈 수 있습니다.');
+                partyToSave = { leader: party.leader, members };
+            }
+
+            const res = await fetch('/api/raids', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    raid_date: selectedDateStr, raid_time: selectedTime, parties: [],
-                    dropped_items, requester_role: ClanApp.role, requester_id: ClanApp.user.active_id
+                    raid_date: selectedDate,
+                    raid_time: selectedTime,
+                    parties: [partyToSave],
+                    requester_role: ClanApp.role,
+                    requester_id: ClanApp.user.active_id
                 })
             });
-            alert('아이템 목록이 저장되었습니다.');
-            await refreshMonthAndDay();
-        }
-
-        function filterAddMemberCandidates() {
-            const val = document.getElementById('addMemberSearchInput').value.trim();
-            const box = document.getElementById('addMemberCandidates');
-            box.innerHTML = '';
-            if (!val) return;
-            allMembers.filter(m => m.active_id.includes(val)).slice(0, 6).forEach(m => {
-                const c = document.createElement('span');
-                c.className = 'winner-chip';
-                c.textContent = m.active_id;
-                c.onclick = () => { document.getElementById('addMemberSearchInput').value = m.active_id; box.innerHTML = ''; };
-                box.appendChild(c);
-            });
-        }
-
-        async function addSelectedMemberToRaid() {
-            const memberId = document.getElementById('addMemberSearchInput').value.trim();
-            if (!allMembers.find(m => m.active_id === memberId)) return alert('등록된 혈맹원이 아닙니다.');
-            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
-            const parties = record ? (record.parties || []) : [];
-            const payload = parties.length > 0
-                ? [{ leader: parties[0].leader, members: Array.from(new Set([parties[0].leader, ...(parties[0].members || []), memberId])) }]
-                : [{ leader: memberId, members: [memberId] }];
-
-            await fetch('/api/raids', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    raid_date: selectedDateStr, raid_time: selectedTime, parties: payload,
-                    dropped_items: record ? (record.dropped_items || '') : '',
-                    requester_role: ClanApp.role, requester_id: ClanApp.user.active_id
-                })
-            });
-            document.getElementById('addMemberSearchInput').value = '';
-            await refreshMonthAndDay();
-        }
-
-        async function removeMemberFromRaid(memberId) {
-            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
-            if (!record || !confirm(`[${memberId}] 님을 명단에서 삭제하시겠습니까?`)) return;
-            for (const p of (record.parties || [])) {
-                const updated = (p.members || []).filter(m => m !== memberId);
-                await fetch(`/api/raids/party?date=${selectedDateStr}&time=${encodeURIComponent(selectedTime)}&leader=${encodeURIComponent(p.leader)}&role=${encodeURIComponent(ClanApp.role)}`, { method: 'DELETE' });
-                if (updated.length > 0) {
-                    await fetch('/api/raids', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            raid_date: selectedDateStr, raid_time: selectedTime,
-                            parties: [{ leader: p.leader === memberId ? updated[0] : p.leader, members: updated }],
-                            dropped_items: record.dropped_items || '',
-                            requester_role: ClanApp.role, requester_id: ClanApp.user.active_id
-                        })
-                    });
-                }
+            if (res.ok) {
+                input.value = '';
+                await loadDateRaids();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '추가 실패');
             }
-            await refreshMonthAndDay();
         }
 
-        async function deleteCurrentTimeRaid() {
-            const record = dayRaidsData.find(r => r.raid_time === selectedTime);
-            if (!record || !confirm('이 시간 기록 전체를 삭제하시겠습니까?')) return;
-            await fetch(`/api/raids/${record.id}?role=${encodeURIComponent(ClanApp.role)}`, { method: 'DELETE' });
-            await refreshMonthAndDay();
+        async function deleteEntireRaidSlot() {
+            if (!ClanApp.isAdminModeOn) return;
+            const rec = getCurrentRecord();
+            if (!rec) return alert('삭제할 보스탐 기록이 없습니다.');
+
+            if (!confirm(`${selectedDate} ${selectedTime} 보스탐 전체 기록을 삭제하시겠습니까?`)) return;
+
+            const res = await fetch(`/api/raids/${rec.id}?role=${encodeURIComponent(ClanApp.role)}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                await loadDateRaids();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '삭제 실패');
+            }
+        }
+
+        function downloadExcelRange(kind) {
+            if (!ClanApp.isAdminModeOn) return;
+            if (kind === 'day') {
+                ClanApp.downloadExcel({ date: selectedDate });
+            } else if (kind === 'week') {
+                const { start, end } = ClanApp.getWeekRange(selectedDate);
+                ClanApp.downloadExcel({ start, end });
+            } else {
+                ClanApp.downloadExcel({ month: selectedDate.slice(0, 7) });
+            }
         }
     </script>
 </body>

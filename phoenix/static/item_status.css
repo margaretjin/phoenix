@@ -1,0 +1,199 @@
+/* =========================================================
+   [item_status.css] 혈맹 아이템 현황 페이지 전용 스타일
+   (기본 텍스트 표시 + [수정] 클릭 시에만 입력창 전환)
+   ========================================================= */
+
+.excel-btn-group {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.btn-excel-sm {
+    background-color: #15803d;
+    color: #ffffff;
+    border: 1px solid #16a34a;
+    border-radius: 5px;
+    padding: 3px 7px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.filter-grid-box {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.filter-field label {
+    display: block;
+    font-size: 11px;
+    color: #9ca3af;
+    font-weight: bold;
+    margin-bottom: 3px;
+}
+
+.status-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.item-status-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    table-layout: auto;
+}
+
+.item-status-table th,
+.item-status-table td {
+    padding: 8px 5px;
+    border-bottom: 1px solid #2e2e32;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.item-status-table th {
+    background-color: #27272a;
+    color: #fbbf24;
+    font-weight: 800;
+    font-size: 11.5px;
+    line-height: 1.25;
+}
+
+.sale-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.sale-badge.type-보유중 {
+    background-color: rgba(245, 158, 11, 0.18);
+    color: #fbbf24;
+    border: 1px solid #f59e0b;
+}
+
+.sale-badge.type-내판 {
+    background-color: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
+    border: 1px solid #22c55e;
+}
+
+.sale-badge.type-외판 {
+    background-color: rgba(59, 130, 246, 0.18);
+    color: #60a5fa;
+    border: 1px solid #3b82f6;
+}
+
+.sale-badge.type-이벤트 {
+    background-color: rgba(168, 85, 247, 0.18);
+    color: #c084fc;
+    border: 1px solid #a855f7;
+}
+
+.tbl-input {
+    background-color: #141414;
+    border: 1px solid #3f3f46;
+    border-radius: 5px;
+    padding: 4px 6px;
+    color: #ffffff;
+    font-size: 12px;
+}
+
+.tbl-input:focus {
+    border-color: #3b82f6;
+}
+
+.tbl-select {
+    background-color: #141414;
+    border: 1px solid #3f3f46;
+    border-radius: 5px;
+    padding: 4px 4px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    width: 74px;
+}
+
+.tbl-price-input {
+    width: 96px;
+    text-align: right;
+    color: #fbbf24;
+    font-weight: 700;
+}
+
+.tbl-winner-input {
+    width: 92px;
+    color: #a7f3d0;
+    font-weight: 700;
+}
+
+.tbl-date-input {
+    width: 124px;
+    font-size: 11.5px;
+}
+
+/* 분배완료일 텍스트 + 체크박스 */
+.dist-check-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.dist-date-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: #60a5fa;
+}
+
+.dist-date-text.empty {
+    color: #71717a;
+    font-weight: 400;
+}
+
+.dist-target-checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: #22c55e;
+    cursor: pointer;
+}
+
+.dist-target-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.btn-row-edit {
+    background-color: #2563eb;
+    color: #ffffff;
+    border: 1px solid #3b82f6;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .filter-grid-box {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .item-status-table {
+        font-size: 11.5px;
+    }
+
+    .item-status-table th,
+    .item-status-table td {
+        padding: 6px 3px;
+    }
+}

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>참여도 현황 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/common.css?v=27">
+    <link rel="stylesheet" href="/static/attendance.css?v=27">
+</head>
+<body>
+    <nav class="navbar" id="appNavbar"></nav>
+
+    <main class="main-container">
+        <div class="top-bar">
+            <h1 class="page-title">📊 전체 혈원 보스탐 참여도 현황</h1>
+            <span id="memberCountLabel" style="font-size: 12px; font-weight: 800; color: #60a5fa;">전체 0명</span>
+        </div>
+
+        <!-- 1. 기준 월 선택 및 검색 필터 -->
+        <section class="card-box">
+            <div class="att-filter-grid">
+                <div class="att-filter-field">
+                    <label>조회 기준 월 (월별 집계)</label>
+                    <input type="month" id="attMonthInput" class="input-common" onchange="loadMonthRaidsData()">
+                </div>
+
+                <div class="att-filter-field">
+                    <label>클래스 필터</label>
+                    <select id="attClassFilter" class="input-common" onchange="renderAttendanceTable()">
+                        <option value="all">전체 클래스</option>
+                        <option value="기사">기사</option>
+                        <option value="요정">요정</option>
+                        <option value="법사">법사</option>
+                        <option value="군주">군주</option>
+                        <option value="다크엘프">다크엘프</option>
+                    </select>
+                </div>
+
+                <div class="att-filter-field full-mobile">
+                    <label>혈원 검색 (본캐릭 / 보조캐릭)</label>
+                    <input type="search" id="attMemberSearch" class="input-common" placeholder="캐릭터명 검색" oninput="renderAttendanceTable()">
+                </div>
+            </div>
+
+            <!-- 상단 요약 KPI 3칸 -->
+            <div class="att-kpi-grid">
+                <div class="att-kpi-box">
+                    <div class="att-kpi-label">전체 등록 혈원</div>
+                    <div id="kpiTotalMembers" class="att-kpi-val">0명</div>
+                </div>
+                <div class="att-kpi-box">
+                    <div class="att-kpi-label">해당 월 진행된 보스탐</div>
+                    <div id="kpiMonthRaids" class="att-kpi-val">총 0회</div>
+                </div>
+                <div class="att-kpi-box">
+                    <div class="att-kpi-label">해당 월 메인보스탐(9·15·21·3시)</div>
+                    <div id="kpiMonthMainRaids" class="att-kpi-val main-highlight">총 0회</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 전체 혈원 참여도 표 (일 전체/일 메인보스탐 삭제, 월별 메인보스탐 및 월별 09·15·21·03시 표시) -->
+        <section class="card-box">
+            <div class="att-header-row">
+                <span class="section-label">🏆 전체 혈원 월별 참여 횟수 및 메인보스탐(09시·15시·21시·03시) 참여도</span>
+                <div class="sort-btn-group">
+                    <button type="button" id="sortBtn_monthTotal" class="sort-tab-btn active" onclick="setSortMode('monthTotal')">월 전체순</button>
+                    <button type="button" id="sortBtn_monthMain" class="sort-tab-btn" onclick="setSortMode('monthMain')">월별 메인탐순</button>
+                    <button type="button" id="sortBtn_name" class="sort-tab-btn" onclick="setSortMode('name')">이름순</button>
+                </div>
+            </div>
+
+            <div class="att-table-wrap">
+                <table class="att-table">
+                    <thead>
+                        <tr>
+                            <th>순위</th>
+                            <th>혈원명</th>
+                            <th>클래스</th>
+                            <th>월 전체<br>참여</th>
+                            <th class="main-white-th">월별 메인보스탐<br>(9·15·21·3시)</th>
+                            <th class="slot-class-th">월별 09시</th>
+                            <th class="slot-class-th">월별 15시</th>
+                            <th class="slot-class-th">월별 21시</th>
+                            <th class="slot-class-th">월별 03시</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceTableBody">
+                        <tr><td colspan="9" class="empty-party-msg">조회 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/common.js?v=27"></script>
+    <script>
+        const MAIN_SLOTS = ['09시', '15시', '21시', '03시'];
+        let allMembers = [];
+        let monthRaids = [];
+        let sortMode = 'monthTotal'; // 'monthTotal' | 'monthMain' | 'name'
+
+        window.onload = async () => {
+            const user = ClanApp.initPage('/attendance');
+            if (!user) return;
+
+            const now = new Date();
+            document.getElementById('attMonthInput').value = ClanApp.formatYM(now);
+
+            await loadAllMembers();
+            await loadMonthRaidsData();
+        };
+
+        async function loadAllMembers() {
+            const res = await fetch('/api/auth/search-members');
+            allMembers = await res.json();
+            document.getElementById('memberCountLabel').textContent = `전체 ${allMembers.length}명`;
+            document.getElementById('kpiTotalMembers').textContent = `${allMembers.length}명`;
+        }
+
+        function setSortMode(mode) {
+            sortMode = mode;
+            ['monthTotal', 'monthMain', 'name'].forEach(k => {
+                const btn = document.getElementById(`sortBtn_${k}`);
+                if (btn) btn.classList.toggle('active', k === mode);
+            });
+            renderAttendanceTable();
+        }
+
+        async function loadMonthRaidsData() {
+            const ym = document.getElementById('attMonthInput').value || ClanApp.formatYM(new Date());
+            const res = await fetch(`/api/raids?month=${encodeURIComponent(ym)}`);
+            monthRaids = await res.json();
+            renderAttendanceTable();
+        }
+
+        function renderAttendanceTable() {
+            const classFilter = document.getElementById('attClassFilter').value;
+            const kw = document.getElementById('attMemberSearch').value.trim().toLowerCase();
+
+            const activeMonthRaids = monthRaids.filter(r => ClanApp.extractParticipants(r).length > 0);
+            const activeMonthMainRaids = activeMonthRaids.filter(r => MAIN_SLOTS.includes(r.raid_time));
+
+            document.getElementById('kpiMonthRaids').textContent = `총 ${activeMonthRaids.length}회`;
+            document.getElementById('kpiMonthMainRaids').textContent = `총 ${activeMonthMainRaids.length}회`;
+
+            // 전체 혈원 초기 스탯 맵 생성
+            const statsMap = new Map();
+            allMembers.forEach(m => {
+                statsMap.set(m.active_id, {
+                    id: m.active_id,
+                    char_class: m.char_class || '-',
+                    sub_chars: m.sub_chars || '',
+                    monthTotal: 0,
+                    monthMain: 0,
+                    slotCounts: { '09시': 0, '15시': 0, '21시': 0, '03시': 0 }
+                });
+            });
+
+            // 월 전체 참여 및 월별 메인보스탐(09시, 15시, 21시, 03시) 집계
+            monthRaids.forEach(r => {
+                const pList = ClanApp.extractParticipants(r);
+                const isMainSlot = MAIN_SLOTS.includes(r.raid_time);
+
+                pList.forEach(p => {
+                    const st = statsMap.get(p.id);
+                    if (!st) return;
+
+                    st.monthTotal += 1;
+                    if (isMainSlot) {
+                        st.monthMain += 1;
+                        st.slotCounts[r.raid_time] = (st.slotCounts[r.raid_time] || 0) + 1;
+                    }
+                });
+            });
+
+            let rows = [...statsMap.values()].filter(row => {
+                if (classFilter !== 'all' && row.char_class !== classFilter) return false;
+                if (kw) {
+                    const matchName = row.id.toLowerCase().includes(kw) || row.sub_chars.toLowerCase().includes(kw);
+                    if (!matchName) return false;
+                }
+                return true;
+            });
+
+            rows.sort((a, b) => {
+                if (sortMode === 'monthTotal') {
+                    if (b.monthTotal !== a.monthTotal) return b.monthTotal - a.monthTotal;
+                    if (b.monthMain !== a.monthMain) return b.monthMain - a.monthMain;
+                } else if (sortMode === 'monthMain') {
+                    if (b.monthMain !== a.monthMain) return b.monthMain - a.monthMain;
+                    if (b.monthTotal !== a.monthTotal) return b.monthTotal - a.monthTotal;
+                }
+                return a.id.localeCompare(b.id, 'ko');
+            });
+
+            const tbody = document.getElementById('attendanceTableBody');
+            if (rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="empty-party-msg">조회된 혈원이 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = rows.map((r, idx) => {
+                const rank = idx + 1;
+                const rankHtml = `<span class="rank-badge ${rank <= 3 ? 'top-rank' : ''}">${rank}</span>`;
+
+                // 월별 09시~03시: 클래스(요정)와 동일한 색상(#d4d4d8)으로 표시
+                const fmtSlot = (cnt) => `<span class="class-same-color">${cnt}회</span>`;
+
+                return `
+                    <tr>
+                        <td>${rankHtml}</td>
+                        <td style="font-weight: 800; color: #fbbf24;">${r.id}</td>
+                        <td><span class="class-same-color">${r.char_class}</span></td>
+                        <td><span class="count-pill month-total">${r.monthTotal}회</span></td>
+                        <td><span class="main-white-text">${r.monthMain}회</span></td>
+                        <td>${fmtSlot(r.slotCounts['09시'])}</td>
+                        <td>${fmtSlot(r.slotCounts['15시'])}</td>
+                        <td>${fmtSlot(r.slotCounts['21시'])}</td>
+                        <td>${fmtSlot(r.slotCounts['03시'])}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+</html>

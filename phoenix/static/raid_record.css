@@ -1,0 +1,372 @@
+/* =========================================================
+   [raid_record.css] 보스탐 참여 기록 페이지 전용 스타일
+   ========================================================= */
+
+.date-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.selected-datetime-text {
+    width: 50%;
+    color: #ff5722;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.date-btn-group {
+    width: 50%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.date-btn {
+    width: 100%;
+    padding: 8px 0;
+    border: 1px solid #3f3f46;
+    background-color: #27272a;
+    color: #d4d4d8;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: bold;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.date-btn.active {
+    background-color: #3b82f6;
+    color: #ffffff;
+    border-color: #3b82f6;
+}
+
+/* 시간 슬롯별 상태 전용 */
+.hour-btn.open {
+    background-color: rgba(34, 197, 94, 0.12);
+    border-color: #22c55e;
+    color: #ffffff;
+}
+.hour-btn.open .common-time-sub {
+    color: #4ade80;
+}
+.hour-btn.recorded::after {
+    content: '✔';
+    position: absolute;
+    top: 1px;
+    right: 2px;
+    font-size: 9px;
+    color: #4ade80;
+    font-weight: 900;
+}
+.hour-btn.expired {
+    background-color: #161618;
+    border-color: #27272a;
+    color: #52525b;
+    text-decoration: line-through;
+}
+.hour-btn.expired .common-time-sub {
+    color: #52525b;
+    text-decoration: none;
+}
+.hour-btn.future {
+    background-color: #1c1c1f;
+    border-color: #2e2e32;
+    color: #71717a;
+}
+.hour-btn.active.recorded::after {
+    color: #ffffff !important;
+}
+
+.limit-warning {
+    display: none;
+    margin-top: 10px;
+    padding: 10px;
+    background-color: rgba(239, 68, 68, 0.14);
+    border: 1px solid #ef4444;
+    border-radius: 6px;
+    color: #f87171;
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+}
+.limit-warning.show {
+    display: block;
+}
+
+.input-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 6px;
+}
+
+.input-guide-text {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-bottom: 8px;
+}
+
+.btn-clear {
+    background-color: #374151;
+    color: #e5e7eb;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.participant-textarea {
+    width: 100%;
+    height: 92px;
+    background-color: #141414;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    padding: 10px;
+    color: #ffffff;
+    font-size: 13px;
+    resize: none;
+}
+.participant-textarea:focus {
+    border-color: #3b82f6;
+}
+.participant-textarea:disabled {
+    background-color: #18181b;
+    border-color: #27272a;
+    color: #52525b;
+    cursor: not-allowed;
+}
+
+.admin-drop-box {
+    margin-top: 10px;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+}
+body.admin-mode .admin-drop-box {
+    display: flex;
+}
+.admin-drop-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #fbbf24;
+}
+
+.match-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-top: 12px;
+    margin-bottom: 8px;
+}
+
+.match-legend {
+    font-size: 11px;
+    font-weight: bold;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.legend-leader { color: #a7f3d0; }
+.legend-green { color: #22c55e; }
+.legend-red { color: #ef4444; }
+
+.match-result-box {
+    width: 100%;
+    min-height: 52px;
+    background-color: #141414;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.preview-party-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed #27272a;
+}
+.preview-party-row:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.party-limit-status {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 800;
+    color: #9ca3af;
+}
+.party-limit-status.over-limit {
+    color: #ef4444;
+}
+
+.member-badge {
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.member-badge.registered {
+    background-color: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
+    border: 1px solid #22c55e;
+}
+.member-badge.leader {
+    background-color: rgba(167, 243, 208, 0.2);
+    color: #a7f3d0;
+    border: 1px solid #6ee7b7;
+}
+.member-badge.unregistered {
+    background-color: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border: 1px solid #ef4444;
+    cursor: pointer;
+}
+
+.member-badge.duplicate {
+    background-color: rgba(251, 191, 36, 0.16);
+    color: #fbbf24;
+    border: 1px solid #f59e0b;
+    cursor: pointer;
+}
+
+.suggest-arrow {
+    color: #fbbf24;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.raid-submit-btn {
+    margin-top: 12px;
+}
+
+.recorded-party-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.party-count-badge {
+    font-size: 12px;
+    font-weight: bold;
+    color: #60a5fa;
+}
+
+.recorded-party-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.btn-delete-party {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid #ef4444;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+/* 드랍 아이템 입력 (관리자 전용) */
+.drop-textarea {
+    width: 100%;
+    height: 56px;
+    background-color: #141414;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #ffffff;
+    font-size: 13px;
+    resize: none;
+}
+.drop-textarea:focus {
+    border-color: #f59e0b;
+}
+
+.drop-match-box {
+    width: 100%;
+    min-height: 40px;
+    background-color: #141414;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.drop-match-box .empty-party-msg {
+    width: 100%;
+    padding: 6px 0;
+}
+
+/* 등록된 파티와 아이템 목록: 위쪽 아이템 박스 */
+.recorded-item-box {
+    width: 100%;
+    background-color: #141414;
+    border: 1px solid #2e2e32;
+    border-radius: 8px;
+    padding: 9px 12px;
+    margin-bottom: 8px;
+}
+
+.recorded-item-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: #fbbf24;
+    margin-bottom: 6px;
+}
+
+.recorded-item-box .empty-party-msg {
+    padding: 6px 0;
+}
+
+.recorded-item-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.recorded-item-chip {
+    padding: 3px 8px;
+    border-radius: 5px;
+    background-color: rgba(245, 158, 11, 0.14);
+    border: 1px solid #f59e0b;
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* 드랍 아이템 등록 버튼 */
+.drop-submit-btn {
+    background-color: #d97706;
+}
+.drop-submit-btn:active {
+    background-color: #b45309;
+}
