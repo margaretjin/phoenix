@@ -20,17 +20,6 @@
     white-space: nowrap;
 }
 
-.admin-notice-banner {
-    background-color: rgba(245, 158, 11, 0.12);
-    border: 1px solid #f59e0b;
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: #fbbf24;
-    text-align: center;
-}
-
 /* 1. 상단 조회 필터 */
 .dist-filter-grid {
     display: grid;
@@ -154,6 +143,29 @@
     font-size: 12.5px;
 }
 
+.dist-date-btn-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.btn-row-del {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border: 1px solid #ef4444;
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
 /* 3. 5칸 요약 KPI 박스 */
 .dist-kpi-strip-5 {
     display: grid;
@@ -219,7 +231,7 @@
     text-align: center;
 }
 
-/* 4. 참여자별 개별 분배금 수령 현황 상단 (모바일에서도 무조건 1줄 배치) */
+/* 4. 참여자별 개별 분배금 수령 현황 상단 */
 .dist-member-header {
     display: flex;
     justify-content: space-between;
@@ -248,13 +260,44 @@
     flex-shrink: 1;
 }
 
-.merged-items-cell {
+/* 분배 아이템 2단 표시: 위(아이템명) / 아래(개별 나누어진 분배금) */
+.item-split-list {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.item-split-unit {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #141414;
+    border: 1px solid #2e2e32;
+    border-radius: 6px;
+    padding: 4px 8px;
+    min-width: 58px;
+}
+
+.item-split-top {
     color: #fbbf24;
+    font-weight: 800;
+    font-size: 12px;
+    line-height: 1.2;
+    padding-bottom: 2px;
+    border-bottom: 1px dashed #3f3f46;
+    width: 100%;
+    text-align: center;
+}
+
+.item-split-bottom {
+    color: #4ade80;
     font-weight: 700;
-    white-space: normal;
-    word-break: keep-all;
-    max-width: 240px;
-    line-height: 1.35;
+    font-size: 11px;
+    line-height: 1.2;
+    padding-top: 2px;
 }
 
 /* 분배완료 색상: 회색으로 통일 */
@@ -308,7 +351,7 @@
     width: 86px;
 }
 
-/* 분배받아간일 + 체크박스 / 수정 버튼: 간격 여유 있게 띄우고 정중앙 정렬 */
+/* 분배받아간일 + 체크박스 / 수정 버튼 */
 .paid-date-action-cell {
     display: inline-flex;
     align-items: center;

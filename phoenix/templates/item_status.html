@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=30">
-    <link rel="stylesheet" href="/static/item_status.css?v=30">
+    <link rel="stylesheet" href="/static/common.css?v=31">
+    <link rel="stylesheet" href="/static/item_status.css?v=31">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -102,21 +102,19 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=30"></script>
+    <script src="/static/common.js?v=31"></script>
     <script>
         let allMembers = [];
-        let memberAliasMap = {};     // 소문자 아이디(본캐/보조캐릭) -> 정식 본캐릭 아이디 매핑
+        let memberAliasMap = {};
         let itemPriceMap = {};
         let flattenedItems = [];
-        let editingItemKeys = new Set();     // 우측 [수정] 버튼을 눌러 판매가격/수령자/판매완료일을 편집 중인 키
-        let editingDistDateKeys = new Set(); // 분배완료일의 [수정] 버튼을 눌러 분배완료일을 편집 중인 키
+        let editingItemKeys = new Set();
 
         window.onload = async () => {
             const user = ClanApp.initPage('/item-status', () => {
                 document.getElementById('adminSaveHeader').classList.toggle('hidden', !ClanApp.isAdminModeOn);
                 if (!ClanApp.isAdminModeOn) {
                     editingItemKeys.clear();
-                    editingDistDateKeys.clear();
                 }
                 renderItemTable();
             });
@@ -173,10 +171,6 @@
             }
         }
 
-        // [핵심] 수령자(winner)와 판매가격(price)에 따른 구분 자동 판별
-        // 1. 수령자 미입력 -> '보유중'
-        // 2. 수령자가 혈맹원 명단에 존재 -> 판매가격 === 0 이면 '이벤트', 판매가격 > 0 이면 '내판'
-        // 3. 수령자가 혈맹원 명단에 없음 -> '외판'
         function computeAutoSaleType(winnerRaw, priceVal) {
             const w = (winnerRaw || '').trim();
             const p = Number(priceVal || 0);
@@ -253,7 +247,6 @@
                     const autoType = computeAutoSaleType(winner, price);
                     const distDate = (item.dist_date || '').trim();
 
-                    // 분배완료일에 일자가 아직 입력되지 않은 경우 디폴트값 = 체크 표시(true)
                     const rawObj = rawSavedDetails[idx] || {};
                     const isChecked = distDate
                         ? true
@@ -278,9 +271,7 @@
                 });
             });
 
-            // 아직 DB에 dist_checked 기본값(True)이 저장되지 않은 신규 드랍 아이템이 있으면 백그라운드로 자동 동기화해 분배금 관리에 즉시 뜨도록 보장
             await autoSyncDefaultCheckedItems(raids);
-
             renderItemTable();
         }
 
@@ -320,14 +311,6 @@
             renderItemTable();
         }
 
-        function startEditDistDate(key) {
-            if (!ClanApp.isAdminModeOn) return;
-            editingDistDateKeys.add(key);
-            editingItemKeys.add(key);
-            renderItemTable();
-        }
-
-        // 수정 모드에서 수령자 또는 판매가격 입력 시 실시간으로 구분 배지(보유중/내판/외판/이벤트) 미리보기 업데이트
         function onLiveWinnerOrPriceInput(i) {
             const winnerEl = document.getElementById(`stWinner_${i}`);
             const priceEl = document.getElementById(`stPrice_${i}`);
@@ -376,33 +359,18 @@
 
                 const hasDistDate = Boolean(row.dist_date && row.dist_date.trim());
                 const isEditingRow = editingItemKeys.has(row.key);
-                const isEditingDist = editingDistDateKeys.has(row.key);
 
-                // [핵심] 분배완료일 칸 표시 규칙:
-                // - 분배완료일에 일자가 입력되어 있으면 -> 일자 텍스트 + [수정] 버튼 표시 (분배완료일 수정 중이면 날짜 입력칸 표시)
-                // - 분배완료일에 일자가 입력되지 않았으면 -> 디폴트 체크표시(checked)된 체크박스 표시
-                let distCellHtml = '';
-                if (hasDistDate) {
-                    if (isEditingDist) {
-                        distCellHtml = `<input type="date" id="stDistDate_${i}" class="tbl-input tbl-date-input" value="${row.dist_date}">`;
-                    } else {
-                        distCellHtml = `
-                            <div class="dist-check-cell">
-                                <span class="dist-date-text">${toShortDate(row.dist_date)}</span>
-                                <button type="button" class="btn-row-edit" onclick="startEditDistDate('${row.key}')">수정</button>
-                            </div>
-                        `;
-                    }
-                } else {
-                    distCellHtml = `
-                        <div class="dist-check-cell">
-                            <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
-                                   ${row.dist_checked ? 'checked' : ''}
-                                   title="분배완료일 미입력 시 기본 체크됩니다."
-                                   onchange="onDistCheckToggle(${i})">
-                        </div>
-                    `;
-                }
+                // [핵심] 분배완료일 칸:
+                // - 분배완료일이 입력되어 있으면 -> 수정 버튼 없이 날짜 텍스트만 표시
+                // - 분배완료일이 비워져 있으면 -> 체크박스 표시
+                const distCellHtml = hasDistDate
+                    ? `<span class="dist-date-text">${toShortDate(row.dist_date)}</span>`
+                    : `<div class="dist-check-cell">
+                           <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
+                                  ${row.dist_checked ? 'checked' : ''}
+                                  title="체크 시 분배금 관리에 표시됩니다."
+                                  onchange="onDistCheckToggle(${i})">
+                       </div>`;
 
                 // 2. 관리자 모드 (기본 상태 = 텍스트 표시 + 우측 [수정] 버튼)
                 if (!isEditingRow) {
@@ -423,7 +391,7 @@
                     `;
                 }
 
-                // 3. 관리자 모드 ([수정] 버튼을 누른 행 -> 판매가격/수령자/판매완료일 입력창 + 자동 구분 배지 + [저장] 버튼)
+                // 3. 관리자 모드 ([수정] 버튼을 누른 행)
                 return `
                     <tr>
                         <td>${shortDate}</td>
@@ -453,7 +421,6 @@
             }).join('');
         }
 
-        // 미분배 상태에서 체크박스 토글 시 즉시 반영
         async function onDistCheckToggle(i) {
             if (!ClanApp.isAdminModeOn) return;
             const target = getFilteredItems()[i];
@@ -500,7 +467,6 @@
             }
         }
 
-        // [저장] 버튼 클릭 시 수령자 명단 매칭 및 가격에 따라 내판/외판/이벤트 자동 구분 후 저장
         async function saveItemRow(i) {
             if (!ClanApp.isAdminModeOn) return;
             const target = getFilteredItems()[i];
@@ -509,23 +475,19 @@
             const priceInputEl = document.getElementById(`stPrice_${i}`);
             const winnerInputEl = document.getElementById(`stWinner_${i}`);
             const takenInputEl = document.getElementById(`stTaken_${i}`);
-            const distDateInputEl = document.getElementById(`stDistDate_${i}`);
             const chkEl = document.getElementById(`stDistChk_${i}`);
 
             const rawWinner = winnerInputEl ? winnerInputEl.value.trim() : target.winner;
-            // 보조캐릭으로 입력했더라도 혈맹원 명단에 있으면 본캐릭명으로 정규화
             const canonicalWinner = memberAliasMap[rawWinner.toLowerCase()] || rawWinner;
             const price = priceInputEl ? Number(priceInputEl.value || 0) : target.price;
-
-            // 수령자 및 판매가격 기준 자동 구분 (명단에 있으면 내판 / 명단+0원이면 이벤트 / 명단에 없으면 외판 / 미입력시 보유중)
             const sale_type = computeAutoSaleType(canonicalWinner, price);
 
             const taken_date = takenInputEl
                 ? (takenInputEl.value || (canonicalWinner ? ClanApp.formatYMD(new Date()) : ''))
                 : target.taken_date;
 
-            const dist_date = distDateInputEl ? distDateInputEl.value : (target.dist_date || '');
-            const dist_checked = dist_date ? true : (chkEl ? chkEl.checked : true);
+            const dist_date = target.dist_date || '';
+            const dist_checked = dist_date ? true : (chkEl ? chkEl.checked : target.dist_checked);
 
             const updatedDetails = [...target.full_details_ref];
             updatedDetails[target.item_idx] = {
@@ -550,7 +512,6 @@
 
             if (res.ok) {
                 editingItemKeys.delete(target.key);
-                editingDistDateKeys.delete(target.key);
                 await loadItemStatusData();
             } else {
                 const err = await res.json().catch(() => ({}));
