@@ -46,10 +46,10 @@
     word-break: break-all;
 }
 
-/* 2. 검색 기준 + 기간 + 아이템 검색 + 참여 횟수 */
+/* 2. 검색 기준 + 기간(월별/일별/전체) + 아이템 검색 + 참여 횟수 */
 .history-filter-grid {
     display: grid;
-    grid-template-columns: 150px 120px 165px 1fr auto;
+    grid-template-columns: 150px 115px 155px 1fr auto;
     gap: 8px;
     align-items: end;
 }
@@ -60,14 +60,6 @@
     color: #9ca3af;
     font-weight: bold;
     margin-bottom: 3px;
-}
-
-.week-range-hint {
-    display: inline-block;
-    font-size: 10.5px;
-    color: #fbbf24;
-    font-weight: 700;
-    margin-left: 4px;
 }
 
 .participation-kpi-group {
@@ -189,25 +181,18 @@
     font-size: 12px;
 }
 
-/* 보스탐 시간 글씨 색상: 흰색 */
-.raid-slot-white {
-    color: #ffffff;
-    font-weight: 800;
+/* 보스탐 / 혈비제외가 / 참여인원 3개 컬럼 모두 참여인원과 동일한 연한 회색(#d4d4d8)으로 통일 */
+.same-member-color {
+    color: #d4d4d8;
+    font-weight: 700;
     font-size: 12.5px;
 }
 
-/* 아이템 컬럼 */
+/* 아이템 컬럼: 노란색 그대로 유지 */
 .drop-item-name {
     font-weight: 800;
     color: #fbbf24;
     font-size: 13px;
-}
-
-/* 혈비제외가 컬럼 */
-.drop-item-net-price {
-    color: #4ade80;
-    font-weight: 800;
-    font-size: 12.5px;
 }
 
 .clan-dist-date-cell {
@@ -216,7 +201,7 @@
     font-size: 12px;
 }
 
-/* 본인수령 / 대리 (캐릭이름) 수령 회색 배지 + 옆에 26-11-15 날짜 표시 */
+/* 본인수령 (본인/쫄아이디) / 대리수령 (대리인아이디) 회색 배지 + 옆에 받은날짜 표시 */
 .history-status-cell {
     display: inline-flex;
     align-items: center;

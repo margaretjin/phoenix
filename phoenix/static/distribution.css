@@ -1,5 +1,5 @@
 /* =========================================================
-   [distribution.css] 분배금 관리 페이지 전용 스타일
+   [distribution.css] 분배관리 페이지 전용 스타일
    ========================================================= */
 
 .excel-btn-group {
@@ -85,18 +85,22 @@
     -webkit-overflow-scrolling: touch;
 }
 
+.dist-member-table-wrap {
+    padding-bottom: 110px;
+}
+
 .checked-item-table,
 .dist-member-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12.5px;
+    font-size: 12px;
 }
 
 .checked-item-table th,
 .checked-item-table td,
 .dist-member-table th,
 .dist-member-table td {
-    padding: 9px 6px;
+    padding: 7px 4px;
     border-bottom: 1px solid #2e2e32;
     text-align: center;
     vertical-align: middle;
@@ -108,7 +112,14 @@
     background-color: #27272a;
     color: #fbbf24;
     font-weight: 800;
-    font-size: 12px;
+    font-size: 11.5px;
+    line-height: 1.25;
+}
+
+.th-sub-label {
+    font-size: 10px;
+    color: #d4d4d8;
+    font-weight: 700;
 }
 
 .checked-item-slot {
@@ -140,7 +151,7 @@
 .confirmed-dist-date {
     font-weight: 800;
     color: #60a5fa;
-    font-size: 12.5px;
+    font-size: 12px;
 }
 
 .dist-date-btn-group {
@@ -158,7 +169,7 @@
     color: #f87171;
     border: 1px solid #ef4444;
     border-radius: 5px;
-    padding: 4px 8px;
+    padding: 4px 7px;
     font-size: 11px;
     font-weight: 800;
     line-height: 1;
@@ -166,10 +177,91 @@
     white-space: nowrap;
 }
 
-/* 3. 5칸 요약 KPI 박스 */
+/* 3. 혈분배일 선택(기준일): 전체보기 + 실제 발생한 혈분배일 칩 선택 바 */
+.dist-date-selector-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background-color: #141414;
+    border: 1px solid #2e2e32;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+}
+
+.dist-date-selector-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.dist-date-selector-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: #fbbf24;
+}
+
+.dist-date-selector-sub {
+    font-size: 11px;
+    color: #9ca3af;
+    font-weight: 700;
+}
+
+.dist-date-chips-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.dist-date-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 11px;
+    border-radius: 6px;
+    border: 1px solid #3f3f46;
+    background-color: #27272a;
+    color: #e4e4e7;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.dist-date-chip:hover {
+    border-color: #60a5fa;
+    color: #ffffff;
+}
+
+.dist-date-chip.active {
+    background-color: #2563eb;
+    border-color: #3b82f6;
+    color: #ffffff;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4);
+}
+
+.dist-date-chip .chip-cnt {
+    font-size: 10.5px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.35);
+    color: #fbbf24;
+    font-weight: 800;
+}
+
+.dist-date-chip.active .chip-cnt {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+/* 5칸 요약 KPI 박스 */
 .dist-kpi-strip-5 {
     display: grid;
-    grid-template-columns: 1.15fr 1.15fr 1.5fr 0.85fr 0.85fr;
+    grid-template-columns: 1.05fr 1.15fr 1.6fr 0.85fr 0.85fr;
     gap: 8px;
     align-items: stretch;
 }
@@ -200,6 +292,11 @@
     word-break: keep-all;
 }
 
+.dist-kpi-val.selected-date {
+    color: #60a5fa;
+    font-size: 13.5px;
+}
+
 .dist-kpi-val.net-pool {
     color: #4ade80;
 }
@@ -217,18 +314,6 @@
 
 .dist-kpi-val.wait {
     color: #f87171;
-}
-
-.kpi-date-picker {
-    background-color: #1e1e1e;
-    border: 1px solid #3f3f46;
-    border-radius: 5px;
-    padding: 4px 6px;
-    color: #ffffff;
-    font-size: 12px;
-    font-weight: 800;
-    width: 132px;
-    text-align: center;
 }
 
 /* 4. 참여자별 개별 분배금 수령 현황 상단 */
@@ -260,76 +345,109 @@
     flex-shrink: 1;
 }
 
-/* 분배 아이템 2단 표시: 위(아이템명) / 아래(개별 나누어진 분배금) */
-.item-split-list {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
+/* [수정] 분배 아이템 (개별 분배금): 왼쪽 정렬 컨테이너 및 텍스트 정렬 적용 */
+.item-split-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+}
+
+.item-split-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(62px, 1fr));
+    gap: 4px;
+    justify-items: start;
+    width: 100%;
 }
 
 .item-split-unit {
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     background-color: #141414;
     border: 1px solid #2e2e32;
-    border-radius: 6px;
-    padding: 4px 8px;
-    min-width: 58px;
+    border-radius: 5px;
+    padding: 3px 6px;
+    min-width: 62px;
+    width: 100%;
 }
 
 .item-split-top {
     color: #fbbf24;
     font-weight: 800;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.2;
     padding-bottom: 2px;
     border-bottom: 1px dashed #3f3f46;
     width: 100%;
-    text-align: center;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .item-split-bottom {
     color: #4ade80;
     font-weight: 700;
-    font-size: 11px;
+    font-size: 10.5px;
     line-height: 1.2;
     padding-top: 2px;
+    text-align: left;
+    width: 100%;
+}
+
+.btn-items-more {
+    background-color: #27272a;
+    color: #60a5fa;
+    border: 1px solid #3f3f46;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+    font-weight: 800;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    transition: background-color 0.15s ease;
+}
+
+.btn-items-more:hover {
+    background-color: #3f3f46;
+    color: #93c5fd;
 }
 
 /* 분배완료 색상: 회색으로 통일 */
 .status-badge-done {
     display: inline-block;
-    padding: 3px 9px;
+    padding: 3px 7px;
     border-radius: 4px;
     background-color: #27272a;
     border: 1px solid #52525b;
     color: #9ca3af;
     font-weight: 800;
-    font-size: 11.5px;
+    font-size: 11px;
 }
 
 .status-badge-wait {
     display: inline-block;
-    padding: 3px 9px;
+    padding: 3px 7px;
     border-radius: 4px;
     background-color: rgba(245, 158, 11, 0.16);
     border: 1px solid #f59e0b;
     color: #fbbf24;
     font-weight: 800;
-    font-size: 11.5px;
+    font-size: 11px;
 }
 
+/* 입력창 너비 축소 */
 .dist-tbl-input {
     background-color: #141414;
     border: 1px solid #3f3f46;
     border-radius: 5px;
-    padding: 5px 6px;
+    padding: 4px 5px;
     color: #ffffff;
-    font-size: 12px;
+    font-size: 11.5px;
 }
 
 .dist-tbl-input:disabled,
@@ -344,36 +462,99 @@
     background-color: #141414;
     border: 1px solid #3f3f46;
     border-radius: 5px;
-    padding: 5px 4px;
+    padding: 4px 2px;
     color: #ffffff;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 700;
-    width: 86px;
+    width: 76px;
 }
 
-/* 분배받아간일 + 체크박스 / 수정 버튼 */
+.receiver-input-compact {
+    width: 88px !important;
+    text-align: center;
+}
+
+.paid-date-input-compact {
+    width: 110px !important;
+}
+
+/* 수령 아이디 커스텀 박스형 자동완성 드롭다운 */
+.receiver-autocomplete-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.receiver-suggest-list {
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 0;
+    min-width: 145px;
+    max-height: 170px;
+    overflow-y: auto;
+    background-color: #18181b;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.78);
+    z-index: 999;
+    text-align: left;
+}
+
+.receiver-suggest-item {
+    padding: 6px 9px;
+    font-size: 12px;
+    color: #ffffff;
+    cursor: pointer;
+    border-bottom: 1px solid #27272a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+}
+
+.receiver-suggest-item:last-child {
+    border-bottom: none;
+}
+
+.receiver-suggest-item:hover,
+.receiver-suggest-item.active {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+.receiver-main-id {
+    font-weight: 800;
+    color: #fbbf24;
+}
+
+.receiver-suggest-item:hover .receiver-main-id,
+.receiver-suggest-item.active .receiver-main-id {
+    color: #ffffff;
+}
+
+.receiver-sub-info {
+    font-size: 10.5px;
+    color: #9ca3af;
+}
+
+.receiver-suggest-item:hover .receiver-sub-info,
+.receiver-suggest-item.active .receiver-sub-info {
+    color: #e5e7eb;
+}
+
+/* 분배받아간일 + 저장 / 수정 버튼 */
 .paid-date-action-cell {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    min-height: 30px;
+    gap: 5px;
+    min-height: 28px;
 }
 
 .action-slot-box {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 48px;
-}
-
-.save-check-input {
-    width: 18px;
-    height: 18px;
-    margin: 0;
-    accent-color: #2563eb;
-    cursor: pointer;
-    vertical-align: middle;
+    flex-shrink: 0;
 }
 
 .btn-row-edit {
@@ -384,8 +565,8 @@
     color: #ffffff;
     border: 1px solid #3b82f6;
     border-radius: 5px;
-    padding: 4px 10px;
-    font-size: 11.5px;
+    padding: 4px 8px;
+    font-size: 11px;
     font-weight: 800;
     line-height: 1;
     cursor: pointer;

@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=31">
-    <link rel="stylesheet" href="/static/item_status.css?v=31">
+    <link rel="stylesheet" href="/static/common.css?v=35">
+    <link rel="stylesheet" href="/static/item_status.css?v=35">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -22,7 +22,7 @@
             </div>
         </div>
 
-        <!-- 1. 조회 기준 (월별 / 주별 / 일별 / 전체 / 특정일 5가지) 및 검색 필터 -->
+        <!-- 1. 조회 기준 및 보유상태 / 분배상태 2종 구분 필터 -->
         <section class="card-box">
             <div class="filter-grid-box">
                 <div class="filter-field">
@@ -51,10 +51,11 @@
                     <input type="text" class="input-common" value="전체 기간 누적" disabled>
                 </div>
 
+                <!-- 구분 1: 보유상태 -->
                 <div class="filter-field">
-                    <label>구분 필터</label>
-                    <select id="saleTypeFilter" class="input-common" onchange="renderItemTable()">
-                        <option value="all">전체 구분</option>
+                    <label>보유상태</label>
+                    <select id="holdStateFilter" class="input-common" onchange="renderItemTable()">
+                        <option value="all">전체아이템현황</option>
                         <option value="보유중">보유중</option>
                         <option value="내판">내판</option>
                         <option value="외판">외판</option>
@@ -62,7 +63,18 @@
                     </select>
                 </div>
 
+                <!-- 구분 2: 분배상태 -->
                 <div class="filter-field">
+                    <label>분배상태</label>
+                    <select id="distStateFilter" class="input-common" onchange="renderItemTable()">
+                        <option value="all">전체 분배상태</option>
+                        <option value="분배대기">분배대기</option>
+                        <option value="분배가능">분배가능</option>
+                        <option value="분배완료">분배완료</option>
+                    </select>
+                </div>
+
+                <div class="filter-field search-full-mobile">
                     <label>아이템 / 수령자 검색</label>
                     <input type="text" id="keywordSearch" class="input-common" placeholder="아이템명 또는 수령자" oninput="renderItemTable()">
                 </div>
@@ -76,9 +88,6 @@
                 <span id="itemTotalCountBadge" style="font-size: 12px; font-weight: bold; color: #60a5fa;">총 0건</span>
             </div>
 
-            <!-- 수령자 검색 자동완성용 혈맹원 명단 -->
-            <datalist id="clanMemberDatalist"></datalist>
-
             <div class="status-table-wrap">
                 <table class="item-status-table">
                     <thead>
@@ -86,33 +95,37 @@
                             <th>획득일</th>
                             <th>시간</th>
                             <th>아이템명</th>
-                            <th>구분</th>
+                            <th>보유상태</th>
+                            <th>분배상태</th>
                             <th>판매가격</th>
                             <th>수령자</th>
                             <th>판매<br>완료일</th>
+                            <th id="adminCheckHeader" class="hidden">체크</th>
                             <th>분배<br>완료일</th>
                             <th id="adminSaveHeader" class="hidden">관리</th>
                         </tr>
                     </thead>
                     <tbody id="itemStatusTableBody">
-                        <tr><td colspan="9" class="empty-party-msg">조회 중...</td></tr>
+                        <tr><td colspan="11" class="empty-party-msg">조회 중...</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
     </main>
 
-    <script src="/static/common.js?v=31"></script>
+    <script src="/static/common.js?v=35"></script>
     <script>
         let allMembers = [];
-        let memberAliasMap = {};
+        let clanCharPool = [];       // 본캐릭 + 보조캐릭(쫄) 개별 선택용 전체 풀
+        let clanCharSet = new Set(); // 혈맹 소속 모든 캐릭터(본캐+쫄) 소문자 Set
         let itemPriceMap = {};
         let flattenedItems = [];
         let editingItemKeys = new Set();
+        let activeSuggestIdxMap = {}; // 행별 자동완성 키보드 하이라이트 인덱스
 
         window.onload = async () => {
             const user = ClanApp.initPage('/item-status', () => {
-                document.getElementById('adminSaveHeader').classList.toggle('hidden', !ClanApp.isAdminModeOn);
+                applyTableAdminHeaders();
                 if (!ClanApp.isAdminModeOn) {
                     editingItemKeys.clear();
                 }
@@ -120,40 +133,79 @@
             });
             if (!user) return;
 
-            document.getElementById('adminSaveHeader').classList.toggle('hidden', !ClanApp.isAdminModeOn);
+            applyTableAdminHeaders();
 
             const now = new Date();
             document.getElementById('filterMonth').value = ClanApp.formatYM(now);
             document.getElementById('filterDate').value = ClanApp.formatYMD(now);
 
-            await Promise.all([loadMembersForDatalist(), loadItemMasterPrices()]);
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.winner-autocomplete-wrap')) {
+                    document.querySelectorAll('.winner-suggest-list').forEach(el => el.classList.add('hidden'));
+                }
+            });
+
+            await Promise.all([loadMembersForAutocomplete(), loadItemMasterPrices()]);
             await loadItemStatusData();
         };
+
+        function applyTableAdminHeaders() {
+            const isAdmin = ClanApp.isAdminModeOn;
+            document.getElementById('adminCheckHeader').classList.toggle('hidden', !isAdmin);
+            document.getElementById('adminSaveHeader').classList.toggle('hidden', !isAdmin);
+        }
 
         function toShortDate(dateStr) {
             if (!dateStr || dateStr.length < 8) return '-';
             return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
         }
 
-        async function loadMembersForDatalist() {
-            memberAliasMap = {};
+        // [핵심] 본캐릭과 모든 보조캐릭(쫄)을 각각 독립된 선택 항목으로 구성
+        async function loadMembersForAutocomplete() {
+            clanCharPool = [];
+            clanCharSet = new Set();
+            const seenChar = new Set();
+
             try {
                 const res = await fetch('/api/auth/search-members');
                 allMembers = await res.json();
-                const dl = document.getElementById('clanMemberDatalist');
-                dl.innerHTML = allMembers.map(m => {
+
+                allMembers.forEach(m => {
                     const activeId = (m.active_id || '').trim();
+                    const cClass = m.char_class || '';
+                    const subs = (m.sub_chars || '').split(',').map(s => s.trim()).filter(Boolean);
+
                     if (activeId) {
-                        memberAliasMap[activeId.toLowerCase()] = activeId;
+                        const lowMain = activeId.toLowerCase();
+                        clanCharSet.add(lowMain);
+                        if (!seenChar.has(lowMain)) {
+                            seenChar.add(lowMain);
+                            clanCharPool.push({
+                                charId: activeId,
+                                labelInfo: `${cClass} · 본캐`,
+                                searchKey: `${activeId} ${subs.join(' ')}`.toLowerCase()
+                            });
+                        }
                     }
-                    (m.sub_chars || '').split(',').map(s => s.trim()).filter(Boolean).forEach(sub => {
-                        memberAliasMap[sub.toLowerCase()] = activeId;
+
+                    // 보조캐릭(쫄)들도 각각 개별 선택 가능하도록 풀에 추가
+                    subs.forEach(subId => {
+                        const lowSub = subId.toLowerCase();
+                        clanCharSet.add(lowSub);
+                        if (!seenChar.has(lowSub)) {
+                            seenChar.add(lowSub);
+                            clanCharPool.push({
+                                charId: subId,
+                                labelInfo: `쫄 (본캐: ${activeId})`,
+                                searchKey: `${subId} ${activeId}`.toLowerCase()
+                            });
+                        }
                     });
-                    return `<option value="${activeId}">${m.char_class} (${m.clan})</option>`;
-                }).join('');
+                });
             } catch (e) {
                 allMembers = [];
-                memberAliasMap = {};
+                clanCharPool = [];
+                clanCharSet = new Set();
             }
         }
 
@@ -171,18 +223,31 @@
             }
         }
 
-        function computeAutoSaleType(winnerRaw, priceVal) {
+        // 1. 보유상태 판별 (본캐릭이든 쫄이든 혈맹원 명단에 있으면 내판/이벤트로 인정)
+        function computeHoldState(winnerRaw, priceVal) {
             const w = (winnerRaw || '').trim();
             const p = Number(priceVal || 0);
 
             if (!w) {
                 return '보유중';
             }
-            const isClanMember = Boolean(memberAliasMap[w.toLowerCase()]);
+            const isClanMember = clanCharSet.has(w.toLowerCase());
             if (isClanMember) {
                 return p === 0 ? '이벤트' : '내판';
             }
             return '외판';
+        }
+
+        // 2. 분배상태 판별: 분배대기 / 분배가능 / 분배완료
+        function computeDistState(holdState, distDateRaw) {
+            const dDate = (distDateRaw || '').trim();
+            if (dDate) {
+                return '분배완료';
+            }
+            if (holdState === '내판' || holdState === '외판') {
+                return '분배가능';
+            }
+            return '분배대기';
         }
 
         function onViewModeChange() {
@@ -244,13 +309,15 @@
                 details.forEach((item, idx) => {
                     const winner = (item.winner || '').trim();
                     const price = Number(item.price || 0);
-                    const autoType = computeAutoSaleType(winner, price);
-                    const distDate = (item.dist_date || '').trim();
+                    const holdState = computeHoldState(winner, price);
+                    const canDist = (holdState === '내판' || holdState === '외판');
+                    const distDate = canDist ? (item.dist_date || '').trim() : '';
+                    const distState = computeDistState(holdState, distDate);
 
                     const rawObj = rawSavedDetails[idx] || {};
-                    const isChecked = distDate
-                        ? true
-                        : (rawObj.dist_checked === undefined || rawObj.dist_checked === null ? true : Boolean(rawObj.dist_checked));
+                    const isChecked = canDist
+                        ? (distDate ? true : Boolean(rawObj.dist_checked))
+                        : false;
 
                     flattenedItems.push({
                         key: `${r.id}_${idx}`,
@@ -259,7 +326,8 @@
                         raid_date: r.raid_date,
                         raid_time: r.raid_time,
                         name: item.name,
-                        sale_type: autoType,
+                        hold_state: holdState,
+                        dist_state: distState,
                         price,
                         winner,
                         taken_date: item.taken_date || '',
@@ -271,35 +339,17 @@
                 });
             });
 
-            await autoSyncDefaultCheckedItems(raids);
             renderItemTable();
         }
 
-        async function autoSyncDefaultCheckedItems(raids) {
-            if (!ClanApp.hasAdminPrivilege) return;
-            for (const r of raids) {
-                const rawList = Array.isArray(r.item_details) ? r.item_details : [];
-                const extracted = ClanApp.extractItemDetails(r, itemPriceMap);
-                if (extracted.length > 0 && rawList.length === 0) {
-                    await fetch('/api/raids/item-details', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            raid_id: r.id,
-                            item_details: extracted,
-                            requester_role: ClanApp.role
-                        })
-                    });
-                }
-            }
-        }
-
         function getFilteredItems() {
-            const typeFilter = document.getElementById('saleTypeFilter').value;
+            const holdFilter = document.getElementById('holdStateFilter').value;
+            const distFilter = document.getElementById('distStateFilter').value;
             const kw = document.getElementById('keywordSearch').value.trim().toLowerCase();
 
             return flattenedItems.filter(row => {
-                if (typeFilter !== 'all' && row.sale_type !== typeFilter) return false;
+                if (holdFilter !== 'all' && row.hold_state !== holdFilter) return false;
+                if (distFilter !== 'all' && row.dist_state !== distFilter) return false;
                 if (kw && !row.name.toLowerCase().includes(kw) && !row.winner.toLowerCase().includes(kw)) return false;
                 return true;
             });
@@ -311,15 +361,145 @@
             renderItemTable();
         }
 
-        function onLiveWinnerOrPriceInput(i) {
+        // [핵심] 타자 입력 시 본캐릭 및 보조캐릭(쫄) 각각 매칭하여 드롭다운 표시
+        function onWinnerTypeSearch(i, currentDistDate) {
+            onLiveWinnerOrPriceInput(i, currentDistDate);
+
+            const winnerEl = document.getElementById(`stWinner_${i}`);
+            const suggestBox = document.getElementById(`stWinnerSuggest_${i}`);
+            if (!winnerEl || !suggestBox) return;
+
+            const q = winnerEl.value.trim().toLowerCase();
+            if (!q) {
+                suggestBox.innerHTML = '';
+                suggestBox.classList.add('hidden');
+                activeSuggestIdxMap[i] = -1;
+                return;
+            }
+
+            // 입력한 글자가 캐릭터명 자체에 포함된 항목을 우선 정렬하고, 본캐-쫄 연관 검색 결과도 함께 노출
+            const matches = clanCharPool.filter(entry => entry.searchKey.includes(q))
+                .sort((a, b) => {
+                    const aDirect = a.charId.toLowerCase().includes(q) ? 0 : 1;
+                    const bDirect = b.charId.toLowerCase().includes(q) ? 0 : 1;
+                    return aDirect - bDirect;
+                })
+                .slice(0, 12);
+
+            if (matches.length === 0) {
+                suggestBox.innerHTML = '';
+                suggestBox.classList.add('hidden');
+                activeSuggestIdxMap[i] = -1;
+                return;
+            }
+
+            activeSuggestIdxMap[i] = 0; // 첫 번째 매칭 항목 기본 하이라이트
+
+            suggestBox.innerHTML = matches.map((entry, idx) => {
+                const safeCharId = entry.charId.replace(/'/g, "\\'");
+                return `
+                    <div class="winner-suggest-item ${idx === 0 ? 'active' : ''}"
+                         data-char-id="${entry.charId}"
+                         onmousedown="selectAndCommitWinner(event, ${i}, '${safeCharId}')">
+                        <span class="suggest-main-id">${entry.charId}</span>
+                        <span class="suggest-sub-info">${entry.labelInfo}</span>
+                    </div>
+                `;
+            }).join('');
+
+            suggestBox.classList.remove('hidden');
+        }
+
+        // [핵심] 매칭된 항목을 마우스로 클릭하거나 엔터 치면 즉시 값이 들어가고 바로 DB 저장까지 완료되어 입력 완료 상태로 전환됨
+        async function selectAndCommitWinner(event, i, selectedCharId) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const winnerEl = document.getElementById(`stWinner_${i}`);
+            const suggestBox = document.getElementById(`stWinnerSuggest_${i}`);
+            if (winnerEl) {
+                winnerEl.value = selectedCharId;
+            }
+            if (suggestBox) {
+                suggestBox.innerHTML = '';
+                suggestBox.classList.add('hidden');
+            }
+            await saveItemRow(i, selectedCharId);
+        }
+
+        // 방향키(↓/↑)로 본캐·쫄 이동 가능, 엔터(Enter) 시 선택된 아이디로 즉시 입력 및 저장 완료
+        async function onWinnerKeydown(event, i, currentDistDate) {
+            if (event.isComposing || event.keyCode === 229) return; // 한글 조합 중 중복 이벤트 방지
+
+            const suggestBox = document.getElementById(`stWinnerSuggest_${i}`);
+            const items = suggestBox ? [...suggestBox.querySelectorAll('.winner-suggest-item')] : [];
+            const isOpen = suggestBox && !suggestBox.classList.contains('hidden') && items.length > 0;
+
+            if (event.key === 'ArrowDown' && isOpen) {
+                event.preventDefault();
+                let cur = activeSuggestIdxMap[i] ?? 0;
+                cur = (cur + 1) % items.length;
+                activeSuggestIdxMap[i] = cur;
+                items.forEach((el, idx) => el.classList.toggle('active', idx === cur));
+                items[cur].scrollIntoView({ block: 'nearest' });
+            } else if (event.key === 'ArrowUp' && isOpen) {
+                event.preventDefault();
+                let cur = activeSuggestIdxMap[i] ?? 0;
+                cur = (cur - 1 + items.length) % items.length;
+                activeSuggestIdxMap[i] = cur;
+                items.forEach((el, idx) => el.classList.toggle('active', idx === cur));
+                items[cur].scrollIntoView({ block: 'nearest' });
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                if (isOpen) {
+                    const cur = (activeSuggestIdxMap[i] >= 0 && activeSuggestIdxMap[i] < items.length)
+                        ? activeSuggestIdxMap[i]
+                        : 0;
+                    const chosenId = items[cur].getAttribute('data-char-id');
+                    if (chosenId) {
+                        await selectAndCommitWinner(null, i, chosenId);
+                        return;
+                    }
+                }
+                await saveItemRow(i);
+            } else if (event.key === 'Escape' && suggestBox) {
+                suggestBox.classList.add('hidden');
+            }
+        }
+
+        function onLiveWinnerOrPriceInput(i, currentDistDate) {
             const winnerEl = document.getElementById(`stWinner_${i}`);
             const priceEl = document.getElementById(`stPrice_${i}`);
-            const badgeEl = document.getElementById(`stLiveBadge_${i}`);
-            if (!badgeEl) return;
+            const holdBadgeEl = document.getElementById(`stLiveHoldBadge_${i}`);
+            const distBadgeEl = document.getElementById(`stLiveDistBadge_${i}`);
+            const checkCellWrap = document.getElementById(`stCheckCellWrap_${i}`);
 
-            const newType = computeAutoSaleType(winnerEl ? winnerEl.value : '', priceEl ? priceEl.value : 0);
-            badgeEl.className = `sale-badge type-${newType}`;
-            badgeEl.textContent = newType;
+            const wVal = winnerEl ? winnerEl.value.trim() : '';
+            const pVal = priceEl ? Number(priceEl.value || 0) : 0;
+            const newHold = computeHoldState(wVal, pVal);
+            const effDistDate = (newHold === '내판' || newHold === '외판') ? (currentDistDate || '') : '';
+            const newDist = computeDistState(newHold, effDistDate);
+
+            if (holdBadgeEl) {
+                holdBadgeEl.className = `sale-badge type-${newHold}`;
+                holdBadgeEl.textContent = newHold;
+            }
+            if (distBadgeEl) {
+                distBadgeEl.className = `dist-state-badge state-${newDist}`;
+                distBadgeEl.textContent = newDist;
+            }
+            if (checkCellWrap) {
+                if (newDist === '분배가능') {
+                    checkCellWrap.innerHTML = `
+                        <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
+                               title="체크 시 분배금 관리로 넘어갑니다."
+                               onchange="onDistCheckToggle(${i})">
+                    `;
+                } else {
+                    checkCellWrap.innerHTML = `<span style="color:#52525b;">-</span>`;
+                }
+            }
         }
 
         function renderItemTable() {
@@ -327,63 +507,70 @@
             document.getElementById('itemTotalCountBadge').textContent = `총 ${filtered.length}건`;
 
             const tbody = document.getElementById('itemStatusTableBody');
+            const isAdmin = ClanApp.isAdminModeOn;
+            const colSpan = isAdmin ? 11 : 9;
+
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="empty-party-msg">조회된 아이템 내역이 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty-party-msg">조회된 아이템 내역이 없습니다.</td></tr>`;
                 return;
             }
 
-            const isAdmin = ClanApp.isAdminModeOn;
-
             tbody.innerHTML = filtered.map((row, i) => {
                 const shortDate = toShortDate(row.raid_date);
-                const badgeHtml = `<span class="sale-badge type-${row.sale_type}">${row.sale_type}</span>`;
-                const priceDisplay = row.sale_type === '이벤트'
+                const holdBadgeHtml = `<span class="sale-badge type-${row.hold_state}">${row.hold_state}</span>`;
+                const distBadgeHtml = `<span class="dist-state-badge state-${row.dist_state}">${row.dist_state}</span>`;
+
+                const priceDisplay = row.hold_state === '이벤트'
                     ? '0 (이벤트)'
                     : (row.price > 0 ? row.price.toLocaleString() : '-');
 
-                // 1. 일반 모드: 조회 전용
+                const distDateHtml = row.dist_date
+                    ? `<span class="dist-date-text">${toShortDate(row.dist_date)}</span>`
+                    : '-';
+
+                // 1. 일반혈원 (또는 관리자 모드 OFF): 체크 열 숨김
                 if (!isAdmin) {
                     return `
                         <tr>
                             <td>${shortDate}</td>
                             <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
                             <td style="color:#fbbf24; font-weight:800;">${row.name}</td>
-                            <td>${badgeHtml}</td>
+                            <td>${holdBadgeHtml}</td>
+                            <td>${distBadgeHtml}</td>
                             <td style="color:#4ade80; font-weight:700;">${priceDisplay}</td>
                             <td style="color:#a7f3d0; font-weight:700;">${row.winner || '-'}</td>
                             <td>${row.taken_date ? toShortDate(row.taken_date) : '-'}</td>
-                            <td style="color:#60a5fa; font-weight:700;">${row.dist_date ? toShortDate(row.dist_date) : '-'}</td>
+                            <td>${distDateHtml}</td>
                         </tr>
                     `;
                 }
 
-                const hasDistDate = Boolean(row.dist_date && row.dist_date.trim());
                 const isEditingRow = editingItemKeys.has(row.key);
 
-                // [핵심] 분배완료일 칸:
-                // - 분배완료일이 입력되어 있으면 -> 수정 버튼 없이 날짜 텍스트만 표시
-                // - 분배완료일이 비워져 있으면 -> 체크박스 표시
-                const distCellHtml = hasDistDate
-                    ? `<span class="dist-date-text">${toShortDate(row.dist_date)}</span>`
-                    : `<div class="dist-check-cell">
+                // 체크표시는 분배상태가 '분배가능'일 때만 보이게 함
+                const checkCellHtml = (row.dist_state === '분배가능')
+                    ? `<div id="stCheckCellWrap_${i}" class="dist-check-cell">
                            <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
                                   ${row.dist_checked ? 'checked' : ''}
-                                  title="체크 시 분배금 관리에 표시됩니다."
+                                  title="체크 시 분배금 관리 템플릿으로 넘어갑니다."
                                   onchange="onDistCheckToggle(${i})">
-                       </div>`;
+                       </div>`
+                    : `<div id="stCheckCellWrap_${i}" class="dist-check-cell"><span style="color:#52525b;">-</span></div>`;
 
-                // 2. 관리자 모드 (기본 상태 = 텍스트 표시 + 우측 [수정] 버튼)
+                // 2. 관리자 모드 (기본 상태 = 입력 완료 상태)
                 if (!isEditingRow) {
                     return `
                         <tr>
                             <td>${shortDate}</td>
                             <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
                             <td style="color:#fbbf24; font-weight:800;">${row.name}</td>
-                            <td>${badgeHtml}</td>
+                            <td>${holdBadgeHtml}</td>
+                            <td>${distBadgeHtml}</td>
                             <td style="color:#4ade80; font-weight:700;">${priceDisplay}</td>
                             <td style="color:#a7f3d0; font-weight:700;">${row.winner || '-'}</td>
                             <td>${row.taken_date ? toShortDate(row.taken_date) : '-'}</td>
-                            <td>${distCellHtml}</td>
+                            <td>${checkCellHtml}</td>
+                            <td>${distDateHtml}</td>
                             <td>
                                 <button type="button" class="btn-row-edit" onclick="startEditItemRow('${row.key}')">수정</button>
                             </td>
@@ -398,21 +585,29 @@
                         <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
                         <td style="color:#fbbf24; font-weight:800;">${row.name}</td>
                         <td>
-                            <span id="stLiveBadge_${i}" class="sale-badge type-${row.sale_type}">${row.sale_type}</span>
+                            <span id="stLiveHoldBadge_${i}" class="sale-badge type-${row.hold_state}">${row.hold_state}</span>
+                        </td>
+                        <td>
+                            <span id="stLiveDistBadge_${i}" class="dist-state-badge state-${row.dist_state}">${row.dist_state}</span>
                         </td>
                         <td>
                             <input type="number" id="stPrice_${i}" class="tbl-input tbl-price-input" value="${row.price}" min="0"
-                                   oninput="onLiveWinnerOrPriceInput(${i})">
+                                   oninput="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}')">
                         </td>
                         <td>
-                            <input type="text" id="stWinner_${i}" class="tbl-input tbl-winner-input" list="clanMemberDatalist"
-                                   value="${row.winner}" placeholder="수령자 검색"
-                                   oninput="onLiveWinnerOrPriceInput(${i})">
+                            <div class="winner-autocomplete-wrap">
+                                <input type="text" id="stWinner_${i}" class="tbl-input tbl-winner-input"
+                                       value="${row.winner}" placeholder="본캐/쫄 검색" autocomplete="off"
+                                       oninput="onWinnerTypeSearch(${i}, '${row.dist_date}')"
+                                       onkeydown="onWinnerKeydown(event, ${i}, '${row.dist_date}')">
+                                <div id="stWinnerSuggest_${i}" class="winner-suggest-list hidden"></div>
+                            </div>
                         </td>
                         <td>
                             <input type="date" id="stTaken_${i}" class="tbl-input tbl-date-input" value="${row.default_taken_date}">
                         </td>
-                        <td>${distCellHtml}</td>
+                        <td>${checkCellHtml}</td>
+                        <td>${distDateHtml}</td>
                         <td>
                             <button type="button" class="btn-sm btn-sm-green" style="padding: 4px 8px; font-size: 11px;" onclick="saveItemRow(${i})">저장</button>
                         </td>
@@ -427,25 +622,32 @@
             if (!target) return;
 
             const chkEl = document.getElementById(`stDistChk_${i}`);
-            const dist_checked = chkEl ? chkEl.checked : target.dist_checked;
-
             const priceEl = document.getElementById(`stPrice_${i}`);
             const winnerEl = document.getElementById(`stWinner_${i}`);
             const takenEl = document.getElementById(`stTaken_${i}`);
 
-            const rawWinner = winnerEl ? winnerEl.value.trim() : target.winner;
-            const canonicalWinner = memberAliasMap[rawWinner.toLowerCase()] || rawWinner;
+            const chosenWinner = winnerEl ? winnerEl.value.trim() : target.winner;
             const price = priceEl ? Number(priceEl.value || 0) : target.price;
-            const autoSaleType = computeAutoSaleType(canonicalWinner, price);
+            const holdState = computeHoldState(chosenWinner, price);
+            const canDist = (holdState === '내판' || holdState === '외판');
+
+            if (!canDist) {
+                alert('분배가능 상태(수령자 입력 완료)일 때만 체크할 수 있습니다.');
+                if (chkEl) chkEl.checked = false;
+                return;
+            }
+
+            const dist_checked = chkEl ? chkEl.checked : false;
+            const dist_date = dist_checked ? (target.dist_date || '') : '';
 
             const updatedDetails = [...target.full_details_ref];
             updatedDetails[target.item_idx] = {
                 name: target.name,
-                sale_type: autoSaleType,
+                sale_type: holdState,
                 price,
-                winner: canonicalWinner,
-                taken_date: takenEl ? takenEl.value : target.taken_date,
-                dist_date: target.dist_date || '',
+                winner: chosenWinner,
+                taken_date: takenEl ? takenEl.value : (target.taken_date || ClanApp.formatYMD(new Date())),
+                dist_date,
                 dist_checked
             };
 
@@ -460,6 +662,7 @@
             });
 
             if (res.ok) {
+                editingItemKeys.delete(target.key);
                 await loadItemStatusData();
             } else {
                 const err = await res.json().catch(() => ({}));
@@ -467,7 +670,8 @@
             }
         }
 
-        async function saveItemRow(i) {
+        // [저장] (또는 자동완성 클릭/엔터 시 호출): 선택한 캐릭터명(본캐 또는 쫄 그대로)으로 즉시 저장하고 편집 모드를 닫아 입력 완료 상태로 만듦
+        async function saveItemRow(i, forcedWinner = null) {
             if (!ClanApp.isAdminModeOn) return;
             const target = getFilteredItems()[i];
             if (!target) return;
@@ -477,24 +681,27 @@
             const takenInputEl = document.getElementById(`stTaken_${i}`);
             const chkEl = document.getElementById(`stDistChk_${i}`);
 
-            const rawWinner = winnerInputEl ? winnerInputEl.value.trim() : target.winner;
-            const canonicalWinner = memberAliasMap[rawWinner.toLowerCase()] || rawWinner;
+            const chosenWinner = forcedWinner !== null
+                ? forcedWinner.trim()
+                : (winnerInputEl ? winnerInputEl.value.trim() : target.winner);
+
             const price = priceInputEl ? Number(priceInputEl.value || 0) : target.price;
-            const sale_type = computeAutoSaleType(canonicalWinner, price);
+            const holdState = computeHoldState(chosenWinner, price);
+            const canDist = (holdState === '내판' || holdState === '외판');
 
-            const taken_date = takenInputEl
-                ? (takenInputEl.value || (canonicalWinner ? ClanApp.formatYMD(new Date()) : ''))
-                : target.taken_date;
+            const taken_date = chosenWinner
+                ? ((takenInputEl && takenInputEl.value) ? takenInputEl.value : (target.taken_date || ClanApp.formatYMD(new Date())))
+                : '';
 
-            const dist_date = target.dist_date || '';
-            const dist_checked = dist_date ? true : (chkEl ? chkEl.checked : target.dist_checked);
+            const dist_checked = canDist ? (chkEl ? chkEl.checked : Boolean(target.dist_checked)) : false;
+            const dist_date = canDist ? (target.dist_date || '') : '';
 
             const updatedDetails = [...target.full_details_ref];
             updatedDetails[target.item_idx] = {
                 name: target.name,
-                sale_type,
+                sale_type: holdState,
                 price,
-                winner: canonicalWinner,
+                winner: chosenWinner,
                 taken_date,
                 dist_date,
                 dist_checked

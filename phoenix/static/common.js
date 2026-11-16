@@ -6,13 +6,11 @@ window.ClanApp = {
     hasAdminPrivilege: false,
     isAdminModeOn: false,
 
-    // 전체 페이지 고정 16개 보스탐 시간 배열 (8칸 x 2줄)
     RAID_TIMES: [
         '01시', '03시', '05시', '07시', '09시', '11시', '12시', '13시',
         '15시', '17시', '18시', '19시', '21시', '22시(오만)', '23시', '24시'
     ],
 
-    // 메인 보스탐 고정 5개 타임 (09시, 15시, 21시, 22시(오만), 03시)
     MAIN_RAID_TIMES: ['09시', '15시', '21시', '22시(오만)', '03시'],
 
     initPage(activePath, onAdminToggleCallback = null) {
@@ -37,11 +35,12 @@ window.ClanApp = {
         const nav = document.getElementById('appNavbar');
         if (!nav || !this.user) return;
 
+        // '분배금관리' -> '분배관리' 변경
         const links = [
             { href: '/raid-record', label: '보스탐기록' },
             { href: '/raid-status', label: '일별현황' },
             { href: '/item-status', label: '템보유현황' },
-            { href: '/distribution', label: '분배금관리' },
+            { href: '/distribution', label: '분배관리' },
             { href: '/my-history', label: '참여내역' },
             { href: '/attendance', label: '참여도' }
         ];
@@ -154,7 +153,6 @@ window.ClanApp = {
         return 'expired';
     },
 
-    // 레코드에서 아이템 상세 배열 추출 (디폴트 dist_checked = true 지원 및 이벤트 0원 보존)
     extractItemDetails(record, priceMap = {}) {
         if (!record) return [];
         const rawTokens = (record.dropped_items || '').split(/[\s,，\n]+/).map(s => s.trim()).filter(Boolean);
@@ -163,21 +161,22 @@ window.ClanApp = {
         if (savedDetails.length > 0 && rawTokens.length === 0) {
             return savedDetails.map(d => {
                 const name = d.name || '';
-                const sType = d.sale_type || '보유중';
-                const hasExplicitZero = (sType === '이벤트') || (d.winner && Number(d.price) === 0);
+                const winner = (d.winner || '').trim();
+                const sType = winner ? (d.sale_type || '내판') : '보유중';
+                const hasExplicitZero = winner && ((sType === '이벤트') || Number(d.price) === 0);
                 const savedPrice = Number(d.price || 0);
                 const finalPrice = hasExplicitZero ? 0 : (savedPrice > 0 ? savedPrice : Number(priceMap[name] || 0));
-                const distDate = d.dist_date || '';
-                const isChecked = (d.dist_checked === undefined || d.dist_checked === null) ? true : Boolean(d.dist_checked);
+                const distDate = winner ? (d.dist_date || '') : '';
+                const isChecked = winner ? Boolean(d.dist_checked || distDate) : false;
 
                 return {
                     name,
                     sale_type: sType,
                     price: finalPrice,
-                    winner: d.winner || '',
+                    winner,
                     taken_date: d.taken_date || '',
                     dist_date: distDate,
-                    dist_checked: Boolean(isChecked || distDate)
+                    dist_checked: isChecked
                 };
             });
         }
@@ -192,23 +191,22 @@ window.ClanApp = {
                     break;
                 }
             }
-            const sType = found && found.sale_type ? found.sale_type : '보유중';
-            const hasExplicitZero = found && ((sType === '이벤트') || (found.winner && Number(found.price) === 0));
+            const winner = found ? (found.winner || '').trim() : '';
+            const sType = winner ? (found && found.sale_type ? found.sale_type : '내판') : '보유중';
+            const hasExplicitZero = found && winner && ((sType === '이벤트') || Number(found.price) === 0);
             const savedPrice = found ? Number(found.price || 0) : 0;
             const finalPrice = hasExplicitZero ? 0 : (savedPrice > 0 ? savedPrice : Number(priceMap[token] || 0));
-            const distDate = found ? (found.dist_date || '') : '';
-            const isChecked = (!found || found.dist_checked === undefined || found.dist_checked === null)
-                ? true
-                : Boolean(found.dist_checked);
+            const distDate = (found && winner) ? (found.dist_date || '') : '';
+            const isChecked = (found && winner) ? Boolean(found.dist_checked || distDate) : false;
 
             return {
                 name: token,
                 sale_type: sType,
                 price: finalPrice,
-                winner: found ? (found.winner || '') : '',
+                winner,
                 taken_date: found ? (found.taken_date || '') : '',
                 dist_date: distDate,
-                dist_checked: Boolean(isChecked || distDate)
+                dist_checked: isChecked
             };
         });
     },

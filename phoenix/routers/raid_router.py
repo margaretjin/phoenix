@@ -9,7 +9,6 @@ from database import supabase
 
 router = APIRouter(prefix="/api/raids", tags=["Raids"])
 
-# 고정 16개 보스탐 시간 배열 (20시 제외)
 RAID_TIMES = [
     "01시", "03시", "05시", "07시", "09시", "11시", "12시", "13시",
     "15시", "17시", "18시", "19시", "21시", "22시(오만)", "23시", "24시"
@@ -34,8 +33,8 @@ class ItemDetailEntry(BaseModel):
     price: int = 0
     winner: str = ""                # 수령자
     taken_date: str = ""            # 판매완료일
-    dist_date: str = ""             # 분배완료일
-    dist_checked: bool = True       # 디폴트값: 체크 표시(True)
+    dist_date: str = ""             # 분배완료일 (혈분배일)
+    dist_checked: bool = False      # 디폴트값: 체크 안 된 상태(False)
 
 class ItemDetailsUpdateRequest(BaseModel):
     raid_id: int
@@ -90,19 +89,22 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
         if matched_item:
             saved_p = int(matched_item.get("price") if matched_item.get("price") is not None else default_p)
             s_type = matched_item.get("sale_type") or "보유중"
-            # 이벤트가 아닐 때 가격이 비어있으면 기본가 매칭
-            if s_type != "이벤트" and saved_p == 0 and not matched_item.get("winner"):
+            winner_str = (matched_item.get("winner") or "").strip()
+            if s_type != "이벤트" and saved_p == 0 and not winner_str:
                 saved_p = default_p
+            # 수령자(winner)가 입력된(분배가능) 상태일 때만 체크 상태 유지 가능, 미입력 시 무조건 False
+            is_checked = bool(matched_item.get("dist_checked")) if winner_str else False
             synced.append({
                 "name": token,
-                "sale_type": s_type,
+                "sale_type": s_type if winner_str else "보유중",
                 "price": saved_p,
-                "winner": matched_item.get("winner") or "",
+                "winner": winner_str,
                 "taken_date": matched_item.get("taken_date") or "",
-                "dist_date": matched_item.get("dist_date") or "",
-                "dist_checked": True if matched_item.get("dist_checked") is None else bool(matched_item.get("dist_checked"))
+                "dist_date": (matched_item.get("dist_date") or "") if is_checked else "",
+                "dist_checked": is_checked
             })
         else:
+            # 신규 드랍 아이템은 보유중 + 체크 해제(False) 상태로 시작
             synced.append({
                 "name": token,
                 "sale_type": "보유중",
@@ -110,7 +112,7 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
                 "winner": "",
                 "taken_date": "",
                 "dist_date": "",
-                "dist_checked": True
+                "dist_checked": False
             })
     return synced
 
@@ -243,7 +245,17 @@ def update_item_details(req: ItemDetailsUpdateRequest):
     if req.requester_role not in ["슈퍼관리자", "관리자"]:
         raise HTTPException(status_code=403, detail="관리자 이상만 아이템 정산 정보를 수정할 수 있습니다.")
 
-    details_list = [d.model_dump() for d in req.item_details]
+    details_list = []
+    for d in req.item_details:
+        dump = d.model_dump()
+        winner_str = (dump.get("winner") or "").strip()
+        # 수령자가 입력되지 않은 경우(보유중)에는 절대 체크 상태로 넘어갈 수 없도록 강제
+        if not winner_str:
+            dump["sale_type"] = "보유중"
+            dump["dist_checked"] = False
+            dump["dist_date"] = ""
+        details_list.append(dump)
+
     dropped_str = " ".join([d["name"] for d in details_list if d.get("name")])
 
     res = supabase.table("raid_logs").update({
@@ -352,7 +364,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
 
     writer.writerow([
         "획득일", "보스탐 시간", "참여 인원수", "참여 명단",
-        "아이템명", "구분", "판매 가격(아데나)", "수령자", "판매완료일", "분배완료일",
+        "아이템명", "구분", "판매 가격(아데나)", "수령자", "판매완료일", "체크여부", "분배완료일",
         "혈비 공제율(%)", "혈비 제외 분배풀", "1인당 분배금", "분배완료 인원", "미분배 인원"
     ])
 
@@ -385,7 +397,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
         if not details:
             writer.writerow([
                 r_date, r_time, p_count, p_names,
-                "득템 없음", "-", 0, "-", "-", "-",
+                "득템 없음", "-", 0, "-", "-", "-", "-",
                 tax_rate, net_pool, per_share,
                 ", ".join(done_list), ", ".join(wait_list)
             ])
@@ -394,10 +406,11 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
                 it_name = item.get("name", "")
                 s_type = item.get("sale_type", "보유중")
                 it_price = 0 if s_type == "이벤트" else (int(item.get("price") or 0) or price_map.get(it_name, 0))
+                chk_str = "O" if item.get("dist_checked") else "X"
                 writer.writerow([
                     r_date, r_time, p_count, p_names,
                     it_name, s_type, it_price,
-                    item.get("winner", ""), item.get("taken_date", ""), item.get("dist_date", ""),
+                    item.get("winner", ""), item.get("taken_date", ""), chk_str, item.get("dist_date", ""),
                     tax_rate, net_pool, per_share,
                     ", ".join(done_list), ", ".join(wait_list)
                 ])

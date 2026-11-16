@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>참여내역 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=29">
-    <link rel="stylesheet" href="/static/my_history.css?v=29">
+    <link rel="stylesheet" href="/static/common.css?v=37">
+    <link rel="stylesheet" href="/static/my_history.css?v=37">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -21,14 +21,14 @@
                     <button type="button" class="btn-sm btn-sm-blue" onclick="reloadProfileAndHistory()">조회</button>
                 </div>
                 <div class="excel-btn-group admin-only">
-                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('day')">📥 일별</button>
-                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('week')">주별(+7일)</button>
-                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('month')">월별</button>
+                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('month')">📥 월별</button>
+                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('day')">일별</button>
+                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('all')">전체</button>
                 </div>
             </div>
         </div>
 
-        <!-- 1. 캐릭터 프로필 & 다중 기준 검색 -->
+        <!-- 1. 캐릭터 프로필 & 조회 조건 (디폴트: 월별 / 순서: 월별 -> 일별 -> 전체) -->
         <section class="card-box">
             <div class="history-profile-grid">
                 <div>
@@ -59,24 +59,24 @@
                     </select>
                 </div>
 
+                <!-- 조회 단위: 디폴트 월별, 순서: 월별 -> 일별 -> 전체 -->
                 <div class="history-filter-field">
-                    <label>조회 단위 (월/주/일)</label>
+                    <label>조회 단위</label>
                     <select id="historyPeriodMode" class="input-common" onchange="onHistoryPeriodModeChange()">
+                        <option value="month" selected>월별</option>
                         <option value="day">일별</option>
-                        <option value="week">주별 (+7일)</option>
-                        <option value="month">월별</option>
                         <option value="all">전체</option>
                     </select>
                 </div>
 
-                <div id="historyDateBox" class="history-filter-field">
-                    <label><span id="historyDateLabel">기준 일자</span><span id="historyWeekRangeHint" class="week-range-hint"></span></label>
-                    <input type="date" id="historyDate" class="input-common" onchange="onHistoryDateChange()">
-                </div>
-
-                <div id="historyMonthBox" class="history-filter-field hidden">
+                <div id="historyMonthBox" class="history-filter-field">
                     <label>조회 월 선택</label>
                     <input type="month" id="historyMonth" class="input-common" onchange="onHistoryMonthChange()">
+                </div>
+
+                <div id="historyDateBox" class="history-filter-field hidden">
+                    <label id="historyDateLabel">기준 일자</label>
+                    <input type="date" id="historyDate" class="input-common" onchange="onHistoryDateChange()">
                 </div>
 
                 <div id="historyAllBox" class="history-filter-field hidden">
@@ -116,7 +116,7 @@
             <div id="myCommonTimeGrid" class="common-time-grid"></div>
         </section>
 
-        <!-- 3. 참여 보스탐 아이템 및 분배금 수령 내역 (보스탐 | 아이템 | 혈비제외가 | 참여인원 | 개별 분배금 | 혈분배일 | 분배금수령상태) -->
+        <!-- 3. 참여 보스탐 아이템 및 분배금 수령 내역 (보스탐 | 아이템 | 혈비제외가 | 참여인원 | 내분배금 | 혈분배일 | 분배금수령상태) -->
         <section class="card-box">
             <div class="history-items-header">
                 <span class="section-label">💎 참여 보스탐 아이템 및 분배금 수령 내역</span>
@@ -135,7 +135,7 @@
                             <th>아이템</th>
                             <th>혈비제외가</th>
                             <th>참여인원</th>
-                            <th>개별 분배금</th>
+                            <th>내분배금</th>
                             <th>혈분배일</th>
                             <th>분배금수령상태</th>
                         </tr>
@@ -148,7 +148,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=29"></script>
+    <script src="/static/common.js?v=37"></script>
     <script>
         let currentTaxRate = 20;
         let allMembers = [];
@@ -180,16 +180,6 @@
         function toShortDate(dateStr) {
             if (!dateStr || dateStr.length < 8) return '-';
             return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
-        }
-
-        function getPlusSevenDaysRange(startDateStr) {
-            const [y, m, d] = startDateStr.split('-').map(Number);
-            const startObj = new Date(y, m - 1, d);
-            const endObj = new Date(y, m - 1, d + 7);
-            const start = ClanApp.formatYMD(startObj);
-            const end = ClanApp.formatYMD(endObj);
-            const shortLabel = `${start.slice(2).replace(/-/g, '.')}~${end.slice(2).replace(/-/g, '.')}`;
-            return { start, end, shortLabel };
         }
 
         async function loadTaxRate() {
@@ -240,41 +230,24 @@
             document.getElementById('profClassSkills').textContent = `${m.char_class || '-'} (${skills || '스킬없음'})`;
         }
 
-        function updateWeekHintLabel() {
-            const mode = document.getElementById('historyPeriodMode').value;
-            const hintEl = document.getElementById('historyWeekRangeHint');
-            if (mode !== 'week') {
-                hintEl.textContent = '';
-                return;
-            }
-            const dVal = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
-            hintEl.textContent = `(${getPlusSevenDaysRange(dVal).shortLabel})`;
-        }
-
         function onHistoryPeriodModeChange() {
             const mode = document.getElementById('historyPeriodMode').value;
-            const dateBox = document.getElementById('historyDateBox');
             const monthBox = document.getElementById('historyMonthBox');
+            const dateBox = document.getElementById('historyDateBox');
             const allBox = document.getElementById('historyAllBox');
-            const dateLabel = document.getElementById('historyDateLabel');
 
-            dateBox.classList.add('hidden');
             monthBox.classList.add('hidden');
+            dateBox.classList.add('hidden');
             allBox.classList.add('hidden');
 
             if (mode === 'month') {
                 monthBox.classList.remove('hidden');
-            } else if (mode === 'week') {
-                dateLabel.textContent = '주간 시작일';
-                dateBox.classList.remove('hidden');
             } else if (mode === 'day') {
-                dateLabel.textContent = '기준 일자';
                 dateBox.classList.remove('hidden');
             } else {
                 allBox.classList.remove('hidden');
             }
 
-            updateWeekHintLabel();
             renderAllHistoryViews();
         }
 
@@ -291,7 +264,6 @@
             const d = document.getElementById('historyDate').value;
             if (!d) return;
             document.getElementById('historyMonth').value = d.slice(0, 7);
-            updateWeekHintLabel();
             renderAllHistoryViews();
         }
 
@@ -323,7 +295,6 @@
             renderProfileCard(targetId);
             const res = await fetch('/api/raids');
             allRaidsCache = await res.json();
-            updateWeekHintLabel();
             renderAllHistoryViews();
         }
 
@@ -377,9 +348,6 @@
 
             if (periodMode === 'day') {
                 return targetDateStr === refDateVal;
-            } else if (periodMode === 'week') {
-                const { start, end } = getPlusSevenDaysRange(refDateVal);
-                return targetDateStr >= start && targetDateStr <= end;
             } else if (periodMode === 'month') {
                 return targetDateStr.startsWith(refMonthVal);
             }
@@ -440,7 +408,7 @@
                         clan_dist_date: clanDistDate,
                         is_done: isDone,
                         method: distInfo.method || '본인수령',
-                        proxy_name: distInfo.proxy_name || '',
+                        receiver_id: (distInfo.proxy_name && distInfo.proxy_name.trim()) ? distInfo.proxy_name.trim() : targetId,
                         paid_date: myPaidDate
                     });
                 });
@@ -465,13 +433,16 @@
 
             const totalMyShare = targetRows.reduce((acc, cur) => acc + cur.my_share, 0);
 
-            // 열 구성 (일반 모드 / 관리자 모드 동일): 보스탐 | 아이템 | 혈비제외가 | 참여인원 | 개별 분배금 | 혈분배일 | 분배금수령상태
+            // 열 구성: 보스탐 | 아이템 | 혈비제외가 | 참여인원 | 내분배금 | 혈분배일 | 분배금수령상태
+            // - 보스탐, 혈비제외가, 참여인원 3개는 참여인원 색상(same-member-color, #d4d4d8)으로 통일
+            // - 아이템은 노란색(drop-item-name) 그대로 유지
+            // - 분배금수령상태: 본인수령 (본인아이디또는 쫄아이디) 받은날짜 / 대리수령 (대리수령아이디) 받은날짜
             const rowsHtml = targetRows.map(row => {
                 let statusHtml = '';
                 if (row.is_done) {
-                    const methodLabel = (row.method === '대리수령' && row.proxy_name)
-                        ? `대리 (${row.proxy_name}) 수령`
-                        : '본인수령';
+                    const methodLabel = row.method === '대리수령'
+                        ? `대리수령 (${row.receiver_id})`
+                        : `본인수령 (${row.receiver_id})`;
                     const datePart = row.paid_date ? `<span class="done-paid-date">${toShortDate(row.paid_date)}</span>` : '';
                     statusHtml = `
                         <div class="history-status-cell">
@@ -485,10 +456,10 @@
 
                 return `
                     <tr>
-                        <td class="raid-slot-white">${toShortDate(row.raid_date)} ${row.raid_time}</td>
+                        <td class="same-member-color">${toShortDate(row.raid_date)} ${row.raid_time}</td>
                         <td class="drop-item-name">${row.item_name}</td>
-                        <td class="drop-item-net-price">${row.net_price.toLocaleString()}</td>
-                        <td>${row.memberCount}명</td>
+                        <td class="same-member-color">${row.net_price.toLocaleString()}</td>
+                        <td class="same-member-color">${row.memberCount}명</td>
                         <td style="color:#fbbf24; font-weight:900;">${row.my_share.toLocaleString()}</td>
                         <td class="clan-dist-date-cell">${row.clan_dist_date ? toShortDate(row.clan_dist_date) : '-'}</td>
                         <td>${statusHtml}</td>
@@ -513,11 +484,10 @@
 
             if (kind === 'day') {
                 ClanApp.downloadExcel({ date: refDate });
-            } else if (kind === 'week') {
-                const { start, end } = getPlusSevenDaysRange(refDate);
-                ClanApp.downloadExcel({ start, end });
-            } else {
+            } else if (kind === 'month') {
                 ClanApp.downloadExcel({ month: refMonth });
+            } else {
+                ClanApp.downloadExcel({});
             }
         }
     </script>
