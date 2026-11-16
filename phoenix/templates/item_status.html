@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=47">
-    <link rel="stylesheet" href="/static/item_status.css?v=47">
+    <link rel="stylesheet" href="/static/common.css?v=48">
+    <link rel="stylesheet" href="/static/item_status.css?v=48">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
 
     <main class="main-container">
-        <!-- 상단 타이틀 & 관리자 전용 엑셀 다운로드 -->
+        <!-- 상단 타이틀 & 관리자 전용 4종 엑셀 다운로드 -->
         <div class="top-bar">
             <h1 class="page-title">💎 혈맹 아이템 현황</h1>
             <div class="excel-btn-group admin-only">
@@ -63,7 +63,7 @@
                     </select>
                 </div>
 
-                <!-- 분배상태 필터 (분배대기 / 분배중 / 분배완료) -->
+                <!-- 분배상태 필터 -->
                 <div class="filter-field">
                     <label>분배상태</label>
                     <select id="distStateFilter" class="input-common" onchange="renderItemTable()">
@@ -113,7 +113,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=47"></script>
+    <script src="/static/common.js?v=48"></script>
     <script>
         let allMembers = [];
         let clanCharPool = [];
@@ -235,10 +235,6 @@
             return '외판';
         }
 
-        // [핵심] 분배상태 3단계 판별 (분배대기 / 분배중 / 분배완료)
-        // - 분배대기: 분배관리에서 혈분배일이 아직 입력되지 않은(미확정) 상태
-        // - 분배완료: 하단 참여자별 수령 현황에서 모든 참여자가 분배완료 처리되었거나 분배완료일이 확정된 경우
-        // - 분배중: 혈분배일이 입력되었으나 아직 모든 인원이 다 받지 않은 상태
         function computeDistState(record, item) {
             const winner = (item.winner || '').trim();
             const holdState = computeHoldState(winner, item.price);
@@ -248,7 +244,6 @@
                 return '분배대기';
             }
 
-            // 혈분배일이 아직 입력되지 않았으면 분배대기
             if (!distDate) {
                 return '분배대기';
             }
@@ -584,6 +579,7 @@
                        </div>`
                     : `<div id="stCheckCellWrap_${i}" class="dist-check-cell"><span style="color:#52525b;">-</span></div>`;
 
+                // [정정된 삭제 기능] 올바른 API 엔드포인트(/api/raids/item-details) 호출
                 const superAdminDeleteBtn = isSuperAdmin
                     ? `<button type="button" class="btn-row-del-item" onclick="deleteItemRow('${row.raid_id}', ${row.item_idx}, '${row.name}')">삭제</button>`
                     : '';
@@ -647,6 +643,7 @@
             }).join('');
         }
 
+        // [정정된 삭제 함수] 해당 보스탐의 item_details 배열에서 선택된 인덱스를 제외하고 서버에 POST 저장
         async function deleteItemRow(raidId, itemIdx, itemName) {
             if (!ClanApp.isSuperAdmin) {
                 alert('슈퍼관리자만 아이템을 삭제할 수 있습니다.');
