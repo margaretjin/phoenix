@@ -98,7 +98,7 @@
     color: #c084fc;
 }
 
-/* 분배상태 배지 */
+/* 분배상태 배지 (분배대기 / 분배중 / 분배완료) */
 .dist-state-badge {
     display: inline-block;
     padding: 2px 8px;

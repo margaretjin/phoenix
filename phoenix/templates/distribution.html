@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>분배관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=46">
-    <link rel="stylesheet" href="/static/distribution.css?v=46">
+    <link rel="stylesheet" href="/static/common.css?v=47">
+    <link rel="stylesheet" href="/static/distribution.css?v=47">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -132,7 +132,7 @@
             </div>
         </section>
 
-        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 ([초기화] 시 분배금 안 받아간 상태로 복귀) -->
+        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 -->
         <section class="card-box">
             <div class="dist-member-header">
                 <span class="section-label">👥 참여자별 개별 분배금 수령 현황</span>
@@ -172,7 +172,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=46"></script>
+    <script src="/static/common.js?v=47"></script>
     <script>
         let currentTaxRate = 20;
         let itemPriceMap = {};
@@ -586,6 +586,7 @@
                     `;
                 }
 
+                // [수정] 평소에는 [수정] 버튼만 노출, 수정 모드일 때만 [저장]과 [초기화] 노출
                 if (hasDistDate && !isEditingDate) {
                     return `
                         <tr>
@@ -600,16 +601,11 @@
                             <td>
                                 <div class="dist-date-btn-group">
                                     <button type="button" class="btn-row-edit" onclick="enableDistDateEdit('${entry.key}')">수정</button>
-                                    <button type="button" class="btn-row-del" onclick="clearCheckedItemDistDate('${entry.key}')">초기화</button>
                                 </div>
                             </td>
                         </tr>
                     `;
                 }
-
-                const resetBtnHtml = hasDistDate
-                    ? `<button type="button" class="btn-row-del" onclick="clearCheckedItemDistDate('${entry.key}')">초기화</button>`
-                    : '';
 
                 return `
                     <tr>
@@ -627,7 +623,7 @@
                             <div class="dist-date-btn-group">
                                 <button type="button" class="btn-sm btn-sm-green" style="padding: 4px 8px; font-size: 11px;"
                                         onclick="saveCheckedItemDistDate('${entry.key}')">저장</button>
-                                ${resetBtnHtml}
+                                ${hasDistDate ? `<button type="button" class="btn-row-del" onclick="clearCheckedItemDistDate('${entry.key}')">초기화</button>` : ''}
                             </div>
                         </td>
                     </tr>
@@ -683,7 +679,7 @@
             if (!ClanApp.isAdminModeOn) return;
             const entry = checkedEntries.find(e => e.key === key);
             if (!entry) return;
-            if (!confirm(`[${entry.name}] 아이템의 혈분배일(${toShortDate(entry.dist_date)}) 설정을 초기화하시겠습니까?\n(초기화 시 미확정 상태가 되며 템보유현황에 체크박스가 다시 표시됩니다.)`)) return;
+            if (!confirm(`[${entry.name}] 아이템의 혈분배일 설정을 초기화하시겠습니까?`)) return;
 
             const updatedDetails = entry.full_details_ref.map((it, idx) => ({
                 name: it.name,
@@ -1197,7 +1193,6 @@
             await loadAllRaidsForDistribution();
         }
 
-        // [초기화 클릭 시] 분배 완료 상태를 해제하고 분배대기(안 받아간 상태)로 되돌림
         async function resetMergedMemberRow(memberId) {
             if (!ClanApp.isAdminModeOn) return;
             if (!confirm(`[${memberId}] 참여자의 분배 완료 상태를 초기화하시겠습니까?\n(초기화 시 분배금을 안 받아간 상태로 돌아갑니다.)`)) return;
