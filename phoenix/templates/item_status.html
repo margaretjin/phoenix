@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=48">
-    <link rel="stylesheet" href="/static/item_status.css?v=48">
+    <link rel="stylesheet" href="/static/common.css?v=50">
+    <link rel="stylesheet" href="/static/item_status.css?v=50">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -113,7 +113,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=48"></script>
+    <script src="/static/common.js?v=50"></script>
     <script>
         let allMembers = [];
         let clanCharPool = [];
@@ -579,7 +579,7 @@
                        </div>`
                     : `<div id="stCheckCellWrap_${i}" class="dist-check-cell"><span style="color:#52525b;">-</span></div>`;
 
-                // [정정된 삭제 기능] 올바른 API 엔드포인트(/api/raids/item-details) 호출
+                // [수정] 슈퍼관리자 전용 삭제 버튼 (신규 추가된 DELETE 엔드포인트 정확히 호출)
                 const superAdminDeleteBtn = isSuperAdmin
                     ? `<button type="button" class="btn-row-del-item" onclick="deleteItemRow('${row.raid_id}', ${row.item_idx}, '${row.name}')">삭제</button>`
                     : '';
@@ -643,7 +643,7 @@
             }).join('');
         }
 
-        // [정정된 삭제 함수] 해당 보스탐의 item_details 배열에서 선택된 인덱스를 제외하고 서버에 POST 저장
+        // [정정된 삭제 함수] 전용 DELETE API 경로 호출
         async function deleteItemRow(raidId, itemIdx, itemName) {
             if (!ClanApp.isSuperAdmin) {
                 alert('슈퍼관리자만 아이템을 삭제할 수 있습니다.');
@@ -651,19 +651,8 @@
             }
             if (!confirm(`[${itemName}] 아이템을 완전히 삭제하시겠습니까?`)) return;
 
-            const target = flattenedItems.find(x => x.raid_id === raidId && x.item_idx === itemIdx);
-            if (!target) return;
-
-            const updatedDetails = target.full_details_ref.filter((_, idx) => idx !== itemIdx);
-
-            const res = await fetch('/api/raids/item-details', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    raid_id: raidId,
-                    item_details: updatedDetails,
-                    requester_role: ClanApp.role
-                })
+            const res = await fetch(`/api/raids/item-details/${raidId}/${itemIdx}?role=${encodeURIComponent(ClanApp.role)}`, {
+                method: 'DELETE'
             });
 
             if (res.ok) {

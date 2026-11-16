@@ -84,3 +84,12 @@ def delete_item(item_id: int, role: str = ""):
     _require_admin(role)
     supabase.table("item_master").delete().eq("id", item_id).execute()
     return {"ok": True}
+
+# 예시: 보스탐 아이템 상세 갱신 / 삭제 처리 엔드포인트 내부
+@router.post("/item-details")
+def update_item_details(payload: ItemDetailsPayload):
+    # 슈퍼관리자 권한 검증 추가
+    if (payload.requester_role or "").strip() not in {"슈퍼관리자"}:
+        raise HTTPException(status_code=403, detail="슈퍼관리자만 아이템을 삭제할 수 있습니다.")
+    
+    # 이후 기존 아이템 배열 업데이트 로직 수행...

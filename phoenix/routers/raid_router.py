@@ -92,7 +92,6 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
             winner_str = (matched_item.get("winner") or "").strip()
             if s_type != "이벤트" and saved_p == 0 and not winner_str:
                 saved_p = default_p
-            # 수령자(winner)가 입력된(분배가능) 상태일 때만 체크 상태 유지 가능, 미입력 시 무조건 False
             is_checked = bool(matched_item.get("dist_checked")) if winner_str else False
             synced.append({
                 "name": token,
@@ -104,7 +103,6 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
                 "dist_checked": is_checked
             })
         else:
-            # 신규 드랍 아이템은 보유중 + 체크 해제(False) 상태로 시작
             synced.append({
                 "name": token,
                 "sale_type": "보유중",
@@ -249,7 +247,6 @@ def update_item_details(req: ItemDetailsUpdateRequest):
     for d in req.item_details:
         dump = d.model_dump()
         winner_str = (dump.get("winner") or "").strip()
-        # 수령자가 입력되지 않은 경우(보유중)에는 절대 체크 상태로 넘어갈 수 없도록 강제
         if not winner_str:
             dump["sale_type"] = "보유중"
             dump["dist_checked"] = False
@@ -263,6 +260,33 @@ def update_item_details(req: ItemDetailsUpdateRequest):
         "dropped_items": dropped_str
     }).eq("id", req.raid_id).execute()
     return {"status": "updated", "data": res.data[0]}
+
+# [신규 추가] 슈퍼관리자 전용 개별 아이템 삭제 API 엔드포인트
+@router.delete("/item-details/{raid_id}/{item_idx}")
+def delete_single_item_detail(raid_id: int, item_idx: int, role: str):
+    if role != "슈퍼관리자":
+        raise HTTPException(status_code=403, detail="슈퍼관리자만 아이템을 삭제할 수 있습니다.")
+
+    row_res = supabase.table("raid_logs").select("*").eq("id", raid_id).execute()
+    if not row_res.data:
+        raise HTTPException(status_code=404, detail="해당 보스탐 기록을 찾을 수 없습니다.")
+
+    row = row_res.data[0]
+    details = row.get("item_details") or []
+
+    if item_idx < 0 or item_idx >= len(details):
+        raise HTTPException(status_code=400, detail="존재하지 않는 아이템 인덱스입니다.")
+
+    # 해당 인덱스의 아이템 제거
+    details.pop(item_idx)
+    dropped_str = " ".join([d["name"] for d in details if d.get("name")])
+
+    res = supabase.table("raid_logs").update({
+        "item_details": details,
+        "dropped_items": dropped_str
+    }).eq("id", raid_id).execute()
+
+    return {"status": "deleted", "data": res.data[0]}
 
 @router.post("/distributions")
 def update_distributions(req: DistributionUpdateRequest):
