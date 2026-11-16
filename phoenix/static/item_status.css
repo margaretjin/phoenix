@@ -65,7 +65,7 @@
     line-height: 1.25;
 }
 
-/* 1. 보유상태 배지 (보유중 / 내판 / 외판 / 이벤트) */
+/* 보유상태 배지 */
 .sale-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -98,7 +98,7 @@
     color: #c084fc;
 }
 
-/* 2. 분배상태 배지 (분배대기 / 분배중 / 분배완료) */
+/* 분배상태 배지 */
 .dist-state-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -125,7 +125,7 @@
     color: #4ade80;
 }
 
-/* 테이블 내 입력창 */
+/* 입력창 */
 .tbl-input {
     background-color: #141414;
     border: 1px solid #3f3f46;
@@ -151,7 +151,7 @@
     width: 118px;
 }
 
-/* 수령자 자동완성 박스 스타일 */
+/* 자동완성 박스 */
 .winner-autocomplete-wrap {
     position: relative;
     display: inline-block;
@@ -199,17 +199,9 @@
     color: #fbbf24;
 }
 
-.winner-suggest-item:hover .suggest-main-id {
-    color: #ffffff;
-}
-
 .suggest-sub-info {
     font-size: 10.5px;
     color: #9ca3af;
-}
-
-.winner-suggest-item:hover .suggest-sub-info {
-    color: #e5e7eb;
 }
 
 .dist-check-cell {
@@ -246,6 +238,23 @@
     line-height: 1;
     cursor: pointer;
     white-space: nowrap;
+}
+
+.btn-row-del-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border: 1px solid #ef4444;
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-left: 4px;
 }
 
 @media (max-width: 768px) {

@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=35">
-    <link rel="stylesheet" href="/static/item_status.css?v=35">
+    <link rel="stylesheet" href="/static/common.css?v=46">
+    <link rel="stylesheet" href="/static/item_status.css?v=46">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -22,7 +22,7 @@
             </div>
         </div>
 
-        <!-- 1. 조회 기준 및 보유상태 / 분배상태 2종 구분 필터 (분배중 선택 지원) -->
+        <!-- 1. 조회 기준 및 보유상태 / 분배상태 필터 -->
         <section class="card-box">
             <div class="filter-grid-box">
                 <div class="filter-field">
@@ -63,7 +63,7 @@
                     </select>
                 </div>
 
-                <!-- 분배상태 필터 (전체 / 분배대기 / 분배중 / 분배완료) -->
+                <!-- 분배상태 필터 -->
                 <div class="filter-field">
                     <label>분배상태</label>
                     <select id="distStateFilter" class="input-common" onchange="renderItemTable()">
@@ -113,7 +113,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=35"></script>
+    <script src="/static/common.js?v=46"></script>
     <script>
         let allMembers = [];
         let clanCharPool = [];
@@ -235,10 +235,6 @@
             return '외판';
         }
 
-        // [핵심] 분배상태 판별: 분배대기 / 분배중 / 분배완료
-        // - 해당 보스탐에 참여한 모든 혈원이 최종 분배완료 상태인 경우 -> '분배완료'
-        // - 수령자가 입력되어 분배가 시작되었으나 모든 인원이 다 받지 않은 경우 -> '분배중'
-        // - 수령자가 미입력(보유중)이거나 이벤트(0원)인 경우 -> '분배대기'
         function computeDistState(record, item) {
             const winner = (item.winner || '').trim();
             const holdState = computeHoldState(winner, item.price);
@@ -248,7 +244,6 @@
                 return '분배대기';
             }
 
-            // 분배완료일이 명시되어 있거나, 해당 보스탐 참여자 전원이 분배완료 처리된 경우
             if (distDate) {
                 return '분배완료';
             }
@@ -529,6 +524,7 @@
 
             const tbody = document.getElementById('itemStatusTableBody');
             const isAdmin = ClanApp.isAdminModeOn;
+            const isSuperAdmin = ClanApp.isSuperAdmin; // 슈퍼관리자 여부
             const colSpan = isAdmin ? 11 : 9;
 
             if (filtered.length === 0) {
@@ -583,6 +579,11 @@
                        </div>`
                     : `<div id="stCheckCellWrap_${i}" class="dist-check-cell"><span style="color:#52525b;">-</span></div>`;
 
+                // [신규] 슈퍼관리자일 경우에만 [삭제] 버튼 노출
+                const superAdminDeleteBtn = isSuperAdmin
+                    ? `<button type="button" class="btn-row-del-item" onclick="deleteItemRow('${row.raid_id}', ${row.item_idx}, '${row.name}')">삭제</button>`
+                    : '';
+
                 if (!isEditingRow) {
                     return `
                         <tr>
@@ -598,6 +599,7 @@
                             <td>${distDateHtml}</td>
                             <td>
                                 <button type="button" class="btn-row-edit" onclick="startEditItemRow('${row.key}')">수정</button>
+                                ${superAdminDeleteBtn}
                             </td>
                         </tr>
                     `;
@@ -634,10 +636,42 @@
                         <td>${distDateHtml}</td>
                         <td>
                             <button type="button" class="btn-sm btn-sm-green" style="padding: 4px 8px; font-size: 11px;" onclick="saveItemRow(${i})">저장</button>
+                            ${superAdminDeleteBtn}
                         </td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        // [슈퍼관리자 전용] 템 행 삭제 기능
+        async function deleteItemRow(raidId, itemIdx, itemName) {
+            if (!ClanApp.isSuperAdmin) {
+                alert('슈퍼관리자만 아이템을 삭제할 수 있습니다.');
+                return;
+            }
+            if (!confirm(`[${itemName}] 아이템을 완전히 삭제하시겠습니까?`)) return;
+
+            const target = flattenedItems.find(x => x.raid_id === raidId && x.item_idx === itemIdx);
+            if (!target) return;
+
+            const updatedDetails = target.full_details_ref.filter((_, idx) => idx !== itemIdx);
+
+            const res = await fetch('/api/raids/item-details', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_id: raidId,
+                    item_details: updatedDetails,
+                    requester_role: ClanApp.role
+                })
+            });
+
+            if (res.ok) {
+                await loadItemStatusData();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '아이템 삭제 실패');
+            }
         }
 
         async function onDistCheckToggle(i) {

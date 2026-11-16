@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>분배관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=44">
-    <link rel="stylesheet" href="/static/distribution.css?v=44">
+    <link rel="stylesheet" href="/static/common.css?v=46">
+    <link rel="stylesheet" href="/static/distribution.css?v=46">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -21,7 +21,7 @@
             </div>
         </div>
 
-        <!-- 1. 상단 조회 기준 : 혈분배일 -->
+        <!-- 1. 상단 조회 기준 : 월별 디폴트 -->
         <section class="card-box">
             <div class="dist-filter-grid">
                 <div class="dist-filter-field">
@@ -102,7 +102,7 @@
         <section class="card-box">
             <div class="dist-date-selector-bar">
                 <div class="dist-date-selector-top">
-                    <span class="dist-date-selector-title">📅 혈분배일 선택 (기준일 목록)</span>
+                    <span class="dist-date-selector-title">📅 혈분배일 선택 (해당 월 기준 목록)</span>
                     <span id="distDateCountHint" class="dist-date-selector-sub">혈분배일 0회</span>
                 </div>
                 <div id="distDateChipContainer" class="dist-date-chips-wrap"></div>
@@ -132,7 +132,7 @@
             </div>
         </section>
 
-        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 ([수정] 클릭 시 [저장] 및 [초기화] 버튼 노출) -->
+        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 ([초기화] 시 분배금 안 받아간 상태로 복귀) -->
         <section class="card-box">
             <div class="dist-member-header">
                 <span class="section-label">👥 참여자별 개별 분배금 수령 현황</span>
@@ -172,7 +172,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=44"></script>
+    <script src="/static/common.js?v=46"></script>
     <script>
         let currentTaxRate = 20;
         let itemPriceMap = {};
@@ -181,7 +181,8 @@
         let allRaids = [];
         let checkedEntries = [];
         let editingDistDateKeys = new Set();
-        let unlockedMembers = new Set(); // [수정]을 눌러 잠금이 해제된 참여자 Set
+        let unlockedMembers = new Set();
+        let expandedItemMembers = new Set();
         let memberInputDrafts = {};
         let memberStatusFilter = 'wait';
         let activeReceiverSuggestIdx = {};
@@ -796,7 +797,8 @@
                     if (p.isLeader) mData.isLeader = true;
                     mData.itemDetails.push({
                         name: entry.name,
-                        share: entry.per_share
+                        share: entry.per_share,
+                        raid_id: entry.raid_id
                     });
                     mData.totalShare += entry.per_share;
                     mData.raidIds.add(entry.raid_id);
@@ -926,7 +928,6 @@
 
                 const safeMemId = m.id.replace(/'/g, "\\'");
 
-                // [핵심] 분배완료(잠금) 상태일 때는 [수정] 버튼, 미완료 상태 또는 [수정]을 누른 상태일 때는 [저장] + [초기화] 버튼 노출
                 const rightActionHtml = isLocked
                     ? `<button type="button" class="btn-row-edit" onclick="unlockMemberRow('${safeMemId}')">수정</button>`
                     : `<div style="display:inline-flex; gap:4px; align-items:center;">
@@ -1196,10 +1197,10 @@
             await loadAllRaidsForDistribution();
         }
 
-        // [신규] [초기화] 버튼 클릭 시 해당 참여자의 분배 완료 상태를 해제하고 분배대기로 되돌림
+        // [초기화 클릭 시] 분배 완료 상태를 해제하고 분배대기(안 받아간 상태)로 되돌림
         async function resetMergedMemberRow(memberId) {
             if (!ClanApp.isAdminModeOn) return;
-            if (!confirm(`[${memberId}] 참여자의 분배 완료 상태를 초기화(대기 전환)하시겠습니까?`)) return;
+            if (!confirm(`[${memberId}] 참여자의 분배 완료 상태를 초기화하시겠습니까?\n(초기화 시 분배금을 안 받아간 상태로 돌아갑니다.)`)) return;
 
             const targetEntries = getSelectedKpiDateEntries();
             const targetRaidIds = [...new Set(
