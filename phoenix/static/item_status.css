@@ -20,7 +20,6 @@
     white-space: nowrap;
 }
 
-/* 상단 5칸 필터 그리드: 조회기준 | 날짜/월 | 보유상태 | 분배상태 | 검색 */
 .filter-grid-box {
     display: grid;
     grid-template-columns: 125px 145px 140px 135px 1fr;
@@ -40,7 +39,7 @@
     width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 90px; /* 자동완성 드롭다운이 테이블 하단에 가려지지 않도록 여유 확보 */
+    padding-bottom: 90px;
 }
 
 .item-status-table {
@@ -99,7 +98,7 @@
     color: #c084fc;
 }
 
-/* 2. 분배상태 배지 (분배대기 / 분배가능 / 분배완료) */
+/* 2. 분배상태 배지 (분배대기 / 분배중 / 분배완료) */
 .dist-state-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -114,16 +113,16 @@
     color: #fbbf24;
 }
 
-.dist-state-badge.state-분배가능 {
-    background-color: rgba(34, 197, 94, 0.18);
-    border: 1px solid #22c55e;
-    color: #4ade80;
+.dist-state-badge.state-분배중 {
+    background-color: rgba(59, 130, 246, 0.18);
+    border: 1px solid #3b82f6;
+    color: #60a5fa;
 }
 
 .dist-state-badge.state-분배완료 {
-    background-color: #27272a;
-    border: 1px solid #52525b;
-    color: #9ca3af;
+    background-color: rgba(34, 197, 94, 0.18);
+    border: 1px solid #22c55e;
+    color: #4ade80;
 }
 
 /* 테이블 내 입력창 */
@@ -152,7 +151,7 @@
     width: 118px;
 }
 
-/* 타자 입력 시 나타나는 수령자 실시간 자동완성 드롭다운 */
+/* 수령자 자동완성 박스 스타일 */
 .winner-autocomplete-wrap {
     position: relative;
     display: inline-block;
@@ -213,7 +212,6 @@
     color: #e5e7eb;
 }
 
-/* 체크 칸 체크박스 (분배가능 상태일 때만 노출) */
 .dist-check-cell {
     display: inline-flex;
     align-items: center;
