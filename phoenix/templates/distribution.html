@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>분배관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=43">
-    <link rel="stylesheet" href="/static/distribution.css?v=43">
+    <link rel="stylesheet" href="/static/common.css?v=44">
+    <link rel="stylesheet" href="/static/distribution.css?v=44">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -132,7 +132,7 @@
             </div>
         </section>
 
-        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 (수령 아이디 줄바꿈 및 검색칸 축소로 우측 수정/저장 버튼 잘림 방지) -->
+        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 ([수정] 클릭 시 [저장] 및 [초기화] 버튼 노출) -->
         <section class="card-box">
             <div class="dist-member-header">
                 <span class="section-label">👥 참여자별 개별 분배금 수령 현황</span>
@@ -172,7 +172,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=43"></script>
+    <script src="/static/common.js?v=44"></script>
     <script>
         let currentTaxRate = 20;
         let itemPriceMap = {};
@@ -181,8 +181,7 @@
         let allRaids = [];
         let checkedEntries = [];
         let editingDistDateKeys = new Set();
-        let unlockedMembers = new Set();
-        let expandedItemMembers = new Set();
+        let unlockedMembers = new Set(); // [수정]을 눌러 잠금이 해제된 참여자 Set
         let memberInputDrafts = {};
         let memberStatusFilter = 'wait';
         let activeReceiverSuggestIdx = {};
@@ -855,7 +854,6 @@
             `;
         }
 
-        // [핵심] 수령 아이디 입력창(88px) 및 날짜창(110px)을 슬림하게 줄여 우측 [수정] / [저장] 버튼이 잘리지 않도록 렌더링
         function renderMergedParticipantsTable() {
             const mergedMembers = buildMergedParticipantsList();
             const tbody = document.getElementById('distParticipantTableBody');
@@ -928,10 +926,14 @@
 
                 const safeMemId = m.id.replace(/'/g, "\\'");
 
+                // [핵심] 분배완료(잠금) 상태일 때는 [수정] 버튼, 미완료 상태 또는 [수정]을 누른 상태일 때는 [저장] + [초기화] 버튼 노출
                 const rightActionHtml = isLocked
                     ? `<button type="button" class="btn-row-edit" onclick="unlockMemberRow('${safeMemId}')">수정</button>`
-                    : `<button type="button" class="btn-sm btn-sm-green" style="padding: 4px 8px; font-size: 11px; line-height: 1;"
-                               onclick="saveMergedMemberRow('${safeMemId}', ${rowIdx})">저장</button>`;
+                    : `<div style="display:inline-flex; gap:4px; align-items:center;">
+                           <button type="button" class="btn-sm btn-sm-green" style="padding: 4px 7px; font-size: 11px; line-height: 1;"
+                                   onclick="saveMergedMemberRow('${safeMemId}', ${rowIdx})">저장</button>
+                           ${isDone ? `<button type="button" class="btn-row-del" style="padding: 4px 7px; font-size: 11px;" onclick="resetMergedMemberRow('${safeMemId}')">초기화</button>` : ''}
+                       </div>`;
 
                 return `
                     <tr>
@@ -1188,6 +1190,43 @@
                 });
 
                 await ensureRaidItemsDistDateFilled(raid, paid_date);
+            }
+
+            unlockedMembers.delete(memberId);
+            await loadAllRaidsForDistribution();
+        }
+
+        // [신규] [초기화] 버튼 클릭 시 해당 참여자의 분배 완료 상태를 해제하고 분배대기로 되돌림
+        async function resetMergedMemberRow(memberId) {
+            if (!ClanApp.isAdminModeOn) return;
+            if (!confirm(`[${memberId}] 참여자의 분배 완료 상태를 초기화(대기 전환)하시겠습니까?`)) return;
+
+            const targetEntries = getSelectedKpiDateEntries();
+            const targetRaidIds = [...new Set(
+                targetEntries.filter(e => e.participants.some(p => p.id === memberId)).map(e => e.raid_id)
+            )];
+
+            for (const rId of targetRaidIds) {
+                const raid = allRaids.find(r => r.id === rId);
+                if (!raid) continue;
+
+                const distMap = JSON.parse(JSON.stringify(raid.distributions || {}));
+                distMap[memberId] = {
+                    status: '분배대기',
+                    method: '본인수령',
+                    proxy_name: memberId,
+                    paid_date: ''
+                };
+
+                await fetch('/api/raids/distributions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        raid_id: rId,
+                        distributions: distMap,
+                        requester_role: ClanApp.role
+                    })
+                });
             }
 
             unlockedMembers.delete(memberId);
