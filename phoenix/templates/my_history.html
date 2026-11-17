@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>참여내역 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=37">
+    <link rel="stylesheet" href="/static/common.css?v=38">
     <link rel="stylesheet" href="/static/my_history.css?v=37">
 </head>
 <body>
@@ -148,7 +148,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=37"></script>
+    <script src="/static/common.js?v=38"></script>
     <script>
         let currentTaxRate = 20;
         let allMembers = [];
@@ -206,6 +206,7 @@
                 const res = await fetch('/api/items');
                 if (!res.ok) return;
                 const list = await res.json();
+                ClanApp.setItemAliases(list);
                 list.forEach(it => {
                     if (it.item_name) itemPriceMap[it.item_name] = Number(it.default_price || 0);
                 });
@@ -380,7 +381,7 @@
                 const isDone = distInfo.status === '분배완료';
 
                 details.forEach(item => {
-                    if (kw && !item.name.toLowerCase().includes(kw)) return;
+                    if (kw && !item.name.toLowerCase().includes(kw) && !ClanApp.getItemAlias(item.name).toLowerCase().includes(kw)) return;
 
                     const clanDistDate = item.dist_date || '';
                     const myPaidDate = distInfo.paid_date || '';
@@ -457,7 +458,7 @@
                 return `
                     <tr>
                         <td class="same-member-color">${toShortDate(row.raid_date)} ${row.raid_time}</td>
-                        <td class="drop-item-name">${row.item_name}</td>
+                        <td class="drop-item-name">${ClanApp.itemNameHtml(row.item_name)}</td>
                         <td class="same-member-color">${row.net_price.toLocaleString()}</td>
                         <td class="same-member-color">${row.memberCount}명</td>
                         <td style="color:#fbbf24; font-weight:900;">${row.my_share.toLocaleString()}</td>

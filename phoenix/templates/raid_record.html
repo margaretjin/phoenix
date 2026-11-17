@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>보스탐 기록 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=13">
+    <link rel="stylesheet" href="/static/common.css?v=14">
     <link rel="stylesheet" href="/static/raid_record.css?v=13">
 </head>
 <body>
@@ -99,7 +99,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=13"></script>
+    <script src="/static/common.js?v=14"></script>
     <script>
         let allMembers = [];
         let aliasMap = {};
@@ -149,6 +149,7 @@
                 const res = await fetch('/api/items');
                 if (!res.ok) return;
                 const items = await res.json();
+                ClanApp.setItemAliases(items);
                 items.forEach(it => {
                     const name = (it.item_name || '').trim();
                     if (!name) return;
@@ -199,11 +200,11 @@
             }
             box.innerHTML = items.map(item => {
                 if (!item.isMatched) {
-                    const sug = item.suggestion ? `<span class="suggest-arrow">→ ${item.suggestion}?</span>` : '';
+                    const sug = item.suggestion ? `<span class="suggest-arrow">→ ${ClanApp.itemNameHtml(item.suggestion)}?</span>` : '';
                     return `<span class="member-badge unregistered"
                                   onclick="applyDropSuggestion('${item.raw}', '${item.suggestion || ''}')">❌ ${item.raw} ${sug}</span>`;
                 }
-                return `<span class="member-badge registered">${item.name}</span>`;
+                return `<span class="member-badge registered">${ClanApp.itemNameHtml(item.name)}</span>`;
             }).join('');
         }
 
@@ -406,7 +407,7 @@
 
                 const badgesHtml = resolved.map((item, idx) => {
                     if (!item.isMatched) {
-                        const sugHtml = item.suggestion ? `<span class="suggest-arrow">→ ${item.suggestion}?</span>` : '';
+                        const sugHtml = item.suggestion ? `<span class="suggest-arrow">→ ${ClanApp.itemNameHtml(item.suggestion)}?</span>` : '';
                         return `
                             <span class="member-badge unregistered suggest-clickable"
                                   onclick="applySuggestion(${lineIdx}, '${item.raw}', '${item.suggestion || ''}')">
@@ -591,7 +592,7 @@
             const chipsHtml = itemNames.length === 0
                 ? `<div class="empty-party-msg">등록된 드랍 아이템이 없습니다.</div>`
                 : `<div class="recorded-item-chips">${[...countMap.entries()].map(([n, c]) =>
-                    `<span class="recorded-item-chip">${n}${c > 1 ? ` ×${c}` : ''}</span>`).join('')}</div>`;
+                    `<span class="recorded-item-chip">${ClanApp.itemNameHtml(n)}${c > 1 ? ` ×${c}` : ''}</span>`).join('')}</div>`;
             itemBox.innerHTML = `<div class="recorded-item-title">🎁 드랍 아이템 (${itemNames.length}개)</div>${chipsHtml}`;
 
             if (parties.length === 0) {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>일별 기록 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=16">
+    <link rel="stylesheet" href="/static/common.css?v=17">
     <link rel="stylesheet" href="/static/raid_status.css?v=16">
 </head>
 <body>
@@ -94,7 +94,7 @@
         </div>
     </main>
 
-    <script src="/static/common.js?v=16"></script>
+    <script src="/static/common.js?v=17"></script>
     <script>
         let selectedDate = '';
         let selectedTime = '';
@@ -144,6 +144,7 @@
                 const res = await fetch('/api/items');
                 if (!res.ok) return;
                 const items = await res.json();
+                ClanApp.setItemAliases(items);
                 items.forEach(it => {
                     const name = (it.item_name || '').trim();
                     if (!name) return;
@@ -234,7 +235,7 @@
                 listEl.innerHTML = `<span class="summary-none">없음</span>`;
             } else {
                 listEl.innerHTML = [...countMap.entries()].map(([name, cnt]) =>
-                    `<span class="summary-drop-chip">${name}${cnt > 1 ? ` ×${cnt}` : ''}</span>`
+                    `<span class="summary-drop-chip">${ClanApp.itemNameHtml(name)}${cnt > 1 ? ` ×${cnt}` : ''}</span>`
                 ).join('');
             }
         }
@@ -359,7 +360,7 @@
                 return `
                     <div class="item-row-card">
                         <div class="item-view-line">
-                            <span class="item-badge-name">🎁 ${item.name}</span>
+                            <span class="item-badge-name">🎁 ${ClanApp.itemNameHtml(item.name)}</span>
                             <span class="item-matched-price">${priceLabel}</span>
                             ${delBtn}
                         </div>

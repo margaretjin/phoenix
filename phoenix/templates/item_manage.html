@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>아이템 관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=28">
+    <link rel="stylesheet" href="/static/common.css?v=29">
     <link rel="stylesheet" href="/static/item_manage.css?v=28">
 </head>
 <body>
@@ -72,7 +72,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=28"></script>
+    <script src="/static/common.js?v=29"></script>
     <script>
         let items = [];
         let editingId = null;
@@ -148,6 +148,7 @@
                 const res = await fetch('/api/items');
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 items = await res.json();
+                ClanApp.setItemAliases(items);
             } catch (e) {
                 items = [];
                 document.getElementById('itemTableBody').innerHTML =
@@ -217,7 +218,7 @@
                 return `
                     <tr>
                         <td class="item-name-cell">
-                            ${esc(it.item_name)}
+                            ${ClanApp.itemNameHtml(it.item_name)}
                             ${aliasSubHtml}
                         </td>
                         <td class="item-gross-cell">${grossPrice.toLocaleString()}</td>

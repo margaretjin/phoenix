@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 
 from routers import auth_router, raid_router, admin_router, item_router
 
+
 app = FastAPI(title="혈맹 보스탐 체크기")
 
 # 서버 응답 압축 최적화

@@ -57,6 +57,40 @@ input[type="month"], input[type="date"] {
     display: none !important;
 }
 
+.item-alias-label {
+    cursor: help;
+    text-decoration: underline dotted rgba(245, 158, 11, 0.65);
+    text-underline-offset: 2px;
+}
+
+.item-full-name-toast {
+    position: fixed;
+    z-index: 1000;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    max-width: min(540px, calc(100vw - 32px));
+    padding: 11px 16px;
+    border: 1px solid var(--accent-gold);
+    border-radius: 10px;
+    background: #1e1e1e;
+    color: var(--text-light);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    font-weight: 700;
+    text-align: center;
+    overflow-wrap: anywhere;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, 8px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+    pointer-events: none;
+}
+
+.item-full-name-toast.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+}
+
 /* 2. 상단 공통 네비게이션 바 (메인 컨테이너와 동일하게 960px 통일) */
 .navbar {
     width: 100%;

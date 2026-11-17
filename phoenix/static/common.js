@@ -5,6 +5,7 @@ window.ClanApp = {
     isSuperAdmin: false,
     hasAdminPrivilege: false,
     isAdminModeOn: false,
+    itemAliases: Object.create(null),
 
     RAID_TIMES: [
         '01시', '03시', '05시', '07시', '09시', '11시', '12시', '13시',
@@ -153,6 +154,42 @@ window.ClanApp = {
         return 'expired';
     },
 
+    setItemAliases(items = []) {
+        const aliases = Object.create(null);
+        items.forEach(item => {
+            const fullName = String(item.item_name || '').trim();
+            if (!fullName) return;
+            const alias = String(item.aliases || '')
+                .split(/[,，]+/)
+                .map(value => value.trim())
+                .find(Boolean);
+            aliases[fullName.toLowerCase()] = alias || fullName;
+        });
+        this.itemAliases = aliases;
+    },
+
+    getItemAlias(fullName) {
+        const name = String(fullName || '').trim();
+        return this.itemAliases[name.toLowerCase()] || name;
+    },
+
+    escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[char]);
+    },
+
+    itemNameHtml(fullName) {
+        const name = String(fullName || '').trim();
+        const safeName = this.escapeHtml(name);
+        const alias = this.escapeHtml(this.getItemAlias(name));
+        return `<span class="item-alias-label" data-item-full-name="${safeName}" title="${safeName}">${alias}</span>`;
+    },
+
     extractItemDetails(record, priceMap = {}) {
         if (!record) return [];
         const rawTokens = (record.dropped_items || '').split(/[\s,，\n]+/).map(s => s.trim()).filter(Boolean);
@@ -241,3 +278,27 @@ window.ClanApp = {
         window.location.href = `/api/raids/export-excel?${params.toString()}`;
     }
 };
+
+const itemFullNameToast = document.createElement('div');
+itemFullNameToast.className = 'item-full-name-toast';
+itemFullNameToast.setAttribute('role', 'status');
+itemFullNameToast.setAttribute('aria-live', 'polite');
+document.body.appendChild(itemFullNameToast);
+
+let itemFullNameToastTimer;
+document.addEventListener('touchend', event => {
+    const itemLabel = event.target instanceof Element
+        ? event.target.closest('.item-alias-label')
+        : null;
+    if (!itemLabel) {
+        itemFullNameToast.classList.remove('visible');
+        return;
+    }
+
+    itemFullNameToast.textContent = itemLabel.dataset.itemFullName || itemLabel.title;
+    itemFullNameToast.classList.add('visible');
+    window.clearTimeout(itemFullNameToastTimer);
+    itemFullNameToastTimer = window.setTimeout(() => {
+        itemFullNameToast.classList.remove('visible');
+    }, 2600);
+}, { passive: true });
