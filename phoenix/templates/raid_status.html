@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>일별 기록 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=17">
-    <link rel="stylesheet" href="/static/raid_status.css?v=16">
+    <link rel="stylesheet" href="/static/common.css?v=52">
+    <link rel="stylesheet" href="/static/raid_status.css?v=18">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -53,7 +53,10 @@
             <!-- 왼쪽: 드랍 아이템 -->
             <section class="card-box raid-detail-items">
                 <div class="item-section-header">
-                    <span class="section-label">🎁 드랍 아이템 내역</span>
+                    <span class="section-label">
+                        🎁 드랍 아이템 내역
+                        <span class="slot-gray-note" style="font-weight: normal; margin-left: 4px;">(실제 판매가는 변경될수있습니다)</span>
+                    </span>
                     <span id="slotItemTotalBadge" class="slot-green-meta">총 0 (단위:아데나)</span>
                 </div>
 
@@ -73,7 +76,7 @@
                 <div class="item-section-header">
                     <span id="slotParticipantCount" class="section-label">총 0파티 (0명)</span>
                     <div class="header-right-group">
-                        <span class="slot-gray-note">혈비 20% 제외 분배</span>
+                        <span class="slot-gray-note">혈비 20% 제외 분배 (실제 분배금은 조정가에 따라 변경될수있습니다)</span>
                         <button type="button" id="deleteEntireRaidBtn" class="btn-sm btn-sm-red admin-only" style="padding: 2px 6px; font-size: 10px;" onclick="deleteEntireRaidSlot()">
                             전체삭제
                         </button>
@@ -94,7 +97,7 @@
         </div>
     </main>
 
-    <script src="/static/common.js?v=17"></script>
+    <script src="/static/common.js?v=52"></script>
     <script>
         let selectedDate = '';
         let selectedTime = '';
@@ -281,6 +284,7 @@
         }
 
         function getEffectiveItemPrice(item) {
+            if (item.sale_type === '이벤트') return 0;
             const saved = Number(item.price || 0);
             return saved > 0 ? saved : Number(itemPriceMap[item.name] || 0);
         }

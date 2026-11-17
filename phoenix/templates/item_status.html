@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=51">
-    <link rel="stylesheet" href="/static/item_status.css?v=50">
+    <link rel="stylesheet" href="/static/common.css?v=52">
+    <link rel="stylesheet" href="/static/item_status.css?v=52">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -113,7 +113,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=51"></script>
+    <script src="/static/common.js?v=52"></script>
     <script>
         let allMembers = [];
         let clanCharPool = [];
@@ -222,6 +222,11 @@
             }
         }
 
+        // 수령자 및 가격에 따른 보유상태 자동 분류:
+        // - 수령자 없음 -> '보유중'
+        // - 혈원 수령 + 가격 0 -> '이벤트'
+        // - 혈원 수령 + 가격 > 0 -> '내판'
+        // - 비혈원(외부인) 수령 -> '외판'
         function computeHoldState(winnerRaw, priceVal) {
             const w = (winnerRaw || '').trim();
             const p = Number(priceVal || 0);
@@ -233,7 +238,7 @@
             if (isClanMember) {
                 return p === 0 ? '이벤트' : '내판';
             }
-            return '외판';
+            return p === 0 ? '이벤트' : '외판';
         }
 
         function computeDistState(record, item) {
@@ -327,6 +332,7 @@
                 details.forEach((item, idx) => {
                     const winner = (item.winner || '').trim();
                     const price = Number(item.price || 0);
+                    const policyPrice = Number(itemPriceMap[item.name] || 0);
                     const holdState = computeHoldState(winner, price);
                     const distState = computeDistState(r, item);
                     const canDist = (holdState === '내판' || holdState === '외판');
@@ -347,6 +353,7 @@
                         hold_state: holdState,
                         dist_state: distState,
                         price,
+                        policy_price: policyPrice,
                         winner,
                         taken_date: item.taken_date || '',
                         default_taken_date: item.taken_date || todayStr,
@@ -520,6 +527,23 @@
             }
         }
 
+        function formatPriceWithPolicyHint(row) {
+            if (row.hold_state === '이벤트') {
+                return '0 (이벤트)';
+            }
+            const actual = Number(row.price || 0);
+            const policy = Number(row.policy_price || 0);
+            if (actual <= 0) return '-';
+
+            if (policy > 0 && actual !== policy) {
+                return `
+                    <div>${actual.toLocaleString()}</div>
+                    <div style="font-size:10px; color:#9ca3af; font-weight:600;">(정책: ${policy.toLocaleString()})</div>
+                `;
+            }
+            return actual.toLocaleString();
+        }
+
         function renderItemTable() {
             const filtered = getFilteredItems();
             document.getElementById('itemTotalCountBadge').textContent = `총 ${filtered.length}건`;
@@ -538,10 +562,7 @@
                 const shortDate = toShortDate(row.raid_date);
                 const holdBadgeHtml = `<span class="sale-badge type-${row.hold_state}">${row.hold_state}</span>`;
                 const distBadgeHtml = `<span class="dist-state-badge state-${row.dist_state}">${row.dist_state}</span>`;
-
-                const priceDisplay = row.hold_state === '이벤트'
-                    ? '0 (이벤트)'
-                    : (row.price > 0 ? row.price.toLocaleString() : '-');
+                const priceDisplay = formatPriceWithPolicyHint(row);
 
                 const distDateHtml = row.dist_date
                     ? `<span class="dist-date-text">${toShortDate(row.dist_date)}</span>`
@@ -581,7 +602,6 @@
                        </div>`
                     : `<div id="stCheckCellWrap_${i}" class="dist-check-cell"><span style="color:#52525b;">-</span></div>`;
 
-                // [수정] 슈퍼관리자 전용 삭제 버튼 (신규 추가된 DELETE 엔드포인트 정확히 호출)
                 const superAdminDeleteBtn = isSuperAdmin
                     ? `<button type="button" class="btn-row-del-item" onclick="deleteItemRow('${row.raid_id}', ${row.item_idx}, '${row.name}')">삭제</button>`
                     : '';
@@ -645,7 +665,6 @@
             }).join('');
         }
 
-        // [정정된 삭제 함수] 전용 DELETE API 경로 호출
         async function deleteItemRow(raidId, itemIdx, itemName) {
             if (!ClanApp.isSuperAdmin) {
                 alert('슈퍼관리자만 아이템을 삭제할 수 있습니다.');
@@ -689,16 +708,28 @@
             const dist_checked = chkEl ? chkEl.checked : false;
             const dist_date = dist_checked ? (target.dist_date || '') : '';
 
-            const updatedDetails = [...target.full_details_ref];
-            updatedDetails[target.item_idx] = {
-                name: target.name,
-                sale_type: holdState,
-                price,
-                winner: rawWinner,
-                taken_date: takenEl ? takenEl.value : (target.taken_date || ClanApp.formatYMD(new Date())),
-                dist_date,
-                dist_checked
-            };
+            const updatedDetails = target.full_details_ref.map((it, idx) => {
+                if (idx === target.item_idx) {
+                    return {
+                        name: target.name,
+                        sale_type: holdState,
+                        price,
+                        winner: rawWinner,
+                        taken_date: takenEl ? takenEl.value : (target.taken_date || ClanApp.formatYMD(new Date())),
+                        dist_date,
+                        dist_checked
+                    };
+                }
+                return {
+                    name: it.name,
+                    sale_type: it.sale_type || '보유중',
+                    price: Number(it.price || 0),
+                    winner: it.winner || '',
+                    taken_date: it.taken_date || '',
+                    dist_date: it.dist_date || '',
+                    dist_checked: Boolean(it.dist_checked)
+                };
+            });
 
             const res = await fetch('/api/raids/item-details', {
                 method: 'POST',
@@ -744,16 +775,28 @@
             const dist_checked = canCheck ? (chkEl ? chkEl.checked : Boolean(target.dist_checked)) : false;
             const dist_date = canCheck ? (target.dist_date || '') : '';
 
-            const updatedDetails = [...target.full_details_ref];
-            updatedDetails[target.item_idx] = {
-                name: target.name,
-                sale_type: holdState,
-                price,
-                winner: rawWinner,
-                taken_date,
-                dist_date,
-                dist_checked
-            };
+            const updatedDetails = target.full_details_ref.map((it, idx) => {
+                if (idx === target.item_idx) {
+                    return {
+                        name: target.name,
+                        sale_type: holdState,
+                        price,
+                        winner: rawWinner,
+                        taken_date,
+                        dist_date,
+                        dist_checked
+                    };
+                }
+                return {
+                    name: it.name,
+                    sale_type: it.sale_type || '보유중',
+                    price: Number(it.price || 0),
+                    winner: it.winner || '',
+                    taken_date: it.taken_date || '',
+                    dist_date: it.dist_date || '',
+                    dist_checked: Boolean(it.dist_checked)
+                };
+            });
 
             const res = await fetch('/api/raids/item-details', {
                 method: 'POST',

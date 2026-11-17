@@ -36,7 +36,6 @@ window.ClanApp = {
         const nav = document.getElementById('appNavbar');
         if (!nav || !this.user) return;
 
-        // '분배금관리' -> '분배관리' 변경
         const links = [
             { href: '/raid-record', label: '보스탐기록' },
             { href: '/raid-status', label: '일별현황' },
@@ -190,32 +189,55 @@ window.ClanApp = {
         return `<span class="item-alias-label" data-item-full-name="${safeName}" title="${safeName}">${alias}</span>`;
     },
 
+    // 전 페이지 공통 가격 추출 로직:
+    // 1순위: 이벤트(수령자 존재 + 가격 0 또는 이벤트 타입) -> 0원
+    // 2순위: raid_logs.item_details에 저장된 실제 판매가(savedPrice > 0) -> 실제 판매가
+    // 3순위: 아직 미판매(보유중)이거나 가격 미지정(0) -> item_master의 기본 정책가(priceMap)
     extractItemDetails(record, priceMap = {}) {
         if (!record) return [];
         const rawTokens = (record.dropped_items || '').split(/[\s,，\n]+/).map(s => s.trim()).filter(Boolean);
         const savedDetails = Array.isArray(record.item_details) ? record.item_details : [];
 
-        if (savedDetails.length > 0 && rawTokens.length === 0) {
-            return savedDetails.map(d => {
-                const name = d.name || '';
-                const winner = (d.winner || '').trim();
-                const sType = winner ? (d.sale_type || '내판') : '보유중';
-                const hasExplicitZero = winner && ((sType === '이벤트') || Number(d.price) === 0);
-                const savedPrice = Number(d.price || 0);
-                const finalPrice = hasExplicitZero ? 0 : (savedPrice > 0 ? savedPrice : Number(priceMap[name] || 0));
-                const distDate = winner ? (d.dist_date || '') : '';
-                const isChecked = winner ? Boolean(d.dist_checked || distDate) : false;
+        const resolveItemObj = (name, foundObj) => {
+            const policyPrice = Number(priceMap[name] || 0);
+            const winner = foundObj ? (foundObj.winner || '').trim() : '';
+            const rawSaleType = foundObj && foundObj.sale_type ? foundObj.sale_type : '보유중';
+            const savedPrice = foundObj ? Number(foundObj.price || 0) : 0;
 
-                return {
-                    name,
-                    sale_type: sType,
-                    price: finalPrice,
-                    winner,
-                    taken_date: d.taken_date || '',
-                    dist_date: distDate,
-                    dist_checked: isChecked
-                };
-            });
+            let sType = '보유중';
+            let finalPrice = policyPrice;
+
+            if (winner) {
+                const isEvent = (rawSaleType === '이벤트') || (savedPrice === 0);
+                if (isEvent) {
+                    sType = '이벤트';
+                    finalPrice = 0;
+                } else {
+                    sType = (rawSaleType === '외판') ? '외판' : '내판';
+                    finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
+                }
+            } else {
+                sType = '보유중';
+                finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
+            }
+
+            const distDate = (foundObj && winner && sType !== '이벤트') ? (foundObj.dist_date || '') : '';
+            const isChecked = (foundObj && winner && sType !== '이벤트') ? Boolean(foundObj.dist_checked || distDate) : false;
+
+            return {
+                name,
+                sale_type: sType,
+                price: finalPrice,
+                policy_price: policyPrice,
+                winner,
+                taken_date: (foundObj && winner) ? (foundObj.taken_date || '') : '',
+                dist_date: distDate,
+                dist_checked: isChecked
+            };
+        };
+
+        if (savedDetails.length > 0 && rawTokens.length === 0) {
+            return savedDetails.map(d => resolveItemObj(d.name || '', d));
         }
 
         const usedIdx = new Set();
@@ -228,23 +250,7 @@ window.ClanApp = {
                     break;
                 }
             }
-            const winner = found ? (found.winner || '').trim() : '';
-            const sType = winner ? (found && found.sale_type ? found.sale_type : '내판') : '보유중';
-            const hasExplicitZero = found && winner && ((sType === '이벤트') || Number(found.price) === 0);
-            const savedPrice = found ? Number(found.price || 0) : 0;
-            const finalPrice = hasExplicitZero ? 0 : (savedPrice > 0 ? savedPrice : Number(priceMap[token] || 0));
-            const distDate = (found && winner) ? (found.dist_date || '') : '';
-            const isChecked = (found && winner) ? Boolean(found.dist_checked || distDate) : false;
-
-            return {
-                name: token,
-                sale_type: sType,
-                price: finalPrice,
-                winner,
-                taken_date: found ? (found.taken_date || '') : '',
-                dist_date: distDate,
-                dist_checked: isChecked
-            };
+            return resolveItemObj(token, found);
         });
     },
 
@@ -279,26 +285,79 @@ window.ClanApp = {
     }
 };
 
-const itemFullNameToast = document.createElement('div');
-itemFullNameToast.className = 'item-full-name-toast';
-itemFullNameToast.setAttribute('role', 'status');
-itemFullNameToast.setAttribute('aria-live', 'polite');
-document.body.appendChild(itemFullNameToast);
+// =========================================================================
+// 아이템 별칭 -> 정식 풀네임 안내 박스 (PC 마우스 오버 / 클릭 / 모바일 터치 모두 지원)
+// =========================================================================
+let itemFullNameToast = null;
+let itemFullNameToastTimer = null;
 
-let itemFullNameToastTimer;
+function ensureItemToastElement() {
+    if (itemFullNameToast && document.body.contains(itemFullNameToast)) {
+        return itemFullNameToast;
+    }
+    itemFullNameToast = document.createElement('div');
+    itemFullNameToast.className = 'item-full-name-toast';
+    itemFullNameToast.setAttribute('role', 'status');
+    itemFullNameToast.setAttribute('aria-live', 'polite');
+    document.body.appendChild(itemFullNameToast);
+    return itemFullNameToast;
+}
+
+function showItemFullNameToast(itemLabel, autoHideMs = 2600) {
+    const toast = ensureItemToastElement();
+    const fullName = itemLabel.getAttribute('data-item-full-name') || itemLabel.getAttribute('title') || '';
+    const aliasText = (itemLabel.textContent || '').trim();
+    if (!fullName) return;
+
+    toast.textContent = (aliasText && aliasText !== fullName)
+        ? `💎 ${aliasText} → ${fullName}`
+        : `💎 ${fullName}`;
+    toast.classList.add('visible');
+
+    window.clearTimeout(itemFullNameToastTimer);
+    if (autoHideMs > 0) {
+        itemFullNameToastTimer = window.setTimeout(() => {
+            toast.classList.remove('visible');
+        }, autoHideMs);
+    }
+}
+
+function hideItemFullNameToast() {
+    if (!itemFullNameToast) return;
+    window.clearTimeout(itemFullNameToastTimer);
+    itemFullNameToast.classList.remove('visible');
+}
+
+document.addEventListener('mouseover', event => {
+    const itemLabel = event.target instanceof Element
+        ? event.target.closest('.item-alias-label')
+        : null;
+    if (itemLabel) {
+        showItemFullNameToast(itemLabel, 0);
+    }
+});
+
+document.addEventListener('mouseout', event => {
+    const itemLabel = event.target instanceof Element
+        ? event.target.closest('.item-alias-label')
+        : null;
+    if (itemLabel) {
+        const related = event.relatedTarget instanceof Element
+            ? event.relatedTarget.closest('.item-alias-label')
+            : null;
+        if (related !== itemLabel) {
+            hideItemFullNameToast();
+        }
+    }
+});
+
 document.addEventListener('touchend', event => {
     const itemLabel = event.target instanceof Element
         ? event.target.closest('.item-alias-label')
         : null;
     if (!itemLabel) {
-        itemFullNameToast.classList.remove('visible');
+        hideItemFullNameToast();
         return;
     }
-
-    itemFullNameToast.textContent = itemLabel.dataset.itemFullName || itemLabel.title;
-    itemFullNameToast.classList.add('visible');
-    window.clearTimeout(itemFullNameToastTimer);
-    itemFullNameToastTimer = window.setTimeout(() => {
-        itemFullNameToast.classList.remove('visible');
-    }, 2600);
+    showItemFullNameToast(itemLabel, 2600);
 }, { passive: true });

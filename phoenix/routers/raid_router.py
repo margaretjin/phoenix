@@ -72,6 +72,24 @@ def get_item_master_price_map() -> Dict[str, int]:
     except Exception:
         return {}
 
+def resolve_effective_item_price(item_dict: dict, price_map: Dict[str, int]) -> int:
+    """
+    1순위: 이벤트(sale_type=='이벤트' 또는 수령자가 있는데 price==0) -> 0원
+    2순위: raid_logs.item_details에 저장된 실제 판매가(saved_price > 0) -> saved_price
+    3순위: 판매 전(보유중)이거나 가격 미지정 -> item_master의 default_price
+    """
+    it_name = item_dict.get("name", "")
+    winner_str = (item_dict.get("winner") or "").strip()
+    s_type = item_dict.get("sale_type") or "보유중"
+    saved_price = int(item_dict.get("price") or 0)
+    default_price = price_map.get(it_name, 0)
+
+    if winner_str and (s_type == "이벤트" or saved_price == 0):
+        return 0
+    if saved_price > 0:
+        return saved_price
+    return default_price
+
 def sync_item_details_from_text(dropped_text: str, existing_details: list) -> list:
     tokens = [t.strip() for t in re.split(r'[\s,，\n]+', (dropped_text or '').strip()) if t.strip()]
     price_map = get_item_master_price_map()
@@ -87,18 +105,24 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
                 break
         default_p = price_map.get(token, 0)
         if matched_item:
-            saved_p = int(matched_item.get("price") if matched_item.get("price") is not None else default_p)
-            s_type = matched_item.get("sale_type") or "보유중"
             winner_str = (matched_item.get("winner") or "").strip()
-            if s_type != "이벤트" and saved_p == 0 and not winner_str:
-                saved_p = default_p
-            is_checked = bool(matched_item.get("dist_checked")) if winner_str else False
+            s_type = matched_item.get("sale_type") or "보유중"
+            saved_p = int(matched_item.get("price") if matched_item.get("price") is not None else default_p)
+            if not winner_str:
+                s_type = "보유중"
+                if saved_p == 0:
+                    saved_p = default_p
+            elif s_type == "이벤트" or saved_p == 0:
+                s_type = "이벤트"
+                saved_p = 0
+
+            is_checked = bool(matched_item.get("dist_checked")) if (winner_str and s_type != "이벤트") else False
             synced.append({
                 "name": token,
-                "sale_type": s_type if winner_str else "보유중",
+                "sale_type": s_type,
                 "price": saved_p,
                 "winner": winner_str,
-                "taken_date": matched_item.get("taken_date") or "",
+                "taken_date": (matched_item.get("taken_date") or "") if winner_str else "",
                 "dist_date": (matched_item.get("dist_date") or "") if is_checked else "",
                 "dist_checked": is_checked
             })
@@ -247,10 +271,20 @@ def update_item_details(req: ItemDetailsUpdateRequest):
     for d in req.item_details:
         dump = d.model_dump()
         winner_str = (dump.get("winner") or "").strip()
+        price_val = max(0, int(dump.get("price") or 0))
+        dump["price"] = price_val
+
         if not winner_str:
             dump["sale_type"] = "보유중"
+            dump["taken_date"] = ""
             dump["dist_checked"] = False
             dump["dist_date"] = ""
+        elif price_val == 0 or dump.get("sale_type") == "이벤트":
+            dump["sale_type"] = "이벤트"
+            dump["price"] = 0
+            dump["dist_checked"] = False
+            dump["dist_date"] = ""
+
         details_list.append(dump)
 
     dropped_str = " ".join([d["name"] for d in details_list if d.get("name")])
@@ -261,7 +295,6 @@ def update_item_details(req: ItemDetailsUpdateRequest):
     }).eq("id", req.raid_id).execute()
     return {"status": "updated", "data": res.data[0]}
 
-# [신규 추가] 슈퍼관리자 전용 개별 아이템 삭제 API 엔드포인트
 @router.delete("/item-details/{raid_id}/{item_idx}")
 def delete_single_item_detail(raid_id: int, item_idx: int, role: str):
     if role != "슈퍼관리자":
@@ -277,7 +310,6 @@ def delete_single_item_detail(raid_id: int, item_idx: int, role: str):
     if item_idx < 0 or item_idx >= len(details):
         raise HTTPException(status_code=400, detail="존재하지 않는 아이템 인덱스입니다.")
 
-    # 해당 인덱스의 아이템 제거
     details.pop(item_idx)
     dropped_str = " ".join([d["name"] for d in details if d.get("name")])
 
@@ -401,7 +433,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
 
         details = r.get("item_details") or []
         tax_rate = float(r.get("clan_tax_rate") if r.get("clan_tax_rate") is not None else default_tax)
-        gross_total = sum((0 if d.get("sale_type") == "이벤트" else (int(d.get("price") or 0) or price_map.get(d.get("name", ""), 0))) for d in details)
+        gross_total = sum(resolve_effective_item_price(d, price_map) for d in details)
         net_pool = int(gross_total * (1 - tax_rate / 100.0))
         per_share = (net_pool // p_count) if (p_count > 0 and net_pool > 0) else 0
 
@@ -429,7 +461,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
             for item in details:
                 it_name = item.get("name", "")
                 s_type = item.get("sale_type", "보유중")
-                it_price = 0 if s_type == "이벤트" else (int(item.get("price") or 0) or price_map.get(it_name, 0))
+                it_price = resolve_effective_item_price(item, price_map)
                 chk_str = "O" if item.get("dist_checked") else "X"
                 writer.writerow([
                     r_date, r_time, p_count, p_names,
