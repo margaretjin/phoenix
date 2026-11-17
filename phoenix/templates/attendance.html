@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>참여도 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=29">
-    <link rel="stylesheet" href="/static/attendance.css?v=29">
+    <link rel="stylesheet" href="/static/common.css?v=53">
+    <link rel="stylesheet" href="/static/attendance.css?v=30">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -59,7 +59,7 @@
             </div>
         </section>
 
-        <!-- 2. 전체 혈원 참여도 표 (월 전체순 / 월별 메인탐순 / 월별 09시 / 월별 15시 / 월별 21시 / 월별 22시(오만) / 월별 03시) -->
+        <!-- 2. 전체 혈원 참여도 표 (월 전체순 / 월별 메인탐순 / 월별 09시 / 월별 15시 / 월별 21시 / 월별 23시(오만) / 월별 03시) -->
         <section class="card-box">
             <div class="att-header-row">
                 <span class="section-label">🏆 전체 혈원 월별 참여 횟수 및 메인보스탐 참여도</span>
@@ -69,7 +69,7 @@
                     <button type="button" id="sortBtn_09시" class="sort-tab-btn" onclick="setSortMode('09시')">월별 09시</button>
                     <button type="button" id="sortBtn_15시" class="sort-tab-btn" onclick="setSortMode('15시')">월별 15시</button>
                     <button type="button" id="sortBtn_21시" class="sort-tab-btn" onclick="setSortMode('21시')">월별 21시</button>
-                    <button type="button" id="sortBtn_22시(오만)" class="sort-tab-btn" onclick="setSortMode('22시(오만)')">월별 22시(오만)</button>
+                    <button type="button" id="sortBtn_23시(오만)" class="sort-tab-btn" onclick="setSortMode('23시(오만)')">월별 23시(오만)</button>
                     <button type="button" id="sortBtn_03시" class="sort-tab-btn" onclick="setSortMode('03시')">월별 03시</button>
                 </div>
             </div>
@@ -86,7 +86,7 @@
                             <th class="slot-class-th">월별 09시</th>
                             <th class="slot-class-th">월별 15시</th>
                             <th class="slot-class-th">월별 21시</th>
-                            <th class="slot-class-th">월별 22시(오만)</th>
+                            <th class="slot-class-th">월별 23시(오만)</th>
                             <th class="slot-class-th">월별 03시</th>
                         </tr>
                     </thead>
@@ -98,12 +98,12 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=29"></script>
+    <script src="/static/common.js?v=53"></script>
     <script>
-        const MAIN_SLOTS = ['09시', '15시', '21시', '22시(오만)', '03시'];
+        const MAIN_SLOTS = ['09시', '15시', '21시', '23시(오만)', '03시'];
         let allMembers = [];
         let monthRaids = [];
-        let sortMode = 'monthTotal'; // 'monthTotal' | 'monthMain' | '09시' | '15시' | '21시' | '22시(오만)' | '03시'
+        let sortMode = 'monthTotal';
 
         window.onload = async () => {
             const user = ClanApp.initPage('/attendance');
@@ -125,7 +125,7 @@
 
         function setSortMode(mode) {
             sortMode = mode;
-            ['monthTotal', 'monthMain', '09시', '15시', '21시', '22시(오만)', '03시'].forEach(k => {
+            ['monthTotal', 'monthMain', '09시', '15시', '21시', '23시(오만)', '03시'].forEach(k => {
                 const btn = document.getElementById(`sortBtn_${k}`);
                 if (btn) btn.classList.toggle('active', k === mode);
             });
@@ -149,7 +149,6 @@
             document.getElementById('kpiMonthRaids').textContent = `총 ${activeMonthRaids.length}회`;
             document.getElementById('kpiMonthMainRaids').textContent = `총 ${activeMonthMainRaids.length}회`;
 
-            // 전체 혈원 초기 스탯 맵 생성
             const statsMap = new Map();
             allMembers.forEach(m => {
                 statsMap.set(m.active_id, {
@@ -162,13 +161,12 @@
                         '09시': 0,
                         '15시': 0,
                         '21시': 0,
-                        '22시(오만)': 0,
+                        '23시(오만)': 0,
                         '03시': 0
                     }
                 });
             });
 
-            // 월 전체 참여 및 월별 메인보스탐(09시, 15시, 21시, 22시(오만), 03시) 집계
             monthRaids.forEach(r => {
                 const pList = ClanApp.extractParticipants(r);
                 const isMainSlot = MAIN_SLOTS.includes(r.raid_time);
@@ -230,7 +228,7 @@
                         <td>${fmtSlot(r.slotCounts['09시'])}</td>
                         <td>${fmtSlot(r.slotCounts['15시'])}</td>
                         <td>${fmtSlot(r.slotCounts['21시'])}</td>
-                        <td>${fmtSlot(r.slotCounts['22시(오만)'])}</td>
+                        <td>${fmtSlot(r.slotCounts['23시(오만)'])}</td>
                         <td>${fmtSlot(r.slotCounts['03시'])}</td>
                     </tr>
                 `;

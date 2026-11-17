@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>보스탐 기록 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=14">
-    <link rel="stylesheet" href="/static/raid_record.css?v=13">
+    <link rel="stylesheet" href="/static/common.css?v=53">
+    <link rel="stylesheet" href="/static/raid_record.css?v=14">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -99,7 +99,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=14"></script>
+    <script src="/static/common.js?v=53"></script>
     <script>
         let allMembers = [];
         let aliasMap = {};
@@ -142,7 +142,6 @@
             });
         }
 
-        // 아이템 목록(DB)을 불러와 이름/별칭 -> 정식 아이템명 매핑 생성
         async function loadItemDirectory() {
             itemAliasMap = {};
             try {
@@ -175,7 +174,6 @@
             return null;
         }
 
-        // 입력된 드랍 아이템을 아이템 목록과 매칭 (같은 아이템 여러 개 드랍은 허용)
         function resolveDropItems() {
             const raw = document.getElementById('droppedItemsInput').value;
             const tokens = raw.split(/[\s,，]+/).map(t => t.trim()).filter(Boolean);
@@ -184,7 +182,6 @@
             return tokens.map(tok => {
                 const main = itemAliasMap[tok.toLowerCase()] || null;
                 if (main) return { raw: tok, name: main, isMatched: true, suggestion: null };
-                // 아이템 목록이 비어 있으면(미설정) 입력값을 그대로 인정
                 if (!hasMaster) return { raw: tok, name: tok, isMatched: true, suggestion: null };
                 return { raw: tok, name: tok, isMatched: false, suggestion: findSuggestedItem(tok) };
             });
@@ -246,15 +243,13 @@
             fetchDayRaids();
         }
 
-        // 주황색 날짜 표시: 26-11-15 일 15시
+        // 주황색 날짜 표시: 26-11-17 화 06시 / 23시(오만) 그대로 표시
         function formatHeaderLabel(dateStr, timeLabel) {
             const [y, m, d] = dateStr.split('-').map(Number);
             const wd = ['일', '월', '화', '수', '목', '금', '토'][new Date(y, m - 1, d).getDay()];
-            const hh = String(ClanApp.parseRaidHour(timeLabel)).padStart(2, '0');
-            return `${String(y).slice(2)}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} ${wd} ${hh}시`;
+            return `${String(y).slice(2)}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} ${wd} ${timeLabel}`;
         }
 
-        // 파티장/파티원 중복 아이디 제거 (파티장은 파티원 목록에서 제외)
         function uniqueMembers(leader, members) {
             const seen = new Set([leader]);
             const out = [];
@@ -290,7 +285,7 @@
 
                 return `
                     <button type="button"
-                            class="common-time-btn hour-btn ${status} ${isActive ? 'active' : ''}"
+                            class="common-time-btn hour-btn ${status} ${isRecorded ? 'recorded' : ''} ${isActive ? 'active' : ''}"
                             onclick="selectHour('${hr}')">
                         <span>${hr}</span>
                         <span class="common-time-sub hour-status-tag">${statusText}</span>
@@ -351,7 +346,6 @@
             previewParties = [];
             const rowHtmlList = [];
 
-            // 이미 이 시간대에 등록된 아이디 + 이번 입력 앞줄에서 쓴 아이디는 중복 처리
             const curRec = currentDayRaids.find(x => x.raid_time === selectedHour);
             const usedIds = new Set(ClanApp.extractParticipants(curRec).map(x => x.id));
 
@@ -458,7 +452,6 @@
             }
         }
 
-        // 중복 표시된 아이디를 터치하면 해당 줄에서 그 아이디(별칭 포함)를 삭제
         function removeDuplicate(lineIdx, name) {
             const textarea = document.getElementById('participantTextarea');
             const lines = textarea.value.split(/\n+/).map(l => l.trim()).filter(Boolean);
@@ -538,7 +531,6 @@
             }
         }
 
-        // 드랍 아이템 전용 등록 (기존 파티 기록은 그대로 유지, 아이템만 추가)
         async function submitDropItems() {
             const dropItems = resolveDropItems();
             if (dropItems.length === 0) {
@@ -549,7 +541,6 @@
             }
 
             const isAdminOn = ClanApp.isAdminModeOn;
-            // 서버가 기존 아이템 목록 뒤에 add_items를 추가함 (기존 파티/아이템은 그대로 유지)
             const payload = {
                 raid_date: selectedDate,
                 raid_time: selectedHour,
@@ -584,7 +575,6 @@
             const uniqueAll = ClanApp.extractParticipants(rec);
             badgeEl.textContent = `총 ${parties.length}파티 (${uniqueAll.length}명)`;
 
-            // 아이템 박스 (같은 아이템은 개수로 묶어서 표시)
             const itemBox = document.getElementById('recordedItemBox');
             const itemNames = ClanApp.extractItemDetails(rec).map(i => i.name);
             const countMap = new Map();

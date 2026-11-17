@@ -10,8 +10,8 @@ from database import supabase
 router = APIRouter(prefix="/api/raids", tags=["Raids"])
 
 RAID_TIMES = [
-    "01시", "03시", "05시", "07시", "09시", "11시", "12시", "13시",
-    "15시", "17시", "18시", "19시", "21시", "22시(오만)", "23시", "24시"
+    "01시", "03시", "05시", "06시", "07시", "09시", "11시", "12시",
+    "13시", "15시", "17시", "18시", "19시", "21시", "23시(오만)", "24시"
 ]
 
 class PartyInfo(BaseModel):
@@ -73,11 +73,6 @@ def get_item_master_price_map() -> Dict[str, int]:
         return {}
 
 def resolve_effective_item_price(item_dict: dict, price_map: Dict[str, int]) -> int:
-    """
-    1순위: 이벤트(sale_type=='이벤트' 또는 수령자가 있는데 price==0) -> 0원
-    2순위: raid_logs.item_details에 저장된 실제 판매가(saved_price > 0) -> saved_price
-    3순위: 판매 전(보유중)이거나 가격 미지정 -> item_master의 default_price
-    """
     it_name = item_dict.get("name", "")
     winner_str = (item_dict.get("winner") or "").strip()
     s_type = item_dict.get("sale_type") or "보유중"

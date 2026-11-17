@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>일별 기록 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=52">
+    <link rel="stylesheet" href="/static/common.css?v=53">
     <link rel="stylesheet" href="/static/raid_status.css?v=18">
 </head>
 <body>
@@ -97,7 +97,7 @@
         </div>
     </main>
 
-    <script src="/static/common.js?v=52"></script>
+    <script src="/static/common.js?v=53"></script>
     <script>
         let selectedDate = '';
         let selectedTime = '';
@@ -167,8 +167,7 @@
         function formatHeaderLabel(dateStr, timeLabel) {
             const [y, m, d] = dateStr.split('-').map(Number);
             const wd = ['일', '월', '화', '수', '목', '금', '토'][new Date(y, m - 1, d).getDay()];
-            const hh = String(ClanApp.parseRaidHour(timeLabel)).padStart(2, '0');
-            return `${String(y).slice(2)}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} ${wd} ${hh}시`;
+            return `${String(y).slice(2)}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} ${wd} ${timeLabel}`;
         }
 
         function uniqueMembers(leader, members) {
@@ -297,7 +296,6 @@
 
             document.getElementById('slotParticipantCount').textContent = `총 ${parties.length}파티 (${pCount}명)`;
 
-            // 아이템 총액 및 혈비 20% 제외 후 1인당 분배금 계산
             const totalItemPrice = editableItems.reduce((acc, it) => acc + getEffectiveItemPrice(it), 0);
             const netPool = Math.floor(totalItemPrice * 0.8);
             const perMemberShare = (pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
@@ -346,7 +344,6 @@
             if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
         }
 
-        // 드랍 아이템 내역: 각 아이템 가격 옆에 '아데나' 빼고 숫자만 표시
         function renderItemDetailsSection() {
             const itemContainer = document.getElementById('slotItemList');
 

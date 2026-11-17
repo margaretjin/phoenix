@@ -8,11 +8,11 @@ window.ClanApp = {
     itemAliases: Object.create(null),
 
     RAID_TIMES: [
-        '01시', '03시', '05시', '07시', '09시', '11시', '12시', '13시',
-        '15시', '17시', '18시', '19시', '21시', '22시(오만)', '23시', '24시'
+        '01시', '03시', '05시', '06시', '07시', '09시', '11시', '12시',
+        '13시', '15시', '17시', '18시', '19시', '21시', '23시(오만)', '24시'
     ],
 
-    MAIN_RAID_TIMES: ['09시', '15시', '21시', '22시(오만)', '03시'],
+    MAIN_RAID_TIMES: ['09시', '15시', '21시', '23시(오만)', '03시'],
 
     initPage(activePath, onAdminToggleCallback = null) {
         const saved = localStorage.getItem('clan_user');
@@ -189,10 +189,6 @@ window.ClanApp = {
         return `<span class="item-alias-label" data-item-full-name="${safeName}" title="${safeName}">${alias}</span>`;
     },
 
-    // 전 페이지 공통 가격 추출 로직:
-    // 1순위: 이벤트(수령자 존재 + 가격 0 또는 이벤트 타입) -> 0원
-    // 2순위: raid_logs.item_details에 저장된 실제 판매가(savedPrice > 0) -> 실제 판매가
-    // 3순위: 아직 미판매(보유중)이거나 가격 미지정(0) -> item_master의 기본 정책가(priceMap)
     extractItemDetails(record, priceMap = {}) {
         if (!record) return [];
         const rawTokens = (record.dropped_items || '').split(/[\s,，\n]+/).map(s => s.trim()).filter(Boolean);
@@ -285,9 +281,6 @@ window.ClanApp = {
     }
 };
 
-// =========================================================================
-// 아이템 별칭 -> 정식 풀네임 안내 박스 (PC 마우스 오버 / 클릭 / 모바일 터치 모두 지원)
-// =========================================================================
 let itemFullNameToast = null;
 let itemFullNameToastTimer = null;
 
