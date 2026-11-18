@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>참여내역 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=38">
-    <link rel="stylesheet" href="/static/my_history.css?v=37">
+    <link rel="stylesheet" href="/static/common.css?v=58">
+    <link rel="stylesheet" href="/static/my_history.css?v=39">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -28,7 +28,7 @@
             </div>
         </div>
 
-        <!-- 1. 캐릭터 프로필 & 조회 조건 (디폴트: 월별 / 순서: 월별 -> 일별 -> 전체) -->
+        <!-- 1. 캐릭터 프로필 & 조회 조건 -->
         <section class="card-box">
             <div class="history-profile-grid">
                 <div>
@@ -59,7 +59,6 @@
                     </select>
                 </div>
 
-                <!-- 조회 단위: 디폴트 월별, 순서: 월별 -> 일별 -> 전체 -->
                 <div class="history-filter-field">
                     <label>조회 단위</label>
                     <select id="historyPeriodMode" class="input-common" onchange="onHistoryPeriodModeChange()">
@@ -116,7 +115,7 @@
             <div id="myCommonTimeGrid" class="common-time-grid"></div>
         </section>
 
-        <!-- 3. 참여 보스탐 아이템 및 분배금 수령 내역 (보스탐 | 아이템 | 혈비제외가 | 참여인원 | 내분배금 | 혈분배일 | 분배금수령상태) -->
+        <!-- 3. 참여 보스탐 아이템 및 분배금 수령 내역 -->
         <section class="card-box">
             <div class="history-items-header">
                 <span class="section-label">💎 참여 보스탐 아이템 및 분배금 수령 내역</span>
@@ -148,7 +147,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=38"></script>
+    <script src="/static/common.js?v=58"></script>
     <script>
         let currentTaxRate = 20;
         let allMembers = [];
@@ -180,6 +179,27 @@
         function toShortDate(dateStr) {
             if (!dateStr || dateStr.length < 8) return '-';
             return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
+        }
+
+        function getHistoryItemDistInfo(raid, itemIdx, itemDistDate, memberId) {
+            const distMap = (raid && raid.distributions) || {};
+            const dDate = (itemDistDate || '').trim();
+            if (dDate && distMap[`${memberId}__date_${dDate}`]) {
+                return distMap[`${memberId}__date_${dDate}`];
+            }
+            const perKey = `${memberId}__item_${itemIdx}`;
+            if (distMap[perKey]) return distMap[perKey];
+
+            const legacy = distMap[memberId];
+            if (!legacy) return { status: '분배대기', method: '본인수령', proxy_name: '', paid_date: '' };
+
+            if (legacy.status === '분배완료') {
+                const paidDate = (legacy.paid_date || '').trim();
+                if (paidDate && dDate && dDate > paidDate) {
+                    return { status: '분배대기', method: '본인수령', proxy_name: '', paid_date: '' };
+                }
+            }
+            return legacy;
         }
 
         async function loadTaxRate() {
@@ -372,19 +392,16 @@
 
                 const memberCount = participants.length;
                 const details = ClanApp.extractItemDetails(r, itemPriceMap);
-                const distInfo = ((r.distributions || {})[targetId]) || {
-                    status: '분배대기',
-                    method: '본인수령',
-                    proxy_name: '',
-                    paid_date: ''
-                };
-                const isDone = distInfo.status === '분배완료';
 
-                details.forEach(item => {
+                details.forEach((item, idx) => {
                     if (kw && !item.name.toLowerCase().includes(kw) && !ClanApp.getItemAlias(item.name).toLowerCase().includes(kw)) return;
 
-                    const clanDistDate = item.dist_date || '';
-                    const myPaidDate = distInfo.paid_date || '';
+                    const sType = item.sale_type || '보유중';
+                    const isNonDistType = (sType === '연합' || sType === '이벤트');
+                    const clanDistDate = isNonDistType ? '' : (item.dist_date || '');
+                    const distInfo = getHistoryItemDistInfo(r, idx, clanDistDate, targetId);
+                    const isDone = isNonDistType ? true : (distInfo.status === '분배완료');
+                    const myPaidDate = isNonDistType ? '' : (distInfo.paid_date || '');
 
                     let compareDate = r.raid_date;
                     if (basis === 'dist_date') {
@@ -395,7 +412,7 @@
 
                     if (!matchesDateFilter(compareDate, periodMode, refDateVal, refMonthVal)) return;
 
-                    const grossPrice = Number(item.price || 0);
+                    const grossPrice = isNonDistType ? 0 : Number(item.price || 0);
                     const netPrice = Math.floor(grossPrice * (1 - currentTaxRate / 100));
                     const myItemShare = (memberCount > 0 && netPrice > 0) ? Math.floor(netPrice / memberCount) : 0;
 
@@ -404,6 +421,7 @@
                         raid_time: r.raid_time,
                         memberCount,
                         item_name: item.name,
+                        sale_type: sType,
                         net_price: netPrice,
                         my_share: myItemShare,
                         clan_dist_date: clanDistDate,
@@ -434,13 +452,11 @@
 
             const totalMyShare = targetRows.reduce((acc, cur) => acc + cur.my_share, 0);
 
-            // 열 구성: 보스탐 | 아이템 | 혈비제외가 | 참여인원 | 내분배금 | 혈분배일 | 분배금수령상태
-            // - 보스탐, 혈비제외가, 참여인원 3개는 참여인원 색상(same-member-color, #d4d4d8)으로 통일
-            // - 아이템은 노란색(drop-item-name) 그대로 유지
-            // - 분배금수령상태: 본인수령 (본인아이디또는 쫄아이디) 받은날짜 / 대리수령 (대리수령아이디) 받은날짜
             const rowsHtml = targetRows.map(row => {
                 let statusHtml = '';
-                if (row.is_done) {
+                if (row.sale_type === '연합' || row.sale_type === '이벤트') {
+                    statusHtml = `<span class="badge-gray-done">${row.sale_type} (분배제외)</span>`;
+                } else if (row.is_done) {
                     const methodLabel = row.method === '대리수령'
                         ? `대리수령 (${row.receiver_id})`
                         : `본인수령 (${row.receiver_id})`;

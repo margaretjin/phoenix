@@ -65,6 +65,20 @@
     line-height: 1.25;
 }
 
+/* 획득일 + 시간 1칸 통합 및 (새벽) 소형 표시 */
+.raid-datetime-unified {
+    color: #e5e7eb;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.dawn-sub-tag {
+    font-size: 10px;
+    color: #9ca3af;
+    font-weight: 600;
+    margin-left: 2px;
+}
+
 /* 보유상태 배지 */
 .sale-badge {
     display: inline-block;
@@ -86,6 +100,12 @@
     color: #60a5fa;
 }
 
+.sale-badge.type-연합 {
+    background-color: rgba(20, 184, 166, 0.18);
+    border: 1px solid #14b8a6;
+    color: #2dd4bf;
+}
+
 .sale-badge.type-외판 {
     background-color: rgba(34, 197, 94, 0.18);
     border: 1px solid #22c55e;
@@ -98,7 +118,7 @@
     color: #c084fc;
 }
 
-/* 분배상태 배지 (분배대기 / 분배중 / 분배완료) */
+/* 분배상태 배지 (분배대기 / 분배시작 / 분배중(2/6) / 분배완료(6/6)-회색) */
 .dist-state-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -113,6 +133,12 @@
     color: #fbbf24;
 }
 
+.dist-state-badge.state-분배시작 {
+    background-color: rgba(34, 197, 94, 0.18);
+    border: 1px solid #22c55e;
+    color: #4ade80;
+}
+
 .dist-state-badge.state-분배중 {
     background-color: rgba(59, 130, 246, 0.18);
     border: 1px solid #3b82f6;
@@ -120,9 +146,9 @@
 }
 
 .dist-state-badge.state-분배완료 {
-    background-color: rgba(34, 197, 94, 0.18);
-    border: 1px solid #22c55e;
-    color: #4ade80;
+    background-color: #27272a;
+    border: 1px solid #52525b;
+    color: #9ca3af;
 }
 
 /* 입력창 */
@@ -133,6 +159,12 @@
     padding: 4px 6px;
     color: #ffffff;
     font-size: 12px;
+}
+
+.tbl-hold-select {
+    width: 74px;
+    font-weight: 700;
+    padding: 4px 2px;
 }
 
 .tbl-price-input {

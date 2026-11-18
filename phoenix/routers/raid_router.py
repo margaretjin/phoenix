@@ -29,7 +29,7 @@ class RaidSaveRequest(BaseModel):
 
 class ItemDetailEntry(BaseModel):
     name: str
-    sale_type: str = "보유중"       # "보유중" | "내판" | "외판" | "이벤트"
+    sale_type: str = "보유중"       # "보유중" | "내판" | "연합" | "외판" | "이벤트"
     price: int = 0
     winner: str = ""                # 수령자
     taken_date: str = ""            # 판매완료일
@@ -111,7 +111,8 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
                 s_type = "이벤트"
                 saved_p = 0
 
-            is_checked = bool(matched_item.get("dist_checked")) if (winner_str and s_type != "이벤트") else False
+            can_dist = bool(winner_str and s_type in ["내판", "외판"])
+            is_checked = bool(matched_item.get("dist_checked")) if can_dist else False
             synced.append({
                 "name": token,
                 "sale_type": s_type,
@@ -279,6 +280,10 @@ def update_item_details(req: ItemDetailsUpdateRequest):
             dump["price"] = 0
             dump["dist_checked"] = False
             dump["dist_date"] = ""
+        elif dump.get("sale_type") == "연합":
+            # 연합 분배 아이템은 혈맹 분배 체크 및 혈분배일 차단
+            dump["dist_checked"] = False
+            dump["dist_date"] = ""
 
         details_list.append(dump)
 
@@ -428,7 +433,10 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
 
         details = r.get("item_details") or []
         tax_rate = float(r.get("clan_tax_rate") if r.get("clan_tax_rate") is not None else default_tax)
-        gross_total = sum(resolve_effective_item_price(d, price_map) for d in details)
+        gross_total = sum(
+            (0 if d.get("sale_type") in ["이벤트", "연합"] else resolve_effective_item_price(d, price_map))
+            for d in details
+        )
         net_pool = int(gross_total * (1 - tax_rate / 100.0))
         per_share = (net_pool // p_count) if (p_count > 0 and net_pool > 0) else 0
 
@@ -457,7 +465,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
                 it_name = item.get("name", "")
                 s_type = item.get("sale_type", "보유중")
                 it_price = resolve_effective_item_price(item, price_map)
-                chk_str = "O" if item.get("dist_checked") else "X"
+                chk_str = "O" if (item.get("dist_checked") and s_type in ["내판", "외판"]) else "X"
                 writer.writerow([
                     r_date, r_time, p_count, p_names,
                     it_name, s_type, it_price,

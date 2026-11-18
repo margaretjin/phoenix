@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=52">
-    <link rel="stylesheet" href="/static/item_status.css?v=52">
+    <link rel="stylesheet" href="/static/common.css?v=59">
+    <link rel="stylesheet" href="/static/item_status.css?v=59">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -51,24 +51,26 @@
                     <input type="text" class="input-common" value="전체 기간 누적" disabled>
                 </div>
 
-                <!-- 보유상태 필터 -->
+                <!-- 보유상태 필터 (연합 포함) -->
                 <div class="filter-field">
                     <label>보유상태</label>
                     <select id="holdStateFilter" class="input-common" onchange="renderItemTable()">
                         <option value="all">전체아이템현황</option>
                         <option value="보유중">보유중</option>
                         <option value="내판">내판</option>
+                        <option value="연합">연합</option>
                         <option value="외판">외판</option>
                         <option value="이벤트">이벤트</option>
                     </select>
                 </div>
 
-                <!-- 분배상태 필터 -->
+                <!-- 분배상태 필터 (분배대기 / 분배시작 / 분배중 / 분배완료) -->
                 <div class="filter-field">
                     <label>분배상태</label>
                     <select id="distStateFilter" class="input-common" onchange="renderItemTable()">
                         <option value="all">전체 분배상태</option>
                         <option value="분배대기">분배대기</option>
+                        <option value="분배시작">분배시작</option>
                         <option value="분배중">분배중</option>
                         <option value="분배완료">분배완료</option>
                     </select>
@@ -92,8 +94,7 @@
                 <table class="item-status-table">
                     <thead>
                         <tr>
-                            <th>획득일</th>
-                            <th>시간</th>
+                            <th>획득일시</th>
                             <th>아이템명</th>
                             <th>보유상태</th>
                             <th>분배상태</th>
@@ -106,14 +107,14 @@
                         </tr>
                     </thead>
                     <tbody id="itemStatusTableBody">
-                        <tr><td colspan="11" class="empty-party-msg">조회 중...</td></tr>
+                        <tr><td colspan="10" class="empty-party-msg">조회 중...</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
     </main>
 
-    <script src="/static/common.js?v=52"></script>
+    <script src="/static/common.js?v=59"></script>
     <script>
         let allMembers = [];
         let clanCharPool = [];
@@ -122,6 +123,7 @@
         let flattenedItems = [];
         let editingItemKeys = new Set();
         let activeSuggestIdxMap = {};
+        const DAWN_SLOTS = new Set(['01시', '03시', '05시']);
 
         window.onload = async () => {
             const user = ClanApp.initPage('/item-status', () => {
@@ -158,6 +160,15 @@
         function toShortDate(dateStr) {
             if (!dateStr || dateStr.length < 8) return '-';
             return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
+        }
+
+        function formatRaidDateTimeCell(dateStr, timeStr) {
+            const shortDate = toShortDate(dateStr);
+            const t = (timeStr || '').trim();
+            const dawnTag = DAWN_SLOTS.has(t)
+                ? `<span class="dawn-sub-tag">(새벽)</span>`
+                : '';
+            return `<span class="raid-datetime-unified">${shortDate} ${t}${dawnTag}</span>`;
         }
 
         async function loadMembersForAutocomplete() {
@@ -222,55 +233,83 @@
             }
         }
 
-        // 수령자 및 가격에 따른 보유상태 자동 분류:
-        // - 수령자 없음 -> '보유중'
-        // - 혈원 수령 + 가격 0 -> '이벤트'
-        // - 혈원 수령 + 가격 > 0 -> '내판'
-        // - 비혈원(외부인) 수령 -> '외판'
-        function computeHoldState(winnerRaw, priceVal) {
+        function computeHoldState(winnerRaw, priceVal, preferredSaleType = '') {
             const w = (winnerRaw || '').trim();
             const p = Number(priceVal || 0);
 
             if (!w) {
                 return '보유중';
             }
+            if (p === 0 || preferredSaleType === '이벤트') {
+                return '이벤트';
+            }
+            if (preferredSaleType === '연합') {
+                return '연합';
+            }
             const isClanMember = clanCharSet.has(w.toLowerCase());
             if (isClanMember) {
-                return p === 0 ? '이벤트' : '내판';
+                return '내판';
             }
-            return p === 0 ? '이벤트' : '외판';
+            return '외판';
         }
 
-        function computeDistState(record, item) {
+        function isDistributableHoldState(holdState) {
+            return holdState === '내판' || holdState === '외판';
+        }
+
+        // [수정] 분배상태 4단계 및 인원수(doneCount/pCount) 계산
+        // 1) 체크 안 됨(또는 보유중/연합/이벤트) -> '분배대기'
+        // 2) 체크됨(dist_checked) + 아직 혈분배일(dist_date) 미입력 -> '분배시작'
+        // 3) 혈분배일(dist_date) 입력됨 + 미완료 -> '분배중' / 표기: '분배중(2/6)'
+        // 4) 혈분배일 입력됨 + 전원 수령 완료 -> '분배완료' / 표기: '분배완료(6/6)'
+        function computeDistStateInfo(record, item, itemIdx = 0) {
             const winner = (item.winner || '').trim();
-            const holdState = computeHoldState(winner, item.price);
+            const holdState = computeHoldState(winner, item.price, item.sale_type);
             const distDate = (item.dist_date || '').trim();
-
-            if (!winner || holdState === '이벤트') {
-                return '분배대기';
-            }
-
-            if (!distDate) {
-                return '분배대기';
-            }
+            const isChecked = Boolean(item.dist_checked || distDate);
 
             const participants = ClanApp.extractParticipants(record);
-            const distMap = record.distributions || {};
+            const distMap = (record && record.distributions) || {};
             const pCount = participants.length;
 
-            if (pCount > 0) {
-                let doneCount = 0;
+            let doneCount = 0;
+            if (pCount > 0 && distDate) {
                 participants.forEach(p => {
-                    if ((distMap[p.id] || {}).status === '분배완료') {
+                    const dateInfo = distMap[`${p.id}__date_${distDate}`];
+                    const itemInfo = distMap[`${p.id}__item_${itemIdx}`];
+                    const legacyInfo = distMap[p.id];
+                    let st = '';
+                    if (dateInfo) {
+                        st = dateInfo.status;
+                    } else if (itemInfo) {
+                        st = itemInfo.status;
+                    } else if (legacyInfo) {
+                        const paidDate = (legacyInfo.paid_date || '').trim();
+                        if (legacyInfo.status === '분배완료' && paidDate && distDate > paidDate) {
+                            st = '분배대기';
+                        } else {
+                            st = legacyInfo.status;
+                        }
+                    }
+                    if (st === '분배완료') {
                         doneCount++;
                     }
                 });
-                if (doneCount === pCount) {
-                    return '분배완료';
-                }
             }
 
-            return '분배중';
+            if (!winner || !isDistributableHoldState(holdState) || !isChecked) {
+                return { state: '분배대기', label: '분배대기', doneCount: 0, totalCount: pCount };
+            }
+
+            if (!distDate) {
+                return { state: '분배시작', label: '분배시작', doneCount: 0, totalCount: pCount };
+            }
+
+            if (pCount > 0 && doneCount === pCount) {
+                return { state: '분배완료', label: `분배완료(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
+            }
+
+            return { state: '분배중', label: `분배중(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
         }
 
         function onViewModeChange() {
@@ -333,15 +372,20 @@
                     const winner = (item.winner || '').trim();
                     const price = Number(item.price || 0);
                     const policyPrice = Number(itemPriceMap[item.name] || 0);
-                    const holdState = computeHoldState(winner, price);
-                    const distState = computeDistState(r, item);
-                    const canDist = (holdState === '내판' || holdState === '외판');
-                    const distDate = canDist ? (item.dist_date || '').trim() : '';
-
                     const rawObj = rawSavedDetails[idx] || {};
+                    const holdState = computeHoldState(winner, price, rawObj.sale_type || item.sale_type);
+
+                    const canDist = isDistributableHoldState(holdState);
+                    const distDate = canDist ? (item.dist_date || '').trim() : '';
                     const isChecked = canDist
                         ? (distDate ? true : Boolean(rawObj.dist_checked))
                         : false;
+
+                    const distInfo = computeDistStateInfo(
+                        r,
+                        { ...item, sale_type: holdState, dist_date: distDate, dist_checked: isChecked },
+                        idx
+                    );
 
                     flattenedItems.push({
                         key: `${r.id}_${idx}`,
@@ -351,7 +395,8 @@
                         raid_time: r.raid_time,
                         name: item.name,
                         hold_state: holdState,
-                        dist_state: distState,
+                        dist_state: distInfo.state,
+                        dist_label: distInfo.label,
                         price,
                         policy_price: policyPrice,
                         winner,
@@ -491,33 +536,56 @@
             }
         }
 
-        function onLiveWinnerOrPriceInput(i, currentDistDate) {
+        function onLiveWinnerOrPriceInput(i, currentDistDate, manualHoldChange = false) {
             const winnerEl = document.getElementById(`stWinner_${i}`);
             const priceEl = document.getElementById(`stPrice_${i}`);
-            const holdBadgeEl = document.getElementById(`stLiveHoldBadge_${i}`);
+            const holdSelectEl = document.getElementById(`stHoldSelect_${i}`);
             const distBadgeEl = document.getElementById(`stLiveDistBadge_${i}`);
             const checkCellWrap = document.getElementById(`stCheckCellWrap_${i}`);
+            const chkEl = document.getElementById(`stDistChk_${i}`);
 
             const wVal = winnerEl ? winnerEl.value.trim() : '';
             const pVal = priceEl ? Number(priceEl.value || 0) : 0;
-            const newHold = computeHoldState(wVal, pVal);
-            const tempItem = { winner: wVal, price: pVal, dist_date: currentDistDate };
-            const targetRow = getFilteredItems()[i];
-            const newDist = computeDistState(targetRow ? targetRow.record_ref : { distributions: {} }, tempItem);
 
-            if (holdBadgeEl) {
-                holdBadgeEl.className = `sale-badge type-${newHold}`;
-                holdBadgeEl.textContent = newHold;
+            let newHold = '보유중';
+            if (manualHoldChange && holdSelectEl) {
+                newHold = holdSelectEl.value;
+                if (newHold === '이벤트' && priceEl) {
+                    priceEl.value = 0;
+                }
+            } else {
+                const preferred = (holdSelectEl && holdSelectEl.value === '연합') ? '연합' : '';
+                newHold = computeHoldState(wVal, pVal, preferred);
+                if (holdSelectEl) {
+                    holdSelectEl.value = newHold;
+                }
             }
+
+            const targetRow = getFilteredItems()[i];
+            const canDist = isDistributableHoldState(newHold);
+            const isCurrentlyChecked = canDist && Boolean((chkEl && chkEl.checked) || (targetRow && targetRow.dist_checked));
+            const tempItem = {
+                winner: wVal,
+                price: newHold === '이벤트' ? 0 : pVal,
+                sale_type: newHold,
+                dist_date: canDist ? currentDistDate : '',
+                dist_checked: isCurrentlyChecked
+            };
+            const distInfo = computeDistStateInfo(
+                targetRow ? targetRow.record_ref : { distributions: {} },
+                tempItem,
+                targetRow ? targetRow.item_idx : 0
+            );
+
             if (distBadgeEl) {
-                distBadgeEl.className = `dist-state-badge state-${newDist}`;
-                distBadgeEl.textContent = newDist;
+                distBadgeEl.className = `dist-state-badge state-${distInfo.state}`;
+                distBadgeEl.textContent = distInfo.label;
             }
             if (checkCellWrap) {
-                const canDist = (newHold === '내판' || newHold === '외판');
                 if (canDist) {
                     checkCellWrap.innerHTML = `
                         <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
+                               ${isCurrentlyChecked ? 'checked' : ''}
                                title="체크 시 분배금 관리로 넘어갑니다."
                                onchange="onDistCheckToggle(${i})">
                     `;
@@ -551,7 +619,7 @@
             const tbody = document.getElementById('itemStatusTableBody');
             const isAdmin = ClanApp.isAdminModeOn;
             const isSuperAdmin = ClanApp.isSuperAdmin;
-            const colSpan = isAdmin ? 11 : 9;
+            const colSpan = isAdmin ? 10 : 8;
 
             if (filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty-party-msg">조회된 아이템 내역이 없습니다.</td></tr>`;
@@ -559,33 +627,28 @@
             }
 
             tbody.innerHTML = filtered.map((row, i) => {
-                const shortDate = toShortDate(row.raid_date);
+                const dateTimeHtml = formatRaidDateTimeCell(row.raid_date, row.raid_time);
                 const holdBadgeHtml = `<span class="sale-badge type-${row.hold_state}">${row.hold_state}</span>`;
-                const distBadgeHtml = `<span class="dist-state-badge state-${row.dist_state}">${row.dist_state}</span>`;
+                const distBadgeHtml = `<span class="dist-state-badge state-${row.dist_state}">${row.dist_label}</span>`;
                 const priceDisplay = formatPriceWithPolicyHint(row);
 
                 const distDateHtml = row.dist_date
                     ? `<span class="dist-date-text">${toShortDate(row.dist_date)}</span>`
                     : '-';
 
-                const canCheck = (row.hold_state === '내판' || row.hold_state === '외판');
+                const canCheck = isDistributableHoldState(row.hold_state);
 
+                // 일반회원 뷰: 체크 열 없음 (총 8열)
                 if (!isAdmin) {
-                    const userCheckDisplay = row.dist_checked
-                        ? `<span style="color:#60a5fa; font-weight:800;">✔</span>`
-                        : `<span style="color:#52525b;">-</span>`;
-
                     return `
                         <tr>
-                            <td>${shortDate}</td>
-                            <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
+                            <td>${dateTimeHtml}</td>
                             <td style="color:#fbbf24; font-weight:800;">${ClanApp.itemNameHtml(row.name)}</td>
                             <td>${holdBadgeHtml}</td>
                             <td>${distBadgeHtml}</td>
                             <td style="color:#4ade80; font-weight:700;">${priceDisplay}</td>
                             <td style="color:#a7f3d0; font-weight:700;">${row.winner || '-'}</td>
                             <td>${row.taken_date ? toShortDate(row.taken_date) : '-'}</td>
-                            <td>${userCheckDisplay}</td>
                             <td>${distDateHtml}</td>
                         </tr>
                     `;
@@ -609,8 +672,7 @@
                 if (!isEditingRow) {
                     return `
                         <tr>
-                            <td>${shortDate}</td>
-                            <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
+                            <td>${dateTimeHtml}</td>
                             <td style="color:#fbbf24; font-weight:800;">${ClanApp.itemNameHtml(row.name)}</td>
                             <td>${holdBadgeHtml}</td>
                             <td>${distBadgeHtml}</td>
@@ -629,14 +691,20 @@
 
                 return `
                     <tr>
-                        <td>${shortDate}</td>
-                        <td style="color:#ff5722; font-weight:800;">${row.raid_time}</td>
+                        <td>${dateTimeHtml}</td>
                         <td style="color:#fbbf24; font-weight:800;">${ClanApp.itemNameHtml(row.name)}</td>
                         <td>
-                            <span id="stLiveHoldBadge_${i}" class="sale-badge type-${row.hold_state}">${row.hold_state}</span>
+                            <select id="stHoldSelect_${i}" class="tbl-input tbl-hold-select"
+                                    onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}', true)">
+                                <option value="보유중" ${row.hold_state === '보유중' ? 'selected' : ''}>보유중</option>
+                                <option value="내판" ${row.hold_state === '내판' ? 'selected' : ''}>내판</option>
+                                <option value="연합" ${row.hold_state === '연합' ? 'selected' : ''}>연합</option>
+                                <option value="외판" ${row.hold_state === '외판' ? 'selected' : ''}>외판</option>
+                                <option value="이벤트" ${row.hold_state === '이벤트' ? 'selected' : ''}>이벤트</option>
+                            </select>
                         </td>
                         <td>
-                            <span id="stLiveDistBadge_${i}" class="dist-state-badge state-${row.dist_state}">${row.dist_state}</span>
+                            <span id="stLiveDistBadge_${i}" class="dist-state-badge state-${row.dist_state}">${row.dist_label}</span>
                         </td>
                         <td>
                             <input type="number" id="stPrice_${i}" class="tbl-input tbl-price-input" value="${row.price}" min="0"
@@ -693,14 +761,16 @@
             const priceEl = document.getElementById(`stPrice_${i}`);
             const winnerEl = document.getElementById(`stWinner_${i}`);
             const takenEl = document.getElementById(`stTaken_${i}`);
+            const holdSelectEl = document.getElementById(`stHoldSelect_${i}`);
 
             const rawWinner = winnerEl ? winnerEl.value.trim() : target.winner;
             const price = priceEl ? Number(priceEl.value || 0) : target.price;
-            const holdState = computeHoldState(rawWinner, price);
-            const canCheck = (holdState === '내판' || holdState === '외판');
+            const preferredType = holdSelectEl ? holdSelectEl.value : target.hold_state;
+            const holdState = computeHoldState(rawWinner, price, preferredType);
+            const canCheck = isDistributableHoldState(holdState);
 
             if (!canCheck) {
-                alert('수령자 입력 완료(내판 또는 외판) 상태일 때만 체크할 수 있습니다.');
+                alert('내판 또는 외판 상태일 때만 체크할 수 있습니다. (연합·이벤트·보유중은 체크 불가)');
                 if (chkEl) chkEl.checked = false;
                 return;
             }
@@ -759,14 +829,19 @@
             const winnerInputEl = document.getElementById(`stWinner_${i}`);
             const takenInputEl = document.getElementById(`stTaken_${i}`);
             const chkEl = document.getElementById(`stDistChk_${i}`);
+            const holdSelectEl = document.getElementById(`stHoldSelect_${i}`);
 
             const rawWinner = forcedWinner !== null
                 ? forcedWinner.trim()
                 : (winnerInputEl ? winnerInputEl.value.trim() : target.winner);
 
             const price = priceInputEl ? Number(priceInputEl.value || 0) : target.price;
-            const holdState = computeHoldState(rawWinner, price);
-            const canCheck = (holdState === '내판' || holdState === '외판');
+            const selectedHold = holdSelectEl ? holdSelectEl.value : target.hold_state;
+            const holdState = (rawWinner && selectedHold && selectedHold !== '보유중')
+                ? (price === 0 ? '이벤트' : selectedHold)
+                : computeHoldState(rawWinner, price, selectedHold);
+
+            const canCheck = isDistributableHoldState(holdState);
 
             const taken_date = rawWinner
                 ? ((takenInputEl && takenInputEl.value) ? takenInputEl.value : (target.taken_date || ClanApp.formatYMD(new Date())))
@@ -780,7 +855,7 @@
                     return {
                         name: target.name,
                         sale_type: holdState,
-                        price,
+                        price: holdState === '이벤트' ? 0 : price,
                         winner: rawWinner,
                         taken_date,
                         dist_date,

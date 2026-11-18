@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>분배관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=48">
-    <link rel="stylesheet" href="/static/distribution.css?v=47">
+    <link rel="stylesheet" href="/static/common.css?v=59">
+    <link rel="stylesheet" href="/static/distribution.css?v=59">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -54,6 +54,7 @@
                     <select id="distStatusFilter" class="input-common" onchange="onItemStatusFilterChange(this.value)">
                         <option value="all">전체 분배</option>
                         <option value="wait">분배 대기</option>
+                        <option value="progress">분배중</option>
                         <option value="done">분배 완료</option>
                     </select>
                 </div>
@@ -72,6 +73,7 @@
                 <div class="status-tab-bar">
                     <button type="button" id="tabBtn_all" class="status-tab-btn active" onclick="setItemStatusFilter('all')">전체 분배</button>
                     <button type="button" id="tabBtn_wait" class="status-tab-btn" onclick="setItemStatusFilter('wait')">분배 대기</button>
+                    <button type="button" id="tabBtn_progress" class="status-tab-btn" onclick="setItemStatusFilter('progress')">분배중</button>
                     <button type="button" id="tabBtn_done" class="status-tab-btn" onclick="setItemStatusFilter('done')">분배 완료</button>
                 </div>
             </div>
@@ -98,20 +100,24 @@
             </div>
         </section>
 
-        <!-- 3. 혈분배일 선택 (기준일) 칩 리스트 + 요약 KPI 5칸 -->
+        <!-- 3. 혈분배일 선택 (기준일) 칩 리스트 + 요약 KPI 6칸 (판매된 금액 합계 포함) -->
         <section class="card-box">
             <div class="dist-date-selector-bar">
                 <div class="dist-date-selector-top">
-                    <span class="dist-date-selector-title">📅 혈분배일 선택 (해당 월 기준 목록)</span>
+                    <span class="dist-date-selector-title">📅 혈분배일 선택 (혈분배일 기준으로 분배 정산)</span>
                     <span id="distDateCountHint" class="dist-date-selector-sub">혈분배일 0회</span>
                 </div>
                 <div id="distDateChipContainer" class="dist-date-chips-wrap"></div>
             </div>
 
-            <div class="dist-kpi-strip-5">
+            <div class="dist-kpi-strip-6">
                 <div class="dist-kpi-box">
                     <div class="dist-kpi-label">현재 선택된 혈분배일</div>
-                    <div id="kpiSelectedDateText" class="dist-kpi-val selected-date">전체보기</div>
+                    <div id="kpiSelectedDateText" class="dist-kpi-val selected-date">-</div>
+                </div>
+                <div class="dist-kpi-box">
+                    <div class="dist-kpi-label">판매된 금액 합계</div>
+                    <div id="kpiGrossSalesTotal" class="dist-kpi-val gross-sales">0</div>
                 </div>
                 <div class="dist-kpi-box">
                     <div class="dist-kpi-label">혈비 제외 총 분배금</div>
@@ -132,12 +138,12 @@
             </div>
         </section>
 
-        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 -->
+        <!-- 4. 👥 참여자별 개별 분배금 수령 현황 (혈분배일 기준) -->
         <section class="card-box">
             <div class="dist-member-header">
-                <span class="section-label">👥 참여자별 개별 분배금 수령 현황</span>
+                <span class="section-label">👥 참여자별 개별 분배금 수령 현황 (선택한 혈분배일 기준)</span>
                 <div id="distBulkActionBox" class="admin-only">
-                    <button type="button" class="btn-sm btn-sm-blue" onclick="markAllMergedParticipantsDone()">✔ 전체 분배 완료</button>
+                    <button type="button" class="btn-sm btn-sm-blue" onclick="markAllMergedParticipantsDone()">✔ 선택 혈분배일 전체 분배 완료</button>
                 </div>
             </div>
 
@@ -156,6 +162,7 @@
                     <thead>
                         <tr>
                             <th>참여캐릭</th>
+                            <th>혈분배일</th>
                             <th>분배 아이템 (개별 분배금)</th>
                             <th>1인당<br>분배금</th>
                             <th>분배<br>상태</th>
@@ -165,14 +172,14 @@
                         </tr>
                     </thead>
                     <tbody id="distParticipantTableBody">
-                        <tr><td colspan="7" class="empty-party-msg">분배할 아이템 내역이 없습니다.</td></tr>
+                        <tr><td colspan="8" class="empty-party-msg">분배할 아이템 내역이 없습니다.</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
     </main>
 
-    <script src="/static/common.js?v=48"></script>
+    <script src="/static/common.js?v=59"></script>
     <script>
         let currentTaxRate = 20;
         let itemPriceMap = {};
@@ -181,12 +188,12 @@
         let allRaids = [];
         let checkedEntries = [];
         let editingDistDateKeys = new Set();
-        let unlockedMembers = new Set();
-        let expandedItemMembers = new Set();
+        let unlockedRowKeys = new Set();
+        let expandedItemRowKeys = new Set();
         let memberInputDrafts = {};
         let memberStatusFilter = 'wait';
         let activeReceiverSuggestIdx = {};
-        let selectedKpiDistDate = 'all';
+        let selectedKpiDistDate = '';
 
         window.onload = async () => {
             const user = ClanApp.initPage('/distribution', () => {
@@ -226,6 +233,70 @@
             const end = ClanApp.formatYMD(endObj);
             const shortLabel = `${start.slice(2).replace(/-/g, '.')}~${end.slice(2).replace(/-/g, '.')}`;
             return { start, end, shortLabel };
+        }
+
+        function getDistInfoByDistDate(raid, itemIdx, itemDistDate, memberId) {
+            const distMap = (raid && raid.distributions) || {};
+            const dDate = (itemDistDate || '').trim();
+
+            if (dDate) {
+                const dateKey = `${memberId}__date_${dDate}`;
+                if (distMap[dateKey]) {
+                    return distMap[dateKey];
+                }
+            }
+
+            const itemKey = `${memberId}__item_${itemIdx}`;
+            if (distMap[itemKey]) {
+                return distMap[itemKey];
+            }
+
+            const legacy = distMap[memberId];
+            if (!legacy) {
+                return { status: '분배대기', method: '본인수령', proxy_name: memberId, paid_date: '' };
+            }
+
+            if (legacy.status === '분배완료') {
+                const paidDate = (legacy.paid_date || '').trim();
+                if (paidDate && dDate && dDate > paidDate) {
+                    return { status: '분배대기', method: '본인수령', proxy_name: memberId, paid_date: '' };
+                }
+            }
+            return legacy;
+        }
+
+        function syncRaidLegacyMemberKey(raid, distMap, memberId, latestInfo) {
+            const details = ClanApp.extractItemDetails(raid, itemPriceMap);
+            let allCheckedDone = true;
+            let hasAnyChecked = false;
+
+            details.forEach((it, idx) => {
+                if (!it.dist_checked) return;
+                hasAnyChecked = true;
+                const dDate = (it.dist_date || '').trim();
+                const dateKey = dDate ? `${memberId}__date_${dDate}` : '';
+                const itemKey = `${memberId}__item_${idx}`;
+
+                let st = '분배대기';
+                if (dateKey && distMap[dateKey]) st = distMap[dateKey].status;
+                else if (distMap[itemKey]) st = distMap[itemKey].status;
+                else st = getDistInfoByDistDate(raid, idx, dDate, memberId).status;
+
+                if (st !== '분배완료') {
+                    allCheckedDone = false;
+                }
+            });
+
+            if (hasAnyChecked && allCheckedDone) {
+                distMap[memberId] = { ...latestInfo, status: '분배완료' };
+            } else {
+                distMap[memberId] = {
+                    status: '분배대기',
+                    method: latestInfo.method || '본인수령',
+                    proxy_name: latestInfo.proxy_name || memberId,
+                    paid_date: ''
+                };
+            }
         }
 
         async function loadTaxRate() {
@@ -325,13 +396,13 @@
                 dateLabel.textContent = '혈분배일 선택';
                 dateBox.classList.remove('hidden');
             }
-            selectedKpiDistDate = 'all';
+            selectedKpiDistDate = '';
             renderAllDistViews();
         }
 
         function onTopMonthOrDateFilterChange() {
             updateTopWeekHint();
-            selectedKpiDistDate = 'all';
+            selectedKpiDistDate = '';
             renderAllDistViews();
         }
 
@@ -359,7 +430,7 @@
         }
 
         function syncItemStatusTabUI(statusVal) {
-            ['all', 'wait', 'done'].forEach(k => {
+            ['all', 'wait', 'progress', 'done'].forEach(k => {
                 const btn = document.getElementById(`tabBtn_${k}`);
                 if (btn) btn.classList.toggle('active', k === statusVal);
             });
@@ -387,16 +458,27 @@
                 const details = ClanApp.extractItemDetails(r, itemPriceMap);
                 const participants = ClanApp.extractParticipants(r);
                 const pCount = participants.length;
-                const distMap = r.distributions || {};
-
-                let doneMemberCount = 0;
-                participants.forEach(p => {
-                    if ((distMap[p.id] || {}).status === '분배완료') doneMemberCount++;
-                });
-                const isFullyDone = (pCount > 0 && doneMemberCount === pCount);
 
                 details.forEach((item, idx) => {
                     if (!item.dist_checked) return;
+
+                    const distDate = (item.dist_date || '').trim();
+                    const hasDistDate = Boolean(distDate);
+                    let doneMemberCount = 0;
+
+                    if (hasDistDate) {
+                        participants.forEach(p => {
+                            const pDist = getDistInfoByDistDate(r, idx, distDate, p.id);
+                            if (pDist.status === '분배완료') doneMemberCount++;
+                        });
+                    }
+
+                    const isFullyDone = (hasDistDate && pCount > 0 && doneMemberCount === pCount);
+                    // 상태 구분:
+                    // - 혈분배일 미입력 -> 'wait' (분배대기)
+                    // - 혈분배일 입력됨 + 미완료 -> 'progress' (분배중(0/6) ~ 분배중(5/6))
+                    // - 혈분배일 입력됨 + 전원 완료 -> 'done' (분배완료(6/6))
+                    const itemState = !hasDistDate ? 'wait' : (isFullyDone ? 'done' : 'progress');
 
                     const price = Number(item.price || 0);
                     const netPool = Math.floor(price * (1 - currentTaxRate / 100));
@@ -412,7 +494,8 @@
                         price,
                         net_pool: netPool,
                         per_share: perItemShare,
-                        dist_date: (item.dist_date || '').trim(),
+                        dist_date: distDate,
+                        item_state: itemState,
                         is_done: isFullyDone,
                         done_count: doneMemberCount,
                         participants,
@@ -443,7 +526,8 @@
                 }
 
                 if (kw) {
-                    const matchItem = entry.name.toLowerCase().includes(kw);
+                    const alias = ClanApp.getItemAlias(entry.name).toLowerCase();
+                    const matchItem = entry.name.toLowerCase().includes(kw) || alias.includes(kw);
                     const matchMember = entry.participants.some(p => p.id.toLowerCase().includes(kw));
                     if (!matchItem && !matchMember) return false;
                 }
@@ -456,8 +540,9 @@
             const baseList = getPeriodFilteredEntries();
 
             return baseList.filter(entry => {
-                if (statusFilter === 'wait') return !entry.is_done;
-                if (statusFilter === 'done') return entry.is_done;
+                if (statusFilter === 'wait') return entry.item_state === 'wait';
+                if (statusFilter === 'progress') return entry.item_state === 'progress';
+                if (statusFilter === 'done') return entry.item_state === 'done';
                 return true;
             });
         }
@@ -465,11 +550,13 @@
         function renderDistDateSelectorChips() {
             const periodList = getPeriodFilteredEntries();
             const dateCountMap = new Map();
+            const dateHasWaitMap = new Map();
             let unconfirmedCount = 0;
 
             periodList.forEach(e => {
                 if (e.dist_date) {
                     dateCountMap.set(e.dist_date, (dateCountMap.get(e.dist_date) || 0) + 1);
+                    if (!e.is_done) dateHasWaitMap.set(e.dist_date, true);
                 } else {
                     unconfirmedCount++;
                 }
@@ -477,25 +564,28 @@
 
             const sortedDates = [...dateCountMap.keys()].sort((a, b) => b.localeCompare(a));
 
-            if (selectedKpiDistDate !== 'all' && selectedKpiDistDate !== 'unconfirmed' && !dateCountMap.has(selectedKpiDistDate)) {
-                selectedKpiDistDate = 'all';
-            }
-            if (selectedKpiDistDate === 'unconfirmed' && unconfirmedCount === 0) {
-                selectedKpiDistDate = 'all';
+            const isValidSelection =
+                selectedKpiDistDate === 'all' ||
+                (selectedKpiDistDate === 'unconfirmed' && unconfirmedCount > 0) ||
+                dateCountMap.has(selectedKpiDistDate);
+
+            if (!selectedKpiDistDate || !isValidSelection) {
+                const latestWaitDate = sortedDates.find(d => dateHasWaitMap.get(d));
+                if (latestWaitDate) {
+                    selectedKpiDistDate = latestWaitDate;
+                } else if (sortedDates.length > 0) {
+                    selectedKpiDistDate = sortedDates[0];
+                } else if (unconfirmedCount > 0) {
+                    selectedKpiDistDate = 'unconfirmed';
+                } else {
+                    selectedKpiDistDate = 'all';
+                }
             }
 
             document.getElementById('distDateCountHint').textContent =
                 `조회 기간 내 혈분배일 총 ${sortedDates.length}회 (아이템 ${periodList.length}건)`;
 
             const chipsHtml = [];
-
-            chipsHtml.push(`
-                <button type="button" class="dist-date-chip ${selectedKpiDistDate === 'all' ? 'active' : ''}"
-                        onclick="selectKpiDistDateChip('all')">
-                    <span>전체보기</span>
-                    <span class="chip-cnt">${periodList.length}건</span>
-                </button>
-            `);
 
             sortedDates.forEach(dStr => {
                 const cnt = dateCountMap.get(dStr);
@@ -512,20 +602,28 @@
                 chipsHtml.push(`
                     <button type="button" class="dist-date-chip ${selectedKpiDistDate === 'unconfirmed' ? 'active' : ''}"
                             onclick="selectKpiDistDateChip('unconfirmed')">
-                        <span>미확정</span>
+                        <span>미확정(분배대기)</span>
                         <span class="chip-cnt">${unconfirmedCount}건</span>
                     </button>
                 `);
             }
+
+            chipsHtml.push(`
+                <button type="button" class="dist-date-chip ${selectedKpiDistDate === 'all' ? 'active' : ''}"
+                        onclick="selectKpiDistDateChip('all')">
+                    <span>전체보기</span>
+                    <span class="chip-cnt">${periodList.length}건</span>
+                </button>
+            `);
 
             document.getElementById('distDateChipContainer').innerHTML = chipsHtml.join('');
         }
 
         function selectKpiDistDateChip(targetVal) {
             selectedKpiDistDate = targetVal;
-            expandedItemMembers.clear();
+            expandedItemRowKeys.clear();
             renderDistDateSelectorChips();
-            renderFiveKpiSummary();
+            renderSixKpiSummary();
             renderMergedParticipantsTable();
         }
 
@@ -541,9 +639,9 @@
         }
 
         function renderAllDistViews() {
-            renderCheckedItemsTable();
             renderDistDateSelectorChips();
-            renderFiveKpiSummary();
+            renderCheckedItemsTable();
+            renderSixKpiSummary();
             renderMergedParticipantsTable();
         }
 
@@ -551,7 +649,7 @@
             const list = getStatusFilteredEntries();
             const tbody = document.getElementById('checkedItemTableBody');
             const isAdmin = ClanApp.isAdminModeOn;
-            const defaultInputDate = (selectedKpiDistDate !== 'all' && selectedKpiDistDate !== 'unconfirmed')
+            const defaultInputDate = (selectedKpiDistDate && selectedKpiDistDate !== 'all' && selectedKpiDistDate !== 'unconfirmed')
                 ? selectedKpiDistDate
                 : ClanApp.formatYMD(new Date());
 
@@ -568,9 +666,18 @@
                 const slotText = `${toShortDate(entry.raid_date)} ${entry.raid_time}`;
                 const shortDistDate = hasDistDate ? toShortDate(entry.dist_date) : '미확정';
 
-                const statusBadgeHtml = entry.is_done
-                    ? `<span class="status-badge-done">분배완료 (${entry.done_count}/${pCount})</span>`
-                    : `<span class="status-badge-wait">분배대기 (${entry.done_count}/${pCount})</span>`;
+                // [수정] 분배관리 분배상태 표시:
+                // - 처음 혈분배일 미입력 상태: '분배대기'
+                // - 혈분배일에 날짜가 입력되면: '분배중(0/6)' ~ '분배중(5/6)'
+                // - 모두 분배 완료되면: '분배완료(6/6)'
+                let statusBadgeHtml = '';
+                if (!hasDistDate) {
+                    statusBadgeHtml = `<span class="status-badge-wait">분배대기</span>`;
+                } else if (entry.is_done) {
+                    statusBadgeHtml = `<span class="status-badge-done">분배완료(${entry.done_count}/${pCount})</span>`;
+                } else {
+                    statusBadgeHtml = `<span class="status-badge-progress">분배중(${entry.done_count}/${pCount})</span>`;
+                }
 
                 if (!isAdmin) {
                     return `
@@ -587,7 +694,6 @@
                     `;
                 }
 
-                // [수정] 평소에는 [수정] 버튼만 노출, 수정 모드일 때만 [저장]과 [초기화] 노출
                 if (hasDistDate && !isEditingDate) {
                     return `
                         <tr>
@@ -711,15 +817,17 @@
             }
         }
 
-        function renderFiveKpiSummary() {
+        function renderSixKpiSummary() {
             const dateMatchedEntries = getSelectedKpiDateEntries();
 
             let selectedLabel = '전체보기';
-            if (selectedKpiDistDate === 'unconfirmed') selectedLabel = '미확정 아이템';
-            else if (selectedKpiDistDate !== 'all') selectedLabel = toShortDate(selectedKpiDistDate);
+            if (selectedKpiDistDate === 'unconfirmed') selectedLabel = '미확정(분배대기)';
+            else if (selectedKpiDistDate && selectedKpiDistDate !== 'all') selectedLabel = toShortDate(selectedKpiDistDate);
             document.getElementById('kpiSelectedDateText').textContent = selectedLabel;
 
+            const totalGrossSales = dateMatchedEntries.reduce((acc, e) => acc + Number(e.price || 0), 0);
             const totalNetPool = dateMatchedEntries.reduce((acc, e) => acc + Number(e.net_pool || 0), 0);
+            document.getElementById('kpiGrossSalesTotal').textContent = totalGrossSales.toLocaleString();
             document.getElementById('kpiNetPoolTotal').textContent = totalNetPool.toLocaleString();
 
             if (dateMatchedEntries.length === 0) {
@@ -733,32 +841,31 @@
                 document.getElementById('kpiDistItemsList').innerHTML = itemsHtml;
             }
 
-            const allMemberStatus = new Map();
+            const waitMembersSet = new Set();
+            const doneMembersSet = new Set();
+
             dateMatchedEntries.forEach(entry => {
-                const distObj = entry.raid_ref.distributions || {};
                 entry.participants.forEach(p => {
-                    const isDone = (distObj[p.id] || {}).status === '분배완료';
-                    if (!allMemberStatus.has(p.id)) {
-                        allMemberStatus.set(p.id, isDone);
-                    } else if (!isDone) {
-                        allMemberStatus.set(p.id, false);
+                    const pDist = getDistInfoByDistDate(entry.raid_ref, entry.item_idx, entry.dist_date, p.id);
+                    if (entry.dist_date && pDist.status === '분배완료') {
+                        doneMembersSet.add(p.id);
+                    } else {
+                        waitMembersSet.add(p.id);
                     }
                 });
             });
 
-            let done = 0;
-            let wait = 0;
-            allMemberStatus.forEach(isDone => {
-                if (isDone) done++;
-                else wait++;
+            let pureDoneCount = 0;
+            doneMembersSet.forEach(mId => {
+                if (!waitMembersSet.has(mId)) pureDoneCount++;
             });
 
-            document.getElementById('kpiDoneCount').textContent = `${done}명`;
-            document.getElementById('kpiWaitCount').textContent = `${wait}명`;
+            document.getElementById('kpiDoneCount').textContent = `${pureDoneCount}명`;
+            document.getElementById('kpiWaitCount').textContent = `${waitMembersSet.size}명`;
         }
 
         function getEffectiveFallbackDate() {
-            if (selectedKpiDistDate !== 'all' && selectedKpiDistDate !== 'unconfirmed') {
+            if (selectedKpiDistDate && selectedKpiDistDate !== 'all' && selectedKpiDistDate !== 'unconfirmed') {
                 return selectedKpiDistDate;
             }
             return ClanApp.formatYMD(new Date());
@@ -767,73 +874,82 @@
         function buildMergedParticipantsList() {
             const targetEntries = getSelectedKpiDateEntries();
             const fallbackDate = getEffectiveFallbackDate();
-            const memberMap = new Map();
+            const rowGroupMap = new Map();
 
             targetEntries.forEach(entry => {
                 const raid = entry.raid_ref;
-                const distObj = raid.distributions || {};
+                const distDateKey = entry.dist_date || 'unconfirmed';
+                const effectiveDistDate = entry.dist_date || fallbackDate;
 
                 entry.participants.forEach(p => {
-                    const pDist = distObj[p.id] || {};
-                    const isMemberDoneForThisRaid = (pDist.status === '분배완료');
+                    const pDist = getDistInfoByDistDate(raid, entry.item_idx, entry.dist_date, p.id);
+                    const isItemDone = Boolean(entry.dist_date && pDist.status === '분배완료');
+                    const groupType = isItemDone ? 'done' : 'wait';
 
-                    if (!memberMap.has(p.id)) {
-                        memberMap.set(p.id, {
+                    const rowKey = `${p.id}__${distDateKey}__${groupType}`;
+
+                    if (!rowGroupMap.has(rowKey)) {
+                        rowGroupMap.set(rowKey, {
+                            rowKey,
                             id: p.id,
+                            distDate: entry.dist_date || '',
+                            effectiveDistDate,
                             isLeader: p.isLeader,
+                            isDoneGroup: isItemDone,
                             itemDetails: [],
                             totalShare: 0,
-                            raidIds: new Set(),
-                            allDone: true,
-                            method: '본인수령',
-                            proxy_name: p.id,
-                            paid_date: entry.dist_date || fallbackDate
+                            method: pDist.method || '본인수령',
+                            proxy_name: pDist.proxy_name || p.id,
+                            paid_date: isItemDone ? (pDist.paid_date || effectiveDistDate) : effectiveDistDate
                         });
                     }
-                    const mData = memberMap.get(p.id);
+
+                    const mData = rowGroupMap.get(rowKey);
                     if (p.isLeader) mData.isLeader = true;
                     mData.itemDetails.push({
                         name: entry.name,
                         share: entry.per_share,
-                        raid_id: entry.raid_id
+                        raid_id: entry.raid_id,
+                        item_idx: entry.item_idx,
+                        dist_date: entry.dist_date || ''
                     });
                     mData.totalShare += entry.per_share;
-                    mData.raidIds.add(entry.raid_id);
 
-                    if (!isMemberDoneForThisRaid) {
-                        mData.allDone = false;
-                    }
                     if (pDist.method) mData.method = pDist.method;
                     if (pDist.proxy_name) mData.proxy_name = pDist.proxy_name;
-                    if (pDist.paid_date) mData.paid_date = pDist.paid_date;
+                    if (isItemDone && pDist.paid_date) mData.paid_date = pDist.paid_date;
                 });
             });
 
-            return [...memberMap.values()];
+            return [...rowGroupMap.values()].sort((a, b) => {
+                const dComp = (b.distDate || '').localeCompare(a.distDate || '');
+                if (dComp !== 0) return dComp;
+                return a.id.localeCompare(b.id, 'ko');
+            });
         }
 
-        function toggleMemberItemsExpand(memberId) {
-            if (expandedItemMembers.has(memberId)) {
-                expandedItemMembers.delete(memberId);
+        function toggleMemberItemsExpand(rowKey) {
+            if (expandedItemRowKeys.has(rowKey)) {
+                expandedItemRowKeys.delete(rowKey);
             } else {
-                expandedItemMembers.add(memberId);
+                expandedItemRowKeys.add(rowKey);
             }
             renderMergedParticipantsTable();
         }
 
-        function buildMemberSplitItemsHtml(member) {
-            const totalCount = member.itemDetails.length;
+        function buildMemberSplitItemsHtml(memberRow) {
+            const totalCount = memberRow.itemDetails.length;
             const maxInitialShow = 8;
-            const isExpanded = expandedItemMembers.has(member.id);
+            const isExpanded = expandedItemRowKeys.has(memberRow.rowKey);
             const visibleList = (totalCount > maxInitialShow && !isExpanded)
-                ? member.itemDetails.slice(0, maxInitialShow)
-                : member.itemDetails;
+                ? memberRow.itemDetails.slice(0, maxInitialShow)
+                : memberRow.itemDetails;
 
             const hiddenCount = totalCount - maxInitialShow;
-            const safeMemId = member.id.replace(/'/g, "\\'");
+            const safeRowKey = memberRow.rowKey.replace(/'/g, "\\'");
 
             const moreBtnHtml = totalCount > maxInitialShow
-                ? `<button type="button" class="btn-items-more" onclick="toggleMemberItemsExpand('${safeMemId}')">
+                ? `<button type="button" class="btn-items-more" onclick="toggleMemberItemsExpand('${safeRowKey}')">
                        ${isExpanded ? `▲ 접기` : `▼ +${hiddenCount}개 더보기 (전체 ${totalCount}개)`}
                    </button>`
                 : '';
@@ -854,16 +970,16 @@
         }
 
         function renderMergedParticipantsTable() {
-            const mergedMembers = buildMergedParticipantsList();
+            const mergedRows = buildMergedParticipantsList();
             const tbody = document.getElementById('distParticipantTableBody');
             const fallbackDate = getEffectiveFallbackDate();
 
             const topItemKw = document.getElementById('distItemSearch').value.trim().toLowerCase();
             const memberKw = document.getElementById('participantSearchInput').value.trim().toLowerCase();
 
-            const visibleMembers = mergedMembers.filter(m => {
-                if (memberStatusFilter === 'wait' && m.allDone) return false;
-                if (memberStatusFilter === 'done' && !m.allDone) return false;
+            const visibleRows = mergedRows.filter(m => {
+                if (memberStatusFilter === 'wait' && m.isDoneGroup) return false;
+                if (memberStatusFilter === 'done' && !m.isDoneGroup) return false;
 
                 if (topItemKw) {
                     const matchTop = m.id.toLowerCase().includes(topItemKw) || m.itemDetails.some(it =>
@@ -872,7 +988,7 @@
                 }
 
                 if (memberKw) {
-                    const draft = memberInputDrafts[m.id] || {};
+                    const draft = memberInputDrafts[m.rowKey] || {};
                     const proxyStr = (draft.proxy_name || m.proxy_name || '').toLowerCase();
                     const matchMem = m.id.toLowerCase().includes(memberKw) ||
                                      m.itemDetails.some(it => `${it.name} ${ClanApp.getItemAlias(it.name)}`.toLowerCase().includes(memberKw)) ||
@@ -882,27 +998,30 @@
                 return true;
             });
 
-            if (visibleMembers.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="empty-party-msg">선택한 기준에 해당하는 참여자 내역이 없습니다.</td></tr>`;
+            if (visibleRows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="empty-party-msg">선택한 혈분배일 기준에 해당하는 참여자 내역이 없습니다.</td></tr>`;
                 return;
             }
 
             const isAdmin = ClanApp.isAdminModeOn;
 
-            tbody.innerHTML = visibleMembers.map((m, rowIdx) => {
+            tbody.innerHTML = visibleRows.map((m, rowIdx) => {
                 const defaultReceiver = (m.method === '대리수령') ? (m.proxy_name || '') : (m.proxy_name || m.id);
-                const draft = memberInputDrafts[m.id] || {
+                const draft = memberInputDrafts[m.rowKey] || {
                     method: m.method || '본인수령',
                     proxy_name: defaultReceiver,
-                    paid_date: m.paid_date || fallbackDate
+                    paid_date: m.paid_date || m.effectiveDistDate || fallbackDate
                 };
-                memberInputDrafts[m.id] = draft;
+                memberInputDrafts[m.rowKey] = draft;
 
                 const splitItemsHtml = buildMemberSplitItemsHtml(m);
 
-                const isDone = m.allDone;
-                const isLocked = isDone && !unlockedMembers.has(m.id);
+                const isDone = m.isDoneGroup;
+                const isLocked = isDone && !unlockedRowKeys.has(m.rowKey);
                 const nameColorClass = m.isLeader ? 'party-leader-name' : 'party-member-name';
+                const distDateBadge = m.distDate
+                    ? `<span class="confirmed-dist-date">${toShortDate(m.distDate)}</span>`
+                    : `<span style="color:#9ca3af; font-size:11px;">미확정</span>`;
 
                 const statusBadgeHtml = isDone
                     ? `<span class="status-badge-done">분배완료</span>`
@@ -914,6 +1033,7 @@
                     return `
                         <tr>
                             <td><span class="${nameColorClass}">${m.id}</span></td>
+                            <td>${distDateBadge}</td>
                             <td>${splitItemsHtml}</td>
                             <td style="color:#fbbf24; font-weight:800;">${m.totalShare.toLocaleString()}</td>
                             <td>${statusBadgeHtml}</td>
@@ -924,26 +1044,28 @@
                     `;
                 }
 
+                const safeRowKey = m.rowKey.replace(/'/g, "\\'");
                 const safeMemId = m.id.replace(/'/g, "\\'");
 
                 const rightActionHtml = isLocked
-                    ? `<button type="button" class="btn-row-edit" onclick="unlockMemberRow('${safeMemId}')">수정</button>`
+                    ? `<button type="button" class="btn-row-edit" onclick="unlockMemberRow('${safeRowKey}')">수정</button>`
                     : `<div style="display:inline-flex; gap:4px; align-items:center;">
                            <button type="button" class="btn-sm btn-sm-green" style="padding: 4px 7px; font-size: 11px; line-height: 1;"
-                                   onclick="saveMergedMemberRow('${safeMemId}', ${rowIdx})">저장</button>
-                           ${isDone ? `<button type="button" class="btn-row-del" style="padding: 4px 7px; font-size: 11px;" onclick="resetMergedMemberRow('${safeMemId}')">초기화</button>` : ''}
+                                   onclick="saveMergedMemberRow('${safeRowKey}', ${rowIdx})">저장</button>
+                           ${isDone ? `<button type="button" class="btn-row-del" style="padding: 4px 7px; font-size: 11px;" onclick="resetMergedMemberRow('${safeRowKey}')">초기화</button>` : ''}
                        </div>`;
 
                 return `
                     <tr>
                         <td><span class="${nameColorClass}">${m.id}</span></td>
+                        <td>${distDateBadge}</td>
                         <td>${splitItemsHtml}</td>
                         <td style="color:#fbbf24; font-weight:800;">${m.totalShare.toLocaleString()}</td>
                         <td>${statusBadgeHtml}</td>
                         <td>
                             <select id="memMethod_${rowIdx}" class="dist-tbl-select"
                                     ${isLocked ? 'disabled' : ''}
-                                    onchange="onMethodSelectChange('${safeMemId}', ${rowIdx}, this.value)">
+                                    onchange="onMethodSelectChange('${safeRowKey}', '${safeMemId}', ${rowIdx}, this.value)">
                                 <option value="본인수령" ${draft.method !== '대리수령' ? 'selected' : ''}>본인수령</option>
                                 <option value="대리수령" ${draft.method === '대리수령' ? 'selected' : ''}>대리수령</option>
                             </select>
@@ -955,9 +1077,9 @@
                                        placeholder="${draft.method === '대리수령' ? '대리인' : '본캐/쫄'}"
                                        autocomplete="off"
                                        ${isLocked ? 'disabled' : ''}
-                                       onfocus="onReceiverInputSearch('${safeMemId}', ${rowIdx})"
-                                       oninput="onReceiverInputSearch('${safeMemId}', ${rowIdx})"
-                                       onkeydown="onReceiverKeydown(event, '${safeMemId}', ${rowIdx})">
+                                       onfocus="onReceiverInputSearch('${safeRowKey}', '${safeMemId}', ${rowIdx})"
+                                       oninput="onReceiverInputSearch('${safeRowKey}', '${safeMemId}', ${rowIdx})"
+                                       onkeydown="onReceiverKeydown(event, '${safeRowKey}', '${safeMemId}', ${rowIdx})">
                                 <div id="memProxySuggest_${rowIdx}" class="receiver-suggest-list hidden"></div>
                             </div>
                         </td>
@@ -966,7 +1088,7 @@
                                 <input type="date" id="memPaidDate_${rowIdx}" class="dist-tbl-input paid-date-input-compact"
                                        value="${draft.paid_date}"
                                        ${isLocked ? 'disabled' : ''}
-                                       onchange="onPaidDateChangeSilent('${safeMemId}', this.value)">
+                                       onchange="onPaidDateChangeSilent('${safeRowKey}', '${safeMemId}', this.value)">
                                 <span class="action-slot-box">
                                     ${rightActionHtml}
                                 </span>
@@ -977,7 +1099,7 @@
             }).join('');
         }
 
-        function onReceiverInputSearch(memberId, rowIdx) {
+        function onReceiverInputSearch(rowKey, memberId, rowIdx) {
             const inputEl = document.getElementById(`memProxy_${rowIdx}`);
             const methodEl = document.getElementById(`memMethod_${rowIdx}`);
             const suggestBox = document.getElementById(`memProxySuggest_${rowIdx}`);
@@ -988,7 +1110,7 @@
             });
 
             const val = inputEl.value.trim();
-            onProxyInputSilent(memberId, val);
+            onProxyInputSilent(rowKey, memberId, val);
 
             const method = methodEl ? methodEl.value : '본인수령';
             const q = val.toLowerCase();
@@ -1028,6 +1150,7 @@
             }
 
             activeReceiverSuggestIdx[rowIdx] = 0;
+            const safeRowKey = rowKey.replace(/'/g, "\\'");
             const safeMemId = memberId.replace(/'/g, "\\'");
 
             suggestBox.innerHTML = candidates.map((entry, idx) => {
@@ -1035,7 +1158,7 @@
                 return `
                     <div class="receiver-suggest-item ${idx === 0 ? 'active' : ''}"
                          data-char-id="${entry.charId}"
-                         onmousedown="selectReceiverSuggestion(event, '${safeMemId}', ${rowIdx}, '${safeCharId}')">
+                         onmousedown="selectReceiverSuggestion(event, '${safeRowKey}', '${safeMemId}', ${rowIdx}, '${safeCharId}')">
                         <span class="receiver-main-id">${entry.charId}</span>
                         <span class="receiver-sub-info">${entry.labelInfo}</span>
                     </div>
@@ -1045,7 +1168,7 @@
             suggestBox.classList.remove('hidden');
         }
 
-        function selectReceiverSuggestion(event, memberId, rowIdx, chosenCharId) {
+        function selectReceiverSuggestion(event, rowKey, memberId, rowIdx, chosenCharId) {
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1055,14 +1178,14 @@
             if (inputEl) {
                 inputEl.value = chosenCharId;
             }
-            onProxyInputSilent(memberId, chosenCharId);
+            onProxyInputSilent(rowKey, memberId, chosenCharId);
             if (suggestBox) {
                 suggestBox.innerHTML = '';
                 suggestBox.classList.add('hidden');
             }
         }
 
-        function onReceiverKeydown(event, memberId, rowIdx) {
+        function onReceiverKeydown(event, rowKey, memberId, rowIdx) {
             if (event.isComposing || event.keyCode === 229) return;
 
             const suggestBox = document.getElementById(`memProxySuggest_${rowIdx}`);
@@ -1091,7 +1214,7 @@
                         : 0;
                     const chosenId = items[cur].getAttribute('data-char-id');
                     if (chosenId) {
-                        selectReceiverSuggestion(null, memberId, rowIdx, chosenId);
+                        selectReceiverSuggestion(null, rowKey, memberId, rowIdx, chosenId);
                     }
                 }
             } else if (event.key === 'Escape' && suggestBox) {
@@ -1099,52 +1222,57 @@
             }
         }
 
-        function onMethodSelectChange(memberId, rowIdx, val) {
-            if (!memberInputDrafts[memberId]) {
-                memberInputDrafts[memberId] = { method: '본인수령', proxy_name: memberId, paid_date: getEffectiveFallbackDate() };
+        function onMethodSelectChange(rowKey, memberId, rowIdx, val) {
+            if (!memberInputDrafts[rowKey]) {
+                memberInputDrafts[rowKey] = { method: '본인수령', proxy_name: memberId, paid_date: getEffectiveFallbackDate() };
             }
-            memberInputDrafts[memberId].method = val;
+            memberInputDrafts[rowKey].method = val;
 
             const proxyInput = document.getElementById(`memProxy_${rowIdx}`);
             if (!proxyInput) return;
 
             if (val === '대리수령') {
-                memberInputDrafts[memberId].proxy_name = '';
+                memberInputDrafts[rowKey].proxy_name = '';
                 proxyInput.value = '';
                 proxyInput.placeholder = '대리인';
                 proxyInput.focus();
             } else {
-                memberInputDrafts[memberId].proxy_name = memberId;
+                memberInputDrafts[rowKey].proxy_name = memberId;
                 proxyInput.value = memberId;
                 proxyInput.placeholder = '본캐/쫄';
-                onReceiverInputSearch(memberId, rowIdx);
+                onReceiverInputSearch(rowKey, memberId, rowIdx);
             }
         }
 
-        function onProxyInputSilent(memberId, val) {
-            if (!memberInputDrafts[memberId]) {
-                memberInputDrafts[memberId] = { method: '본인수령', proxy_name: memberId, paid_date: getEffectiveFallbackDate() };
+        function onProxyInputSilent(rowKey, memberId, val) {
+            if (!memberInputDrafts[rowKey]) {
+                memberInputDrafts[rowKey] = { method: '본인수령', proxy_name: memberId, paid_date: getEffectiveFallbackDate() };
             }
-            memberInputDrafts[memberId].proxy_name = val.trim();
+            memberInputDrafts[rowKey].proxy_name = val.trim();
         }
 
-        function onPaidDateChangeSilent(memberId, val) {
-            if (!memberInputDrafts[memberId]) {
-                memberInputDrafts[memberId] = { method: '본인수령', proxy_name: memberId, paid_date: val };
+        function onPaidDateChangeSilent(rowKey, memberId, val) {
+            if (!memberInputDrafts[rowKey]) {
+                memberInputDrafts[rowKey] = { method: '본인수령', proxy_name: memberId, paid_date: val };
             }
-            memberInputDrafts[memberId].paid_date = val;
+            memberInputDrafts[rowKey].paid_date = val;
         }
 
-        function unlockMemberRow(memberId) {
+        function unlockMemberRow(rowKey) {
             if (!ClanApp.isAdminModeOn) return;
-            unlockedMembers.add(memberId);
+            unlockedRowKeys.add(rowKey);
             renderMergedParticipantsTable();
         }
 
-        async function saveMergedMemberRow(memberId, rowIdx) {
+        async function saveMergedMemberRow(rowKey, rowIdx) {
             if (!ClanApp.isAdminModeOn) return;
 
-            const fallbackDate = getEffectiveFallbackDate();
+            const mergedRows = buildMergedParticipantsList();
+            const targetRow = mergedRows.find(r => r.rowKey === rowKey);
+            if (!targetRow) return;
+
+            const memberId = targetRow.id;
+            const targetDistDate = targetRow.distDate || targetRow.effectiveDistDate || getEffectiveFallbackDate();
             const methodEl = document.getElementById(`memMethod_${rowIdx}`);
             const proxyEl = document.getElementById(`memProxy_${rowIdx}`);
             const dateEl = document.getElementById(`memPaidDate_${rowIdx}`);
@@ -1152,31 +1280,33 @@
             const method = methodEl ? methodEl.value : '본인수령';
             const rawReceiver = proxyEl ? proxyEl.value.trim() : '';
             const proxy_name = (method === '대리수령') ? rawReceiver : (rawReceiver || memberId);
-            const paid_date = (dateEl && dateEl.value) ? dateEl.value : fallbackDate;
+            const paid_date = (dateEl && dateEl.value) ? dateEl.value : targetDistDate;
 
             if (method === '대리수령' && !proxy_name) {
                 alert('대리수령을 선택한 경우 대리수령 아이디를 입력해 주세요.');
                 return;
             }
 
-            memberInputDrafts[memberId] = { method, proxy_name, paid_date };
+            memberInputDrafts[rowKey] = { method, proxy_name, paid_date };
 
-            const targetEntries = getSelectedKpiDateEntries();
-            const targetRaidIds = [...new Set(
-                targetEntries.filter(e => e.participants.some(p => p.id === memberId)).map(e => e.raid_id)
-            )];
+            const raidItemsMap = new Map();
+            targetRow.itemDetails.forEach(it => {
+                if (!raidItemsMap.has(it.raid_id)) raidItemsMap.set(it.raid_id, []);
+                raidItemsMap.get(it.raid_id).push(it.item_idx);
+            });
 
-            for (const rId of targetRaidIds) {
+            const doneInfo = { status: '분배완료', method, proxy_name, paid_date };
+
+            for (const [rId, itemIdxs] of raidItemsMap.entries()) {
                 const raid = allRaids.find(r => r.id === rId);
                 if (!raid) continue;
 
                 const distMap = JSON.parse(JSON.stringify(raid.distributions || {}));
-                distMap[memberId] = {
-                    status: '분배완료',
-                    method,
-                    proxy_name,
-                    paid_date
-                };
+                distMap[`${memberId}__date_${targetDistDate}`] = doneInfo;
+                itemIdxs.forEach(idx => {
+                    distMap[`${memberId}__item_${idx}`] = doneInfo;
+                });
+                syncRaidLegacyMemberKey(raid, distMap, memberId, doneInfo);
 
                 await fetch('/api/raids/distributions', {
                     method: 'POST',
@@ -1188,33 +1318,44 @@
                     })
                 });
 
-                await ensureRaidItemsDistDateFilled(raid, paid_date);
+                await ensureRaidItemsDistDateFilled(raid, itemIdxs, targetDistDate);
             }
 
-            unlockedMembers.delete(memberId);
+            unlockedRowKeys.delete(rowKey);
             await loadAllRaidsForDistribution();
         }
 
-        async function resetMergedMemberRow(memberId) {
+        async function resetMergedMemberRow(rowKey) {
             if (!ClanApp.isAdminModeOn) return;
-            if (!confirm(`[${memberId}] 참여자의 분배 완료 상태를 초기화하시겠습니까?\n(초기화 시 분배금을 안 받아간 상태로 돌아갑니다.)`)) return;
 
-            const targetEntries = getSelectedKpiDateEntries();
-            const targetRaidIds = [...new Set(
-                targetEntries.filter(e => e.participants.some(p => p.id === memberId)).map(e => e.raid_id)
-            )];
+            const mergedRows = buildMergedParticipantsList();
+            const targetRow = mergedRows.find(r => r.rowKey === rowKey);
+            if (!targetRow) return;
 
-            for (const rId of targetRaidIds) {
+            const memberId = targetRow.id;
+            const targetDistDate = targetRow.distDate || '';
+            if (!confirm(`[${memberId}] 참여자의 (${targetDistDate ? toShortDate(targetDistDate) : '해당'}) 혈분배일 완료 상태를 초기화하시겠습니까?`)) return;
+
+            const raidItemsMap = new Map();
+            targetRow.itemDetails.forEach(it => {
+                if (!raidItemsMap.has(it.raid_id)) raidItemsMap.set(it.raid_id, []);
+                raidItemsMap.get(it.raid_id).push(it.item_idx);
+            });
+
+            const waitInfo = { status: '분배대기', method: '본인수령', proxy_name: memberId, paid_date: '' };
+
+            for (const [rId, itemIdxs] of raidItemsMap.entries()) {
                 const raid = allRaids.find(r => r.id === rId);
                 if (!raid) continue;
 
                 const distMap = JSON.parse(JSON.stringify(raid.distributions || {}));
-                distMap[memberId] = {
-                    status: '분배대기',
-                    method: '본인수령',
-                    proxy_name: memberId,
-                    paid_date: ''
-                };
+                if (targetDistDate) {
+                    distMap[`${memberId}__date_${targetDistDate}`] = waitInfo;
+                }
+                itemIdxs.forEach(idx => {
+                    distMap[`${memberId}__item_${idx}`] = waitInfo;
+                });
+                syncRaidLegacyMemberKey(raid, distMap, memberId, waitInfo);
 
                 await fetch('/api/raids/distributions', {
                     method: 'POST',
@@ -1227,22 +1368,26 @@
                 });
             }
 
-            unlockedMembers.delete(memberId);
+            unlockedRowKeys.delete(rowKey);
             await loadAllRaidsForDistribution();
         }
 
         async function markAllMergedParticipantsDone() {
             if (!ClanApp.isAdminModeOn) return;
             const targetEntries = getSelectedKpiDateEntries();
-            if (targetEntries.length === 0) return alert('선택한 기준에 분배 처리할 대상 아이템이 없습니다.');
+            if (targetEntries.length === 0) return alert('선택한 혈분배일에 분배 처리할 대상 아이템이 없습니다.');
 
             const selectedDistDate = getEffectiveFallbackDate();
-            const labelStr = (selectedKpiDistDate === 'all') ? '현재 조회된 전체 목록' : toShortDate(selectedDistDate);
-            if (!confirm(`${labelStr}의 모든 참여자를 [분배완료] 처리하시겠습니까?`)) return;
+            const labelStr = (selectedKpiDistDate === 'all') ? '현재 조회된 전체 혈분배일' : `혈분배일 [${toShortDate(selectedDistDate)}]`;
+            if (!confirm(`${labelStr}의 모든 미분배 참여자를 [분배완료] 처리하시겠습니까?`)) return;
 
-            const uniqueRaidIds = [...new Set(targetEntries.map(e => e.raid_id))];
+            const raidItemsMap = new Map();
+            targetEntries.forEach(e => {
+                if (!raidItemsMap.has(e.raid_id)) raidItemsMap.set(e.raid_id, []);
+                raidItemsMap.get(e.raid_id).push({ idx: e.item_idx, distDate: e.dist_date || selectedDistDate });
+            });
 
-            for (const rId of uniqueRaidIds) {
+            for (const [rId, itemObjs] of raidItemsMap.entries()) {
                 const raid = allRaids.find(r => r.id === rId);
                 if (!raid) continue;
 
@@ -1250,20 +1395,22 @@
                 const participants = ClanApp.extractParticipants(raid);
 
                 participants.forEach(p => {
-                    const draft = memberInputDrafts[p.id] || distMap[p.id] || {};
-                    const methodVal = draft.method || '본인수령';
-                    const receiverVal = draft.proxy_name || p.id;
-                    distMap[p.id] = {
-                        status: '분배완료',
-                        method: methodVal,
-                        proxy_name: receiverVal,
-                        paid_date: selectedDistDate
-                    };
-                    memberInputDrafts[p.id] = {
-                        method: methodVal,
-                        proxy_name: receiverVal,
-                        paid_date: selectedDistDate
-                    };
+                    itemObjs.forEach(({ idx, distDate }) => {
+                        const existing = getDistInfoByDistDate(raid, idx, distDate, p.id);
+                        if (existing.status !== '분배완료') {
+                            const waitRowKey = `${p.id}__${distDate}__wait`;
+                            const draft = memberInputDrafts[waitRowKey] || {};
+                            const doneInfo = {
+                                status: '분배완료',
+                                method: draft.method || '본인수령',
+                                proxy_name: draft.proxy_name || p.id,
+                                paid_date: draft.paid_date || distDate
+                            };
+                            distMap[`${p.id}__date_${distDate}`] = doneInfo;
+                            distMap[`${p.id}__item_${idx}`] = doneInfo;
+                            syncRaidLegacyMemberKey(raid, distMap, p.id, doneInfo);
+                        }
+                    });
                 });
 
                 await fetch('/api/raids/distributions', {
@@ -1276,19 +1423,21 @@
                     })
                 });
 
-                await ensureRaidItemsDistDateFilled(raid, selectedDistDate);
+                await ensureRaidItemsDistDateFilled(raid, itemObjs.map(o => o.idx), selectedDistDate);
             }
 
-            unlockedMembers.clear();
+            unlockedRowKeys.clear();
             await loadAllRaidsForDistribution();
             alert(`${labelStr} 기준 전체 분배 완료 처리되었습니다.`);
         }
 
-        async function ensureRaidItemsDistDateFilled(raid, fallbackDate) {
+        async function ensureRaidItemsDistDateFilled(raid, targetItemIdxs, fallbackDate) {
             const details = ClanApp.extractItemDetails(raid, itemPriceMap);
+            const idxSet = new Set(targetItemIdxs);
             let changed = false;
-            const updated = details.map(it => {
-                if (it.dist_checked && (!it.dist_date || !it.dist_date.trim())) {
+
+            const updated = details.map((it, idx) => {
+                if (idxSet.has(idx) && it.dist_checked && (!it.dist_date || !it.dist_date.trim())) {
                     changed = true;
                     return { ...it, dist_date: fallbackDate };
                 }

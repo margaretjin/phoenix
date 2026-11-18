@@ -258,10 +258,10 @@
     color: #ffffff;
 }
 
-/* 5칸 요약 KPI 박스 */
-.dist-kpi-strip-5 {
+/* 6칸 요약 KPI 박스 (판매된 금액 합계 포함) */
+.dist-kpi-strip-6 {
     display: grid;
-    grid-template-columns: 1.05fr 1.15fr 1.6fr 0.85fr 0.85fr;
+    grid-template-columns: 0.95fr 1.05fr 1.05fr 1.55fr 0.75fr 0.75fr;
     gap: 8px;
     align-items: stretch;
 }
@@ -295,6 +295,10 @@
 .dist-kpi-val.selected-date {
     color: #60a5fa;
     font-size: 13.5px;
+}
+
+.dist-kpi-val.gross-sales {
+    color: #ffffff;
 }
 
 .dist-kpi-val.net-pool {
@@ -345,7 +349,7 @@
     flex-shrink: 1;
 }
 
-/* [수정] 분배 아이템 (개별 분배금): 왼쪽 정렬 컨테이너 및 텍스트 정렬 적용 */
+/* 분배 아이템 (개별 분배금): 왼쪽 정렬 컨테이너 및 텍스트 정렬 적용 */
 .item-split-container {
     display: flex;
     flex-direction: column;
@@ -417,7 +421,7 @@
     color: #93c5fd;
 }
 
-/* 분배완료 색상: 회색으로 통일 */
+/* 분배상태 배지: 분배대기(주황) / 분배중(파랑) / 분배완료(회색) */
 .status-badge-done {
     display: inline-block;
     padding: 3px 7px;
@@ -425,6 +429,17 @@
     background-color: #27272a;
     border: 1px solid #52525b;
     color: #9ca3af;
+    font-weight: 800;
+    font-size: 11px;
+}
+
+.status-badge-progress {
+    display: inline-block;
+    padding: 3px 7px;
+    border-radius: 4px;
+    background-color: rgba(59, 130, 246, 0.18);
+    border: 1px solid #3b82f6;
+    color: #60a5fa;
     font-weight: 800;
     font-size: 11px;
 }
@@ -578,11 +593,11 @@
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .dist-kpi-strip-5 {
+    .dist-kpi-strip-6 {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .dist-kpi-strip-5 .dist-kpi-box:nth-child(3) {
+    .dist-kpi-strip-6 .dist-kpi-box:nth-child(4) {
         grid-column: 1 / -1;
     }
 

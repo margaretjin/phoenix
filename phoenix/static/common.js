@@ -209,7 +209,9 @@ window.ClanApp = {
                     sType = '이벤트';
                     finalPrice = 0;
                 } else {
-                    sType = (rawSaleType === '외판') ? '외판' : '내판';
+                    if (rawSaleType === '외판') sType = '외판';
+                    else if (rawSaleType === '연합') sType = '연합';
+                    else sType = '내판';
                     finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
                 }
             } else {
@@ -217,8 +219,10 @@ window.ClanApp = {
                 finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
             }
 
-            const distDate = (foundObj && winner && sType !== '이벤트') ? (foundObj.dist_date || '') : '';
-            const isChecked = (foundObj && winner && sType !== '이벤트') ? Boolean(foundObj.dist_checked || distDate) : false;
+            // 내판, 외판만 분배 체크 및 혈분배일 허용 (연합, 이벤트, 보유중은 차단)
+            const canDist = Boolean(foundObj && winner && (sType === '내판' || sType === '외판'));
+            const distDate = canDist ? (foundObj.dist_date || '') : '';
+            const isChecked = canDist ? Boolean(foundObj.dist_checked || distDate) : false;
 
             return {
                 name,
