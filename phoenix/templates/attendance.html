@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>참여도 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=53">
-    <link rel="stylesheet" href="/static/attendance.css?v=30">
+    <link rel="stylesheet" href="/static/common.css?v=61">
+    <link rel="stylesheet" href="/static/attendance.css?v=61">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -21,7 +21,7 @@
             <div class="att-filter-grid">
                 <div class="att-filter-field">
                     <label>조회 기준 월 (월별 집계)</label>
-                    <input type="month" id="attMonthInput" class="input-common" onchange="loadMonthRaidsData()">
+                    <input type="month" id="attMonthInput" class="input-common" onchange="onAttMonthChange()">
                 </div>
 
                 <div class="att-filter-field">
@@ -59,12 +59,13 @@
             </div>
         </section>
 
-        <!-- 2. 전체 혈원 참여도 표 (월 전체순 / 월별 메인탐순 / 월별 09시 / 월별 15시 / 월별 21시 / 월별 23시(오만) / 월별 03시) -->
+        <!-- 2. 전체 혈원 참여도 표 -->
         <section class="card-box">
             <div class="att-header-row">
-                <span class="section-label">🏆 전체 혈원 월별 참여 횟수 및 메인보스탐 참여도</span>
+                <span class="section-label" id="attSectionTitle">🏆 전체 혈원 월별 참여 횟수 및 11월 누적분배금</span>
                 <div class="sort-btn-group">
                     <button type="button" id="sortBtn_monthTotal" class="sort-tab-btn active" onclick="setSortMode('monthTotal')">월 전체순</button>
+                    <button type="button" id="sortBtn_totalShare" class="sort-tab-btn" onclick="setSortMode('totalShare')">11월 누적분배금순</button>
                     <button type="button" id="sortBtn_monthMain" class="sort-tab-btn" onclick="setSortMode('monthMain')">월별 메인탐순</button>
                     <button type="button" id="sortBtn_09시" class="sort-tab-btn" onclick="setSortMode('09시')">월별 09시</button>
                     <button type="button" id="sortBtn_15시" class="sort-tab-btn" onclick="setSortMode('15시')">월별 15시</button>
@@ -82,6 +83,7 @@
                             <th>혈원명</th>
                             <th>클래스</th>
                             <th>월 전체<br>참여</th>
+                            <th id="thMonthlyShare" class="share-th">11월<br>누적분배금</th>
                             <th class="main-white-th">월별 메인보스탐</th>
                             <th class="slot-class-th">월별 09시</th>
                             <th class="slot-class-th">월별 15시</th>
@@ -91,18 +93,20 @@
                         </tr>
                     </thead>
                     <tbody id="attendanceTableBody">
-                        <tr><td colspan="10" class="empty-party-msg">조회 중...</td></tr>
+                        <tr><td colspan="11" class="empty-party-msg">조회 중...</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
     </main>
 
-    <script src="/static/common.js?v=53"></script>
+    <script src="/static/common.js?v=61"></script>
     <script>
         const MAIN_SLOTS = ['09시', '15시', '21시', '23시(오만)', '03시'];
         let allMembers = [];
         let monthRaids = [];
+        let itemPriceMap = {};
+        let currentTaxRate = 20;
         let sortMode = 'monthTotal';
 
         window.onload = async () => {
@@ -111,10 +115,39 @@
 
             const now = new Date();
             document.getElementById('attMonthInput').value = ClanApp.formatYM(now);
+            updateMonthlyShareLabels();
 
-            await loadAllMembers();
+            await Promise.all([loadAllMembers(), loadTaxRate(), loadItemMasterPrices()]);
             await loadMonthRaidsData();
         };
+
+        function getSelectedMonthNumber() {
+            const ym = document.getElementById('attMonthInput').value || ClanApp.formatYM(new Date());
+            const parts = ym.split('-');
+            if (parts.length === 2) {
+                return parseInt(parts[1], 10);
+            }
+            return new Date().getMonth() + 1;
+        }
+
+        function updateMonthlyShareLabels() {
+            const monthNum = getSelectedMonthNumber();
+            const labelPrefix = `${monthNum}월 누적분배금`;
+
+            const thEl = document.getElementById('thMonthlyShare');
+            if (thEl) thEl.innerHTML = `${monthNum}월<br>누적분배금`;
+
+            const sortBtnEl = document.getElementById('sortBtn_totalShare');
+            if (sortBtnEl) sortBtnEl.textContent = `${labelPrefix}순`;
+
+            const titleEl = document.getElementById('attSectionTitle');
+            if (titleEl) titleEl.textContent = `🏆 전체 혈원 월별 참여 횟수 및 ${labelPrefix}`;
+        }
+
+        async function onAttMonthChange() {
+            updateMonthlyShareLabels();
+            await loadMonthRaidsData();
+        }
 
         async function loadAllMembers() {
             const res = await fetch('/api/auth/search-members');
@@ -123,9 +156,33 @@
             document.getElementById('kpiTotalMembers').textContent = `${allMembers.length}명`;
         }
 
+        async function loadTaxRate() {
+            try {
+                const res = await fetch('/api/raids/tax-rate');
+                currentTaxRate = Number((await res.json()).tax_rate ?? 20);
+            } catch (e) {
+                currentTaxRate = 20;
+            }
+        }
+
+        async function loadItemMasterPrices() {
+            itemPriceMap = {};
+            try {
+                const res = await fetch('/api/items');
+                if (!res.ok) return;
+                const list = await res.json();
+                ClanApp.setItemAliases(list);
+                list.forEach(it => {
+                    if (it.item_name) itemPriceMap[it.item_name] = Number(it.default_price || 0);
+                });
+            } catch (e) {
+                itemPriceMap = {};
+            }
+        }
+
         function setSortMode(mode) {
             sortMode = mode;
-            ['monthTotal', 'monthMain', '09시', '15시', '21시', '23시(오만)', '03시'].forEach(k => {
+            ['monthTotal', 'totalShare', 'monthMain', '09시', '15시', '21시', '23시(오만)', '03시'].forEach(k => {
                 const btn = document.getElementById(`sortBtn_${k}`);
                 if (btn) btn.classList.toggle('active', k === mode);
             });
@@ -133,6 +190,7 @@
         }
 
         async function loadMonthRaidsData() {
+            updateMonthlyShareLabels();
             const ym = document.getElementById('attMonthInput').value || ClanApp.formatYM(new Date());
             const res = await fetch(`/api/raids?month=${encodeURIComponent(ym)}`);
             monthRaids = await res.json();
@@ -156,6 +214,7 @@
                     char_class: m.char_class || '-',
                     sub_chars: m.sub_chars || '',
                     monthTotal: 0,
+                    totalShare: 0,
                     monthMain: 0,
                     slotCounts: {
                         '09시': 0,
@@ -169,13 +228,29 @@
 
             monthRaids.forEach(r => {
                 const pList = ClanApp.extractParticipants(r);
+                const pCount = pList.length;
+                if (pCount === 0) return;
+
                 const isMainSlot = MAIN_SLOTS.includes(r.raid_time);
+                const details = ClanApp.extractItemDetails(r, itemPriceMap);
+
+                let raidPerMemberShare = 0;
+                details.forEach(item => {
+                    const sType = item.sale_type || '보유중';
+                    if (sType === '이벤트' || sType === '연합') return;
+                    const gross = Number(item.price || 0);
+                    const netPool = Math.floor(gross * (1 - currentTaxRate / 100));
+                    if (netPool > 0) {
+                        raidPerMemberShare += Math.floor(netPool / pCount);
+                    }
+                });
 
                 pList.forEach(p => {
                     const st = statsMap.get(p.id);
                     if (!st) return;
 
                     st.monthTotal += 1;
+                    st.totalShare += raidPerMemberShare;
                     if (isMainSlot) {
                         st.monthMain += 1;
                         st.slotCounts[r.raid_time] = (st.slotCounts[r.raid_time] || 0) + 1;
@@ -195,7 +270,11 @@
             rows.sort((a, b) => {
                 if (sortMode === 'monthTotal') {
                     if (b.monthTotal !== a.monthTotal) return b.monthTotal - a.monthTotal;
+                    if (b.totalShare !== a.totalShare) return b.totalShare - a.totalShare;
                     if (b.monthMain !== a.monthMain) return b.monthMain - a.monthMain;
+                } else if (sortMode === 'totalShare') {
+                    if (b.totalShare !== a.totalShare) return b.totalShare - a.totalShare;
+                    if (b.monthTotal !== a.monthTotal) return b.monthTotal - a.monthTotal;
                 } else if (sortMode === 'monthMain') {
                     if (b.monthMain !== a.monthMain) return b.monthMain - a.monthMain;
                     if (b.monthTotal !== a.monthTotal) return b.monthTotal - a.monthTotal;
@@ -209,7 +288,7 @@
 
             const tbody = document.getElementById('attendanceTableBody');
             if (rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" class="empty-party-msg">조회된 혈원이 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" class="empty-party-msg">조회된 혈원이 없습니다.</td></tr>`;
                 return;
             }
 
@@ -217,6 +296,9 @@
                 const rank = idx + 1;
                 const rankHtml = `<span class="rank-badge ${rank <= 3 ? 'top-rank' : ''}">${rank}</span>`;
                 const fmtSlot = (cnt) => `<span class="class-same-color">${cnt}회</span>`;
+                const shareHtml = r.totalShare > 0
+                    ? `<span class="share-amount-text">${r.totalShare.toLocaleString()}</span>`
+                    : `<span class="share-zero-text">0</span>`;
 
                 return `
                     <tr>
@@ -224,6 +306,7 @@
                         <td style="font-weight: 800; color: #fbbf24;">${r.id}</td>
                         <td><span class="class-same-color">${r.char_class}</span></td>
                         <td><span class="count-pill month-total">${r.monthTotal}회</span></td>
+                        <td>${shareHtml}</td>
                         <td><span class="main-white-text">${r.monthMain}회</span></td>
                         <td>${fmtSlot(r.slotCounts['09시'])}</td>
                         <td>${fmtSlot(r.slotCounts['15시'])}</td>

@@ -114,13 +114,31 @@
     line-height: 1.25;
 }
 
-/* 월별 메인보스탐 헤더: 초록색 바탕 없이 동일한 어두운 바탕에 흰색 글씨 */
+/* 누적 개별 분배금 헤더 및 금액 텍스트 */
+.att-table th.share-th {
+    background-color: #27272a;
+    color: #4ade80;
+}
+
+.share-amount-text {
+    color: #4ade80;
+    font-weight: 800;
+    font-size: 12.5px;
+}
+
+.share-zero-text {
+    color: #71717a;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+/* 월별 메인보스탐 헤더 */
 .att-table th.main-white-th {
     background-color: #27272a;
     color: #ffffff;
 }
 
-/* 월별 09시 / 15시 / 21시 / 03시 헤더: 동일한 어두운 바탕에 클래스(요정)와 같은 색상 */
+/* 월별 09시 / 15시 / 21시 / 23시(오만) / 03시 헤더 */
 .att-table th.slot-class-th {
     background-color: #27272a;
     color: #d4d4d8;
@@ -156,14 +174,12 @@
     color: #fbbf24;
 }
 
-/* 월별 메인보스탐: 초록색 바탕 제거, 검은색 바탕 동일 + 흰색 글씨 */
 .main-white-text {
     color: #ffffff;
     font-weight: 800;
     font-size: 12.5px;
 }
 
-/* 클래스('요정' 등) 및 월별 09시~03시 동일한 텍스트 컬러(#d4d4d8) */
 .class-same-color {
     color: #d4d4d8;
     font-weight: 700;

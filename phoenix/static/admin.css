@@ -1,5 +1,5 @@
 /* =========================================================
-   [admin.css] 회원관리 페이지 전용 스타일
+   [admin.css] 회원관리 및 혈맹원 명단 페이지 전용 스타일
    ========================================================= */
 
 .admin-warning-banner {
@@ -28,28 +28,24 @@
     margin-bottom: 4px;
 }
 
-/* 1번째 줄: 고유아이디 + 사용중인아이디 (2칸) */
 .form-row-2col {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
 }
 
-/* 2번째 줄: 클래스 + 혈맹 + 권한 (3칸 고정) */
 .form-row-3col {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
 }
 
-/* 4번째 줄: 보조캐릭 아이디 1줄에 3칸 고정 */
 .sub-char-row-3col {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 6px;
 }
 
-/* 5번째 줄: 보유 중요 스킬 칩 영역 (체크박스와 글자 간격 조정) */
 .skill-chips-box {
     display: flex;
     flex-wrap: wrap;
@@ -99,7 +95,59 @@
     margin-top: 4px;
 }
 
-/* 하단 등록된 혈맹원 명단 테이블 */
+/* 스킬 관리 섹션 */
+.skill-manage-guide {
+    font-size: 12px;
+    color: #9ca3af;
+    margin: 6px 0 10px;
+}
+
+.skill-add-row {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.skill-class-select {
+    font-weight: 700;
+}
+
+.skill-manage-list-box {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #141414;
+    border: 1px solid #2e2e32;
+    border-radius: 6px;
+}
+
+.skill-manage-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    background-color: #27272a;
+    border: 1px solid #3f3f46;
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.skill-del-x {
+    background: none;
+    border: none;
+    color: #f87171;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    padding: 0 2px;
+}
+
+/* 등록된 혈맹원 명단 테이블 */
 .member-search-bar {
     display: flex;
     justify-content: space-between;
@@ -136,6 +184,27 @@
     font-size: 12px;
 }
 
+.member-list-table th.sortable-th {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+}
+
+.member-list-table th.sortable-th:hover {
+    background-color: #3f3f46;
+}
+
+.sort-arrow {
+    display: inline-block;
+    margin-left: 3px;
+    font-size: 10.5px;
+    color: #71717a;
+}
+
+.sort-arrow.active {
+    color: #60a5fa;
+}
+
 .masked-email-text {
     color: #4ade80;
     font-weight: 800;
@@ -151,4 +220,11 @@
     display: inline-flex;
     gap: 4px;
     justify-content: center;
+}
+
+@media (max-width: 520px) {
+    .skill-add-row {
+        grid-template-columns: 105px 1fr auto;
+        gap: 6px;
+    }
 }

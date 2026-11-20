@@ -46,9 +46,12 @@ window.ClanApp = {
         ];
 
         const adminTabs = [];
+        // 관리자 모드 ON일 때만 '혈맹원관리' 표시
         if (this.hasAdminPrivilege && (this.isAdminModeOn || activePath === '/admin')) {
-            adminTabs.push({ href: '/admin', label: '회원관리' });
+            adminTabs.push({ href: '/admin', label: '혈맹원관리' });
         }
+        // '명단'과 '아이템'은 일반회원도 열람 가능하도록 항상 표시
+        adminTabs.push({ href: '/member-list', label: '명단' });
         adminTabs.push({ href: '/item-manage', label: '아이템' });
 
         const adminTabsHtml = adminTabs.map(l =>
@@ -219,7 +222,6 @@ window.ClanApp = {
                 finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
             }
 
-            // 내판, 외판만 분배 체크 및 혈분배일 허용 (연합, 이벤트, 보유중은 차단)
             const canDist = Boolean(foundObj && winner && (sType === '내판' || sType === '외판'));
             const distDate = canDist ? (foundObj.dist_date || '') : '';
             const isChecked = canDist ? Boolean(foundObj.dist_checked || distDate) : false;

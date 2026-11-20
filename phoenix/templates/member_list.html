@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>혈맹원 명단 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="/static/common.css?v=62">
+    <link rel="stylesheet" href="/static/admin.css?v=62">
+</head>
+<body>
+    <nav class="navbar" id="appNavbar"></nav>
+
+    <main class="main-container">
+        <div class="top-bar">
+            <h1 class="page-title">📋 등록된 혈원 명단</h1>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span id="memberSearchResultCount" style="font-size: 12px; font-weight: 800; color: #fbbf24;">총 0명</span>
+                <a href="/admin" class="btn-sm btn-sm-green admin-only">+ 혈맹원관리</a>
+            </div>
+        </div>
+
+        <section class="card-box">
+            <span class="section-label">📋 전체 혈맹원 명단 (클래스 / 보유 스킬 화살표 클릭 정렬)</span>
+            <div class="member-search-bar">
+                <input type="search" id="memberSearchInput" class="input-common" placeholder="본캐릭 / 고유ID / 보조캐릭 / 클래스 / 스킬 검색" oninput="renderMembersTable()">
+            </div>
+
+            <div class="member-table-wrap">
+                <table class="member-list-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable-th" onclick="toggleMemberSort('unique_id')">고유ID <span id="sortArrow_unique_id" class="sort-arrow">⇅</span></th>
+                            <th class="sortable-th" onclick="toggleMemberSort('active_id')">본캐릭명 <span id="sortArrow_active_id" class="sort-arrow">⇅</span></th>
+                            <th>보조캐릭 (1~3)</th>
+                            <th class="sortable-th" onclick="toggleMemberSort('char_class')">클래스 <span id="sortArrow_char_class" class="sort-arrow">⇅</span></th>
+                            <th class="sortable-th" onclick="toggleMemberSort('skills')">보유 스킬 <span id="sortArrow_skills" class="sort-arrow">⇅</span></th>
+                            <th class="sortable-th" onclick="toggleMemberSort('clan')">혈맹 <span id="sortArrow_clan" class="sort-arrow">⇅</span></th>
+                            <th class="sortable-th" onclick="toggleMemberSort('role')">권한 <span id="sortArrow_role" class="sort-arrow">⇅</span></th>
+                            <th>등록 이메일</th>
+                            <th id="memberActionHeader" class="hidden">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="memberTableBody">
+                        <tr><td colspan="9" class="empty-party-msg">조회 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/common.js?v=62"></script>
+    <script>
+        let membersList = [];
+        let sortColumn = 'active_id';
+        let sortDirection = 'asc';
+        const ROLE_ORDER = { '슈퍼관리자': 1, '관리자': 2, '일반회원': 3 };
+
+        window.onload = async () => {
+            const user = ClanApp.initPage('/member-list', () => {
+                applyAdminUI();
+                renderMembersTable();
+            });
+            if (!user) return;
+
+            applyAdminUI();
+            updateSortArrowsUI();
+            await loadMembers();
+        };
+
+        function applyAdminUI() {
+            const isOn = ClanApp.isAdminModeOn;
+            document.getElementById('memberActionHeader').classList.toggle('hidden', !isOn);
+        }
+
+        function toggleMemberSort(col) {
+            if (sortColumn === col) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = col;
+                sortDirection = (col === 'skills') ? 'desc' : 'asc';
+            }
+            updateSortArrowsUI();
+            renderMembersTable();
+        }
+
+        function updateSortArrowsUI() {
+            const cols = ['unique_id', 'active_id', 'char_class', 'skills', 'clan', 'role'];
+            cols.forEach(c => {
+                const el = document.getElementById(`sortArrow_${c}`);
+                if (!el) return;
+                if (c === sortColumn) {
+                    el.textContent = sortDirection === 'asc' ? '▲' : '▼';
+                    el.classList.add('active');
+                } else {
+                    el.textContent = '⇅';
+                    el.classList.remove('active');
+                }
+            });
+        }
+
+        async function loadMembers() {
+            const res = await fetch('/api/auth/search-members');
+            membersList = await res.json();
+            renderMembersTable();
+        }
+
+        function getSkillsText(m) {
+            return Array.isArray(m.skills) ? m.skills.join(', ') : String(m.skills || '');
+        }
+
+        function renderMembersTable() {
+            const tbody = document.getElementById('memberTableBody');
+            const keyword = document.getElementById('memberSearchInput').value.trim().toLowerCase();
+
+            let filtered = membersList.filter(m => {
+                if (!keyword) return true;
+                return [m.active_id, m.unique_id, m.sub_chars, m.char_class, getSkillsText(m)]
+                    .some(v => String(v || '').toLowerCase().includes(keyword));
+            });
+
+            const dir = sortDirection === 'asc' ? 1 : -1;
+            filtered.sort((a, b) => {
+                if (sortColumn === 'skills') {
+                    const aSkills = getSkillsText(a).trim();
+                    const bSkills = getSkillsText(b).trim();
+                    if (!aSkills && !bSkills) return (a.active_id || '').localeCompare(b.active_id || '', 'ko');
+                    if (!aSkills) return 1;
+                    if (!bSkills) return -1;
+                    const aLen = Array.isArray(a.skills) ? a.skills.length : aSkills.split(',').length;
+                    const bLen = Array.isArray(b.skills) ? b.skills.length : bSkills.split(',').length;
+                    if (aLen !== bLen) return (aLen - bLen) * dir;
+                    const cmp = aSkills.localeCompare(bSkills, 'ko');
+                    if (cmp !== 0) return cmp * dir;
+                    return (a.active_id || '').localeCompare(b.active_id || '', 'ko');
+                }
+                if (sortColumn === 'role') {
+                    const aRank = ROLE_ORDER[a.role] || 99;
+                    const bRank = ROLE_ORDER[b.role] || 99;
+                    if (aRank !== bRank) return (aRank - bRank) * dir;
+                    return (a.active_id || '').localeCompare(b.active_id || '', 'ko');
+                }
+                const aVal = String(a[sortColumn] || '');
+                const bVal = String(b[sortColumn] || '');
+                const cmp = aVal.localeCompare(bVal, 'ko', { numeric: true });
+                if (cmp !== 0) return cmp * dir;
+                return (a.active_id || '').localeCompare(b.active_id || '', 'ko');
+            });
+
+            document.getElementById('memberSearchResultCount').textContent = `총 ${filtered.length}명`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="empty-party-msg">검색 결과가 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(m => {
+                const skills = getSkillsText(m);
+                const subCharsDisplay = m.sub_chars
+                    ? `<span style="color:#a7f3d0; font-weight:700;">${m.sub_chars}</span>`
+                    : `<span style="color:#71717a;">-</span>`;
+
+                const hasEmail = Boolean(m.has_email || (m.google_email && m.google_email.trim()));
+                const emailDisplay = hasEmail
+                    ? `<span class="masked-email-text">****</span>`
+                    : `<span class="unregistered-email-text">미등록</span>`;
+
+                const isTargetSuper = m.role === '슈퍼관리자';
+                const canModify = ClanApp.isSuperAdmin || !isTargetSuper;
+
+                let actionCell = '';
+                if (ClanApp.isAdminModeOn) {
+                    actionCell = canModify ? `
+                        <td>
+                            <div class="member-action-btns">
+                                <a href="/admin?edit_id=${m.id}" class="btn-sm btn-sm-blue" style="padding: 3px 7px; font-size: 11px;">수정</a>
+                                <button type="button" class="btn-sm btn-sm-dark" style="padding: 3px 7px; font-size: 11px;" onclick="resetEmail(${m.id}, '${m.active_id}')">이메일초기화</button>
+                                <button type="button" class="btn-sm btn-sm-red" style="padding: 3px 7px; font-size: 11px;" onclick="deleteMember(${m.id}, '${m.active_id}')">삭제</button>
+                            </div>
+                        </td>
+                    ` : `<td><span style="color:#71717a; font-size:11px;">슈퍼관리자 전용</span></td>`;
+                }
+
+                return `
+                    <tr>
+                        <td style="color:#9ca3af; font-size:11.5px;">${m.unique_id}</td>
+                        <td style="font-weight: 800; color: #fbbf24;">${m.active_id}</td>
+                        <td>${subCharsDisplay}</td>
+                        <td>${m.char_class}</td>
+                        <td>${skills || '-'}</td>
+                        <td>${m.clan}</td>
+                        <td style="font-weight:700;">${m.role}</td>
+                        <td>${emailDisplay}</td>
+                        ${actionCell}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function resetEmail(memberId, activeId) {
+            if (!ClanApp.isAdminModeOn) return;
+            if (!confirm(`[${activeId}] 회원의 등록된 이메일을 초기화하시겠습니까?\n초기화 후 해당 회원이 로그인 화면에서 새 이메일을 직접 등록할 수 있습니다.`)) return;
+
+            const res = await fetch(`/api/auth/reset-email/${memberId}?requester_role=${encodeURIComponent(ClanApp.role)}`, {
+                method: 'POST'
+            });
+            if (res.ok) {
+                alert(`[${activeId}] 이메일이 초기화되었습니다.`);
+                await loadMembers();
+            } else {
+                const err = await res.json();
+                alert(err.detail || '초기화 실패');
+            }
+        }
+
+        async function deleteMember(memberId, activeId) {
+            if (!ClanApp.isAdminModeOn) return;
+            if (!confirm(`[${activeId}] 회원을 명단에서 삭제하시겠습니까?`)) return;
+
+            const res = await fetch(`/api/admin/members/${memberId}?requester_role=${encodeURIComponent(ClanApp.role)}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                alert('삭제되었습니다.');
+                await loadMembers();
+            } else {
+                const err = await res.json();
+                alert(err.detail || '삭제 실패');
+            }
+        }
+    </script>
+</body>
+</html>

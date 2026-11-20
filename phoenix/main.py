@@ -7,10 +7,8 @@ from fastapi.templating import Jinja2Templates
 
 from routers import auth_router, raid_router, admin_router, item_router
 
-
 app = FastAPI(title="혈맹 보스탐 체크기")
 
-# 서버 응답 압축 최적화
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -18,7 +16,6 @@ BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
-# 백엔드 API 라우터 등록
 app.include_router(auth_router.router)
 app.include_router(raid_router.router)
 app.include_router(admin_router.router)
@@ -59,6 +56,10 @@ async def attendance_page(request: Request):
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
     return templates.TemplateResponse(request, "admin.html", {})
+
+@app.get("/member-list", response_class=HTMLResponse)
+async def member_list_page(request: Request):
+    return templates.TemplateResponse(request, "member_list.html", {})
 
 @app.get("/item-manage", response_class=HTMLResponse)
 async def item_manage_page(request: Request):
