@@ -9,7 +9,7 @@ window.ClanApp = {
 
     RAID_TIMES: [
         '01시', '03시', '05시', '06시', '07시', '09시', '11시', '12시',
-        '13시', '15시', '17시', '18시', '19시', '21시', '23시(오만)', '24시'
+        '13시', '15시', '17시', '18시', '19시', '21시', '23시(오만)', '24시', '용레이드'
     ],
 
     MAIN_RAID_TIMES: ['09시', '15시', '21시', '23시(오만)', '03시'],
@@ -129,7 +129,7 @@ window.ClanApp = {
 
     parseRaidHour(timeLabel) {
         const m = String(timeLabel || '').match(/^(\d{1,2})시/);
-        return m ? parseInt(m[1], 10) : 0;
+        return m ? parseInt(m[1], 10) : null;
     },
 
     getDefaultRaidTime(now = new Date()) {
@@ -138,6 +138,7 @@ window.ClanApp = {
 
         for (const slot of this.RAID_TIMES) {
             const slotHour = this.parseRaidHour(slot);
+            if (slotHour === null) continue;
             if (slotHour <= currentHour) {
                 selected = slot;
             }
@@ -147,6 +148,11 @@ window.ClanApp = {
 
     getSlotStatus(dateStr, timeLabel, now = new Date()) {
         const hourNum = this.parseRaidHour(timeLabel);
+        // 용레이드 등 고정 시각이 없는 특수 타임은 날짜·시간 상관없이 항시 입력 가능
+        if (hourNum === null) {
+            return 'open';
+        }
+
         const [y, m, d] = dateStr.split('-').map(Number);
         const slotTime = new Date(y, m - 1, d, hourNum, 0, 0);
         const diffHours = (now - slotTime) / (1000 * 60 * 60);
@@ -286,6 +292,59 @@ window.ClanApp = {
         window.location.href = `/api/raids/export-excel?${params.toString()}`;
     }
 };
+
+// 용레이드 버튼: '입력 가능' 텍스트 제거 + 평시 컬러를 기록 막아둔(마감/예정) 버튼과 동일하게 맞춤
+(function initDragonRaidNeutralStyle() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .common-time-btn.dragon-raid-slot:not(.active):not(.selected):not(.participated) {
+            background-color: var(--dragon-locked-bg, #141414) !important;
+            border-color: var(--dragon-locked-border, #27272a) !important;
+            color: var(--dragon-locked-color, #71717a) !important;
+        }
+        .common-time-btn.dragon-raid-slot:not(.active):not(.selected):not(.participated) .common-time-sub {
+            color: var(--dragon-locked-sub, #52525b) !important;
+        }
+    `;
+    document.head.appendChild(style);
+
+    const markDragonButtons = () => {
+        // 같은 화면의 기록 막아둔(마감/예정) 버튼 색상을 읽어와 동일하게 적용
+        const lockedRef = document.querySelector(
+            '.common-time-btn.expired:not(.active):not(.selected), .common-time-btn.future:not(.active):not(.selected), .common-time-btn.locked:not(.active):not(.selected)'
+        );
+        if (lockedRef) {
+            const cs = window.getComputedStyle(lockedRef);
+            document.documentElement.style.setProperty('--dragon-locked-bg', cs.backgroundColor);
+            document.documentElement.style.setProperty('--dragon-locked-border', cs.borderColor);
+            document.documentElement.style.setProperty('--dragon-locked-color', cs.color);
+            const subRef = lockedRef.querySelector('.common-time-sub');
+            if (subRef) {
+                document.documentElement.style.setProperty('--dragon-locked-sub', window.getComputedStyle(subRef).color);
+            }
+        }
+
+        document.querySelectorAll('.common-time-btn').forEach(btn => {
+            if ((btn.textContent || '').includes('용레이드')) {
+                btn.classList.add('dragon-raid-slot');
+                const subEl = btn.querySelector('.common-time-sub');
+                if (subEl && subEl.textContent.replace(/\s+/g, '') === '입력가능') {
+                    subEl.textContent = '';
+                    subEl.style.display = 'none';
+                }
+            }
+        });
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', markDragonButtons);
+    } else {
+        markDragonButtons();
+    }
+
+    const observer = new MutationObserver(markDragonButtons);
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+})();
 
 let itemFullNameToast = null;
 let itemFullNameToastTimer = null;

@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/raids", tags=["Raids"])
 
 RAID_TIMES = [
     "01시", "03시", "05시", "06시", "07시", "09시", "11시", "12시",
-    "13시", "15시", "17시", "18시", "19시", "21시", "23시(오만)", "24시"
+    "13시", "15시", "17시", "18시", "19시", "21시", "23시(오만)", "24시", "용레이드"
 ]
 
 class PartyInfo(BaseModel):
@@ -281,7 +281,6 @@ def update_item_details(req: ItemDetailsUpdateRequest):
             dump["dist_checked"] = False
             dump["dist_date"] = ""
         elif dump.get("sale_type") == "연합":
-            # 연합 분배 아이템은 혈맹 분배 체크 및 혈분배일 차단
             dump["dist_checked"] = False
             dump["dist_date"] = ""
 
