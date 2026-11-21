@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>분배관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=59">
-    <link rel="stylesheet" href="/static/distribution.css?v=59">
+    <link rel="stylesheet" href="/static/common.css?v=63">
+    <link rel="stylesheet" href="/static/distribution.css?v=63">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -149,7 +149,7 @@
 
             <div class="dist-member-oneline-bar">
                 <input type="search" id="participantSearchInput" class="input-common member-search-left"
-                       placeholder="캐릭/아이템 검색" oninput="renderMergedParticipantsTable()">
+                       placeholder="캐릭/아이템/피닉스혈 검색" oninput="renderMergedParticipantsTable()">
                 <div class="status-tab-bar">
                     <button type="button" id="memTab_all" class="status-tab-btn" onclick="setMemberStatusFilter('all')">전체 보기</button>
                     <button type="button" id="memTab_wait" class="status-tab-btn active" onclick="setMemberStatusFilter('wait')">분배 대기</button>
@@ -167,7 +167,7 @@
                             <th>1인당<br>분배금</th>
                             <th>분배<br>상태</th>
                             <th>수령방식</th>
-                            <th>수령 아이디<br><span class="th-sub-label">(본캐/쫄/대리)</span></th>
+                            <th>수령 아이디<br><span class="th-sub-label">(본캐/쫄/대리/혈귀속)</span></th>
                             <th>분배받아간일</th>
                         </tr>
                     </thead>
@@ -179,7 +179,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=59"></script>
+    <script src="/static/common.js?v=63"></script>
     <script>
         let currentTaxRate = 20;
         let itemPriceMap = {};
@@ -474,10 +474,6 @@
                     }
 
                     const isFullyDone = (hasDistDate && pCount > 0 && doneMemberCount === pCount);
-                    // 상태 구분:
-                    // - 혈분배일 미입력 -> 'wait' (분배대기)
-                    // - 혈분배일 입력됨 + 미완료 -> 'progress' (분배중(0/6) ~ 분배중(5/6))
-                    // - 혈분배일 입력됨 + 전원 완료 -> 'done' (분배완료(6/6))
                     const itemState = !hasDistDate ? 'wait' : (isFullyDone ? 'done' : 'progress');
 
                     const price = Number(item.price || 0);
@@ -666,10 +662,6 @@
                 const slotText = `${toShortDate(entry.raid_date)} ${entry.raid_time}`;
                 const shortDistDate = hasDistDate ? toShortDate(entry.dist_date) : '미확정';
 
-                // [수정] 분배관리 분배상태 표시:
-                // - 처음 혈분배일 미입력 상태: '분배대기'
-                // - 혈분배일에 날짜가 입력되면: '분배중(0/6)' ~ '분배중(5/6)'
-                // - 모두 분배 완료되면: '분배완료(6/6)'
                 let statusBadgeHtml = '';
                 if (!hasDistDate) {
                     statusBadgeHtml = `<span class="status-badge-wait">분배대기</span>`;
@@ -874,6 +866,7 @@
         function buildMergedParticipantsList() {
             const targetEntries = getSelectedKpiDateEntries();
             const fallbackDate = getEffectiveFallbackDate();
+            const todayStr = ClanApp.formatYMD(new Date());
             const rowGroupMap = new Map();
 
             targetEntries.forEach(entry => {
@@ -889,6 +882,11 @@
                     const rowKey = `${p.id}__${distDateKey}__${groupType}`;
 
                     if (!rowGroupMap.has(rowKey)) {
+                        const defaultMethod = pDist.method || '본인수령';
+                        const defaultProxy = (defaultMethod === '혈귀속')
+                            ? (pDist.proxy_name || '피닉스혈')
+                            : (pDist.proxy_name || p.id);
+
                         rowGroupMap.set(rowKey, {
                             rowKey,
                             id: p.id,
@@ -898,9 +896,10 @@
                             isDoneGroup: isItemDone,
                             itemDetails: [],
                             totalShare: 0,
-                            method: pDist.method || '본인수령',
-                            proxy_name: pDist.proxy_name || p.id,
-                            paid_date: isItemDone ? (pDist.paid_date || effectiveDistDate) : effectiveDistDate
+                            method: defaultMethod,
+                            proxy_name: defaultProxy,
+                            // 분배받아간일 디폴트값: 현재일(오늘 날짜)
+                            paid_date: isItemDone ? (pDist.paid_date || todayStr) : todayStr
                         });
                     }
 
@@ -972,7 +971,7 @@
         function renderMergedParticipantsTable() {
             const mergedRows = buildMergedParticipantsList();
             const tbody = document.getElementById('distParticipantTableBody');
-            const fallbackDate = getEffectiveFallbackDate();
+            const todayStr = ClanApp.formatYMD(new Date());
 
             const topItemKw = document.getElementById('distItemSearch').value.trim().toLowerCase();
             const memberKw = document.getElementById('participantSearchInput').value.trim().toLowerCase();
@@ -990,9 +989,11 @@
                 if (memberKw) {
                     const draft = memberInputDrafts[m.rowKey] || {};
                     const proxyStr = (draft.proxy_name || m.proxy_name || '').toLowerCase();
+                    const methodStr = (draft.method || m.method || '').toLowerCase();
                     const matchMem = m.id.toLowerCase().includes(memberKw) ||
                                      m.itemDetails.some(it => `${it.name} ${ClanApp.getItemAlias(it.name)}`.toLowerCase().includes(memberKw)) ||
-                                     proxyStr.includes(memberKw);
+                                     proxyStr.includes(memberKw) ||
+                                     methodStr.includes(memberKw);
                     if (!matchMem) return false;
                 }
                 return true;
@@ -1006,11 +1007,14 @@
             const isAdmin = ClanApp.isAdminModeOn;
 
             tbody.innerHTML = visibleRows.map((m, rowIdx) => {
-                const defaultReceiver = (m.method === '대리수령') ? (m.proxy_name || '') : (m.proxy_name || m.id);
+                const defaultReceiver = (m.method === '혈귀속')
+                    ? (m.proxy_name || '피닉스혈')
+                    : ((m.method === '대리수령') ? (m.proxy_name || '') : (m.proxy_name || m.id));
+
                 const draft = memberInputDrafts[m.rowKey] || {
                     method: m.method || '본인수령',
                     proxy_name: defaultReceiver,
-                    paid_date: m.paid_date || m.effectiveDistDate || fallbackDate
+                    paid_date: m.paid_date || todayStr
                 };
                 memberInputDrafts[m.rowKey] = draft;
 
@@ -1027,7 +1031,7 @@
                     ? `<span class="status-badge-done">분배완료</span>`
                     : `<span class="status-badge-wait">분배대기</span>`;
 
-                const receiverDisplay = draft.proxy_name || m.id;
+                const receiverDisplay = draft.proxy_name || (draft.method === '혈귀속' ? '피닉스혈' : m.id);
 
                 if (!isAdmin) {
                     return `
@@ -1055,6 +1059,11 @@
                            ${isDone ? `<button type="button" class="btn-row-del" style="padding: 4px 7px; font-size: 11px;" onclick="resetMergedMemberRow('${safeRowKey}')">초기화</button>` : ''}
                        </div>`;
 
+                const inputPlaceholder = draft.method === '혈귀속'
+                    ? '피닉스혈'
+                    : (draft.method === '대리수령' ? '대리인' : '본캐/쫄');
+                const inputVal = draft.proxy_name || (draft.method === '혈귀속' ? '피닉스혈' : (draft.method === '대리수령' ? '' : m.id));
+
                 return `
                     <tr>
                         <td><span class="${nameColorClass}">${m.id}</span></td>
@@ -1066,15 +1075,16 @@
                             <select id="memMethod_${rowIdx}" class="dist-tbl-select"
                                     ${isLocked ? 'disabled' : ''}
                                     onchange="onMethodSelectChange('${safeRowKey}', '${safeMemId}', ${rowIdx}, this.value)">
-                                <option value="본인수령" ${draft.method !== '대리수령' ? 'selected' : ''}>본인수령</option>
+                                <option value="본인수령" ${draft.method !== '대리수령' && draft.method !== '혈귀속' ? 'selected' : ''}>본인수령</option>
                                 <option value="대리수령" ${draft.method === '대리수령' ? 'selected' : ''}>대리수령</option>
+                                <option value="혈귀속" ${draft.method === '혈귀속' ? 'selected' : ''}>혈귀속</option>
                             </select>
                         </td>
                         <td>
                             <div class="receiver-autocomplete-wrap">
                                 <input type="text" id="memProxy_${rowIdx}" class="dist-tbl-input receiver-input-compact"
-                                       value="${draft.proxy_name || (draft.method === '대리수령' ? '' : m.id)}"
-                                       placeholder="${draft.method === '대리수령' ? '대리인' : '본캐/쫄'}"
+                                       value="${inputVal}"
+                                       placeholder="${inputPlaceholder}"
                                        autocomplete="off"
                                        ${isLocked ? 'disabled' : ''}
                                        onfocus="onReceiverInputSearch('${safeRowKey}', '${safeMemId}', ${rowIdx})"
@@ -1113,6 +1123,13 @@
             onProxyInputSilent(rowKey, memberId, val);
 
             const method = methodEl ? methodEl.value : '본인수령';
+            if (method === '혈귀속') {
+                suggestBox.innerHTML = '';
+                suggestBox.classList.add('hidden');
+                activeReceiverSuggestIdx[rowIdx] = -1;
+                return;
+            }
+
             const q = val.toLowerCase();
             let candidates = [];
 
@@ -1223,15 +1240,22 @@
         }
 
         function onMethodSelectChange(rowKey, memberId, rowIdx, val) {
+            const todayStr = ClanApp.formatYMD(new Date());
             if (!memberInputDrafts[rowKey]) {
-                memberInputDrafts[rowKey] = { method: '본인수령', proxy_name: memberId, paid_date: getEffectiveFallbackDate() };
+                memberInputDrafts[rowKey] = { method: '본인수령', proxy_name: memberId, paid_date: todayStr };
             }
             memberInputDrafts[rowKey].method = val;
 
             const proxyInput = document.getElementById(`memProxy_${rowIdx}`);
+            const suggestBox = document.getElementById(`memProxySuggest_${rowIdx}`);
             if (!proxyInput) return;
 
-            if (val === '대리수령') {
+            if (val === '혈귀속') {
+                memberInputDrafts[rowKey].proxy_name = '피닉스혈';
+                proxyInput.value = '피닉스혈';
+                proxyInput.placeholder = '피닉스혈';
+                if (suggestBox) suggestBox.classList.add('hidden');
+            } else if (val === '대리수령') {
                 memberInputDrafts[rowKey].proxy_name = '';
                 proxyInput.value = '';
                 proxyInput.placeholder = '대리인';
@@ -1246,7 +1270,7 @@
 
         function onProxyInputSilent(rowKey, memberId, val) {
             if (!memberInputDrafts[rowKey]) {
-                memberInputDrafts[rowKey] = { method: '본인수령', proxy_name: memberId, paid_date: getEffectiveFallbackDate() };
+                memberInputDrafts[rowKey] = { method: '본인수령', proxy_name: memberId, paid_date: ClanApp.formatYMD(new Date()) };
             }
             memberInputDrafts[rowKey].proxy_name = val.trim();
         }
@@ -1272,6 +1296,7 @@
             if (!targetRow) return;
 
             const memberId = targetRow.id;
+            const todayStr = ClanApp.formatYMD(new Date());
             const targetDistDate = targetRow.distDate || targetRow.effectiveDistDate || getEffectiveFallbackDate();
             const methodEl = document.getElementById(`memMethod_${rowIdx}`);
             const proxyEl = document.getElementById(`memProxy_${rowIdx}`);
@@ -1279,8 +1304,13 @@
 
             const method = methodEl ? methodEl.value : '본인수령';
             const rawReceiver = proxyEl ? proxyEl.value.trim() : '';
-            const proxy_name = (method === '대리수령') ? rawReceiver : (rawReceiver || memberId);
-            const paid_date = (dateEl && dateEl.value) ? dateEl.value : targetDistDate;
+            let proxy_name = rawReceiver || memberId;
+            if (method === '혈귀속') {
+                proxy_name = rawReceiver || '피닉스혈';
+            } else if (method === '대리수령') {
+                proxy_name = rawReceiver;
+            }
+            const paid_date = (dateEl && dateEl.value) ? dateEl.value : todayStr;
 
             if (method === '대리수령' && !proxy_name) {
                 alert('대리수령을 선택한 경우 대리수령 아이디를 입력해 주세요.');
@@ -1378,6 +1408,7 @@
             if (targetEntries.length === 0) return alert('선택한 혈분배일에 분배 처리할 대상 아이템이 없습니다.');
 
             const selectedDistDate = getEffectiveFallbackDate();
+            const todayStr = ClanApp.formatYMD(new Date());
             const labelStr = (selectedKpiDistDate === 'all') ? '현재 조회된 전체 혈분배일' : `혈분배일 [${toShortDate(selectedDistDate)}]`;
             if (!confirm(`${labelStr}의 모든 미분배 참여자를 [분배완료] 처리하시겠습니까?`)) return;
 
@@ -1400,11 +1431,15 @@
                         if (existing.status !== '분배완료') {
                             const waitRowKey = `${p.id}__${distDate}__wait`;
                             const draft = memberInputDrafts[waitRowKey] || {};
+                            const methodVal = draft.method || '본인수령';
+                            const receiverVal = (methodVal === '혈귀속')
+                                ? (draft.proxy_name || '피닉스혈')
+                                : (draft.proxy_name || p.id);
                             const doneInfo = {
                                 status: '분배완료',
-                                method: draft.method || '본인수령',
-                                proxy_name: draft.proxy_name || p.id,
-                                paid_date: draft.paid_date || distDate
+                                method: methodVal,
+                                proxy_name: receiverVal,
+                                paid_date: draft.paid_date || todayStr
                             };
                             distMap[`${p.id}__date_${distDate}`] = doneInfo;
                             distMap[`${p.id}__item_${idx}`] = doneInfo;
