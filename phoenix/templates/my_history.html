@@ -4,516 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>참여내역 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=58">
-    <link rel="stylesheet" href="/static/my_history.css?v=39">
-</head>
-<body>
-    <nav class="navbar" id="appNavbar"></nav>
-
-    <main class="main-container">
-        <!-- 상단 타이틀 & 관리자 조회대상 검색 / 엑셀 다운로드 -->
-        <div class="top-bar">
-            <h1 class="page-title">🛡️ 캐릭터 및 참여·분배금 수령 내역</h1>
-            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                <div id="adminMemberSearchBox" class="admin-target-search admin-only">
-                    <span style="color: #fbbf24; font-size: 11.5px; font-weight: 800;">👑 조회 캐릭터:</span>
-                    <input type="text" id="targetMemberIdInput" class="input-common" placeholder="아이디" style="width: 100px; padding: 4px 7px; font-size: 12px;">
-                    <button type="button" class="btn-sm btn-sm-blue" onclick="reloadProfileAndHistory()">조회</button>
-                </div>
-                <div class="excel-btn-group admin-only">
-                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('month')">📥 월별</button>
-                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('day')">일별</button>
-                    <button type="button" class="btn-excel-sm" onclick="exportHistoryExcel('all')">전체</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 1. 캐릭터 프로필 & 조회 조건 -->
-        <section class="card-box">
-            <div class="history-profile-grid">
-                <div>
-                    <div class="prof-box-label">고유 아이디</div>
-                    <div class="prof-box-val" id="profUniqueId">-</div>
-                </div>
-                <div>
-                    <div class="prof-box-label">본캐릭터</div>
-                    <div class="prof-box-val" style="color: #fbbf24;" id="profActiveId">-</div>
-                </div>
-                <div>
-                    <div class="prof-box-label">보조캐릭 (1~3)</div>
-                    <div class="prof-box-val" style="color: #a7f3d0;" id="profSubChars">-</div>
-                </div>
-                <div>
-                    <div class="prof-box-label">클래스 / 스킬</div>
-                    <div class="prof-box-val" style="color: #4ade80;" id="profClassSkills">-</div>
-                </div>
-            </div>
-
-            <div class="history-filter-grid">
-                <div class="history-filter-field">
-                    <label>날짜 검색 기준</label>
-                    <select id="historyDateBasis" class="input-common" onchange="renderAllHistoryViews()">
-                        <option value="raid_date">보스탐 일자 기준</option>
-                        <option value="dist_date">혈분배일 기준</option>
-                        <option value="paid_date">본인수령일 기준</option>
-                    </select>
-                </div>
-
-                <div class="history-filter-field">
-                    <label>조회 단위</label>
-                    <select id="historyPeriodMode" class="input-common" onchange="onHistoryPeriodModeChange()">
-                        <option value="month" selected>월별</option>
-                        <option value="day">일별</option>
-                        <option value="all">전체</option>
-                    </select>
-                </div>
-
-                <div id="historyMonthBox" class="history-filter-field">
-                    <label>조회 월 선택</label>
-                    <input type="month" id="historyMonth" class="input-common" onchange="onHistoryMonthChange()">
-                </div>
-
-                <div id="historyDateBox" class="history-filter-field hidden">
-                    <label id="historyDateLabel">기준 일자</label>
-                    <input type="date" id="historyDate" class="input-common" onchange="onHistoryDateChange()">
-                </div>
-
-                <div id="historyAllBox" class="history-filter-field hidden">
-                    <label>기간 범위</label>
-                    <input type="text" class="input-common" value="전체 누적 내역" disabled>
-                </div>
-
-                <div class="history-filter-field">
-                    <label>아이템별 검색</label>
-                    <input type="search" id="historyItemSearch" class="input-common" placeholder="아이템명 입력" oninput="renderHistoryItemsTable()">
-                </div>
-
-                <div class="participation-kpi-group">
-                    <div class="part-kpi-badge">
-                        <div class="part-kpi-label">해당 일 참여횟수</div>
-                        <div class="part-kpi-val day-val"><span id="dayParticipatedCount">0</span>회</div>
-                    </div>
-                    <div class="part-kpi-badge">
-                        <div class="part-kpi-label">월별 보스탐 참여횟수</div>
-                        <div class="part-kpi-val"><span id="monthParticipatedCount">0</span>회</div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- 2. 선택일 16개 보스탐 참여 타임 그리드 -->
-        <section class="card-box">
-            <div class="history-time-header">
-                <span class="section-label">⏱️ <span id="selectedHistoryDateLabel" class="history-selected-date">00-00-00</span> 보스탐 참여 타임</span>
-                <div style="display: flex; gap: 6px;">
-                    <button type="button" class="btn-sm btn-sm-dark" onclick="moveHistoryDay(-1)">◀ 전날</button>
-                    <button type="button" class="btn-sm btn-sm-blue" onclick="setHistoryToday()">오늘</button>
-                    <button type="button" class="btn-sm btn-sm-dark" onclick="moveHistoryDay(1)">다음날 ▶</button>
-                </div>
-            </div>
-
-            <div id="myCommonTimeGrid" class="common-time-grid"></div>
-        </section>
-
-        <!-- 3. 참여 보스탐 아이템 및 분배금 수령 내역 -->
-        <section class="card-box">
-            <div class="history-items-header">
-                <span class="section-label">💎 참여 보스탐 아이템 및 분배금 수령 내역</span>
-                <div class="status-tab-bar">
-                    <button type="button" id="histTab_all" class="status-tab-btn active" onclick="setHistoryItemFilter('all')">전체 (<span id="cntAllItems">0</span>)</button>
-                    <button type="button" id="histTab_wait" class="status-tab-btn" onclick="setHistoryItemFilter('wait')">분배대기중인 아이템 (<span id="cntWaitItems">0</span>)</button>
-                    <button type="button" id="histTab_done" class="status-tab-btn" onclick="setHistoryItemFilter('done')">분배완료 아이템 (<span id="cntDoneItems">0</span>)</button>
-                </div>
-            </div>
-
-            <div class="history-table-wrap">
-                <table class="history-item-table">
-                    <thead>
-                        <tr>
-                            <th>보스탐</th>
-                            <th>아이템</th>
-                            <th>혈비제외가</th>
-                            <th>참여인원</th>
-                            <th>내분배금</th>
-                            <th>혈분배일</th>
-                            <th>분배금수령상태</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dailyIndividualShareBody">
-                        <tr><td colspan="7" class="empty-party-msg">조회 중...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
-
-    <script src="/static/common.js?v=58"></script>
-    <script>
-        let currentTaxRate = 20;
-        let allMembers = [];
-        let itemPriceMap = {};
-        let allRaidsCache = [];
-        let historyItemFilter = 'all';
-
-        window.onload = async () => {
-            const user = ClanApp.initPage('/my-history', () => {
-                if (!ClanApp.isAdminModeOn) {
-                    document.getElementById('targetMemberIdInput').value = ClanApp.user.active_id;
-                    reloadProfileAndHistory();
-                } else {
-                    renderHistoryItemsTable();
-                }
-            });
-            if (!user) return;
-
-            document.getElementById('targetMemberIdInput').value = user.active_id;
-
-            const now = new Date();
-            document.getElementById('historyMonth').value = ClanApp.formatYM(now);
-            document.getElementById('historyDate').value = ClanApp.formatYMD(now);
-
-            await Promise.all([loadTaxRate(), loadMembers(), loadItemMasterPrices()]);
-            await reloadProfileAndHistory();
-        };
-
-        function toShortDate(dateStr) {
-            if (!dateStr || dateStr.length < 8) return '-';
-            return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
-        }
-
-        function getHistoryItemDistInfo(raid, itemIdx, itemDistDate, memberId) {
-            const distMap = (raid && raid.distributions) || {};
-            const dDate = (itemDistDate || '').trim();
-            if (dDate && distMap[`${memberId}__date_${dDate}`]) {
-                return distMap[`${memberId}__date_${dDate}`];
-            }
-            const perKey = `${memberId}__item_${itemIdx}`;
-            if (distMap[perKey]) return distMap[perKey];
-
-            const legacy = distMap[memberId];
-            if (!legacy) return { status: '분배대기', method: '본인수령', proxy_name: '', paid_date: '' };
-
-            if (legacy.status === '분배완료') {
-                const paidDate = (legacy.paid_date || '').trim();
-                if (paidDate && dDate && dDate > paidDate) {
-                    return { status: '분배대기', method: '본인수령', proxy_name: '', paid_date: '' };
-                }
-            }
-            return legacy;
-        }
-
-        async function loadTaxRate() {
-            try {
-                const res = await fetch('/api/raids/tax-rate');
-                currentTaxRate = Number((await res.json()).tax_rate ?? 20);
-            } catch (e) {
-                currentTaxRate = 20;
-            }
-        }
-
-        async function loadMembers() {
-            try {
-                const res = await fetch('/api/auth/search-members');
-                allMembers = await res.json();
-            } catch (e) {
-                allMembers = [];
-            }
-        }
-
-        async function loadItemMasterPrices() {
-            itemPriceMap = {};
-            try {
-                const res = await fetch('/api/items');
-                if (!res.ok) return;
-                const list = await res.json();
-                ClanApp.setItemAliases(list);
-                list.forEach(it => {
-                    if (it.item_name) itemPriceMap[it.item_name] = Number(it.default_price || 0);
-                });
-            } catch (e) {
-                itemPriceMap = {};
-            }
-        }
-
-        function getTargetMemberId() {
-            if (ClanApp.isAdminModeOn) {
-                return document.getElementById('targetMemberIdInput').value.trim() || ClanApp.user.active_id;
-            }
-            return ClanApp.user.active_id;
-        }
-
-        function renderProfileCard(targetId) {
-            const m = allMembers.find(x => x.active_id === targetId) || ClanApp.user;
-            document.getElementById('profUniqueId').textContent = m.unique_id || '-';
-            document.getElementById('profActiveId').textContent = m.active_id || targetId;
-            document.getElementById('profSubChars').textContent = m.sub_chars || '없음';
-            const skills = Array.isArray(m.skills) ? m.skills.join(', ') : (m.skills || '');
-            document.getElementById('profClassSkills').textContent = `${m.char_class || '-'} (${skills || '스킬없음'})`;
-        }
-
-        function onHistoryPeriodModeChange() {
-            const mode = document.getElementById('historyPeriodMode').value;
-            const monthBox = document.getElementById('historyMonthBox');
-            const dateBox = document.getElementById('historyDateBox');
-            const allBox = document.getElementById('historyAllBox');
-
-            monthBox.classList.add('hidden');
-            dateBox.classList.add('hidden');
-            allBox.classList.add('hidden');
-
-            if (mode === 'month') {
-                monthBox.classList.remove('hidden');
-            } else if (mode === 'day') {
-                dateBox.classList.remove('hidden');
-            } else {
-                allBox.classList.remove('hidden');
-            }
-
-            renderAllHistoryViews();
-        }
-
-        function onHistoryMonthChange() {
-            const ym = document.getElementById('historyMonth').value;
-            if (!ym) return;
-            if (!document.getElementById('historyDate').value.startsWith(ym)) {
-                document.getElementById('historyDate').value = `${ym}-01`;
-            }
-            renderAllHistoryViews();
-        }
-
-        function onHistoryDateChange() {
-            const d = document.getElementById('historyDate').value;
-            if (!d) return;
-            document.getElementById('historyMonth').value = d.slice(0, 7);
-            renderAllHistoryViews();
-        }
-
-        function moveHistoryDay(offset) {
-            const dVal = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
-            const [y, m, d] = dVal.split('-').map(Number);
-            const target = new Date(y, m - 1, d);
-            target.setDate(target.getDate() + offset);
-            document.getElementById('historyDate').value = ClanApp.formatYMD(target);
-            onHistoryDateChange();
-        }
-
-        function setHistoryToday() {
-            document.getElementById('historyDate').value = ClanApp.formatYMD(new Date());
-            onHistoryDateChange();
-        }
-
-        function setHistoryItemFilter(filterVal) {
-            historyItemFilter = filterVal;
-            ['all', 'wait', 'done'].forEach(k => {
-                const btn = document.getElementById(`histTab_${k}`);
-                if (btn) btn.classList.toggle('active', k === filterVal);
-            });
-            renderHistoryItemsTable();
-        }
-
-        async function reloadProfileAndHistory() {
-            const targetId = getTargetMemberId();
-            renderProfileCard(targetId);
-            const res = await fetch('/api/raids');
-            allRaidsCache = await res.json();
-            renderAllHistoryViews();
-        }
-
-        function renderAllHistoryViews() {
-            const targetId = getTargetMemberId();
-            const dateVal = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
-            const monthVal = document.getElementById('historyMonth').value || dateVal.slice(0, 7);
-            document.getElementById('selectedHistoryDateLabel').textContent = toShortDate(dateVal);
-
-            let monthPartCount = 0;
-            let dayPartCount = 0;
-
-            allRaidsCache.forEach(r => {
-                const pIds = ClanApp.extractParticipants(r).map(p => p.id);
-                if (pIds.includes(targetId)) {
-                    if ((r.raid_date || '').startsWith(monthVal)) {
-                        monthPartCount++;
-                    }
-                    if (r.raid_date === dateVal) {
-                        dayPartCount++;
-                    }
-                }
-            });
-
-            document.getElementById('dayParticipatedCount').textContent = dayPartCount;
-            document.getElementById('monthParticipatedCount').textContent = monthPartCount;
-
-            const dayRecords = allRaidsCache.filter(r => r.raid_date === dateVal);
-            const gridEl = document.getElementById('myCommonTimeGrid');
-
-            gridEl.innerHTML = ClanApp.RAID_TIMES.map(t => {
-                const rec = dayRecords.find(r => r.raid_time === t);
-                const pIds = rec ? ClanApp.extractParticipants(rec).map(p => p.id) : [];
-                const participated = pIds.includes(targetId);
-                const subText = participated ? '참여완료' : '미참여';
-
-                return `
-                    <div class="common-time-btn my-slot-btn ${participated ? 'participated' : ''}">
-                        <span>${t}</span>
-                        <span class="common-time-sub">${subText}</span>
-                    </div>
-                `;
-            }).join('');
-
-            renderHistoryItemsTable();
-        }
-
-        function matchesDateFilter(targetDateStr, periodMode, refDateVal, refMonthVal) {
-            if (periodMode === 'all') return true;
-            if (!targetDateStr) return false;
-
-            if (periodMode === 'day') {
-                return targetDateStr === refDateVal;
-            } else if (periodMode === 'month') {
-                return targetDateStr.startsWith(refMonthVal);
-            }
-            return true;
-        }
-
-        function renderHistoryItemsTable() {
-            const targetId = getTargetMemberId();
-            const basis = document.getElementById('historyDateBasis').value;
-            const periodMode = document.getElementById('historyPeriodMode').value;
-            const refDateVal = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
-            const refMonthVal = document.getElementById('historyMonth').value || refDateVal.slice(0, 7);
-            const kw = document.getElementById('historyItemSearch').value.trim().toLowerCase();
-
-            const allItemRows = [];
-
-            allRaidsCache.forEach(r => {
-                const participants = ClanApp.extractParticipants(r);
-                const pIds = participants.map(p => p.id);
-                if (!pIds.includes(targetId)) return;
-
-                const memberCount = participants.length;
-                const details = ClanApp.extractItemDetails(r, itemPriceMap);
-
-                details.forEach((item, idx) => {
-                    if (kw && !item.name.toLowerCase().includes(kw) && !ClanApp.getItemAlias(item.name).toLowerCase().includes(kw)) return;
-
-                    const sType = item.sale_type || '보유중';
-                    const isNonDistType = (sType === '연합' || sType === '이벤트');
-                    const clanDistDate = isNonDistType ? '' : (item.dist_date || '');
-                    const distInfo = getHistoryItemDistInfo(r, idx, clanDistDate, targetId);
-                    const isDone = isNonDistType ? true : (distInfo.status === '분배완료');
-                    const myPaidDate = isNonDistType ? '' : (distInfo.paid_date || '');
-
-                    let compareDate = r.raid_date;
-                    if (basis === 'dist_date') {
-                        compareDate = clanDistDate;
-                    } else if (basis === 'paid_date') {
-                        compareDate = myPaidDate;
-                    }
-
-                    if (!matchesDateFilter(compareDate, periodMode, refDateVal, refMonthVal)) return;
-
-                    const grossPrice = isNonDistType ? 0 : Number(item.price || 0);
-                    const netPrice = Math.floor(grossPrice * (1 - currentTaxRate / 100));
-                    const myItemShare = (memberCount > 0 && netPrice > 0) ? Math.floor(netPrice / memberCount) : 0;
-
-                    allItemRows.push({
-                        raid_date: r.raid_date,
-                        raid_time: r.raid_time,
-                        memberCount,
-                        item_name: item.name,
-                        sale_type: sType,
-                        net_price: netPrice,
-                        my_share: myItemShare,
-                        clan_dist_date: clanDistDate,
-                        is_done: isDone,
-                        method: distInfo.method || '본인수령',
-                        receiver_id: (distInfo.proxy_name && distInfo.proxy_name.trim()) ? distInfo.proxy_name.trim() : targetId,
-                        paid_date: myPaidDate
-                    });
-                });
-            });
-
-            const waitRows = allItemRows.filter(x => !x.is_done);
-            const doneRows = allItemRows.filter(x => x.is_done);
-
-            document.getElementById('cntAllItems').textContent = allItemRows.length;
-            document.getElementById('cntWaitItems').textContent = waitRows.length;
-            document.getElementById('cntDoneItems').textContent = doneRows.length;
-
-            let targetRows = allItemRows;
-            if (historyItemFilter === 'wait') targetRows = waitRows;
-            else if (historyItemFilter === 'done') targetRows = doneRows;
-
-            const tbody = document.getElementById('dailyIndividualShareBody');
-            if (targetRows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="empty-party-msg">해당 검색 조건에 조회된 아이템 내역이 없습니다.</td></tr>`;
-                return;
-            }
-
-            const totalMyShare = targetRows.reduce((acc, cur) => acc + cur.my_share, 0);
-
-            const rowsHtml = targetRows.map(row => {
-                let statusHtml = '';
-                if (row.sale_type === '연합' || row.sale_type === '이벤트') {
-                    statusHtml = `<span class="badge-gray-done">${row.sale_type} (분배제외)</span>`;
-                } else if (row.is_done) {
-                    const methodLabel = row.method === '대리수령'
-                        ? `대리수령 (${row.receiver_id})`
-                        : `본인수령 (${row.receiver_id})`;
-                    const datePart = row.paid_date ? `<span class="done-paid-date">${toShortDate(row.paid_date)}</span>` : '';
-                    statusHtml = `
-                        <div class="history-status-cell">
-                            <span class="badge-gray-done">${methodLabel}</span>
-                            ${datePart}
-                        </div>
-                    `;
-                } else {
-                    statusHtml = `<span class="badge-orange-wait">분배 대기</span>`;
-                }
-
-                return `
-                    <tr>
-                        <td class="same-member-color">${toShortDate(row.raid_date)} ${row.raid_time}</td>
-                        <td class="drop-item-name">${ClanApp.itemNameHtml(row.item_name)}</td>
-                        <td class="same-member-color">${row.net_price.toLocaleString()}</td>
-                        <td class="same-member-color">${row.memberCount}명</td>
-                        <td style="color:#fbbf24; font-weight:900;">${row.my_share.toLocaleString()}</td>
-                        <td class="clan-dist-date-cell">${row.clan_dist_date ? toShortDate(row.clan_dist_date) : '-'}</td>
-                        <td>${statusHtml}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            tbody.innerHTML = rowsHtml + `
-                <tr class="history-sum-row">
-                    <td colspan="7">
-                        조회 기간 내 분배금 합계:
-                        <span class="history-sum-amount">${totalMyShare.toLocaleString()}</span>
-                    </td>
-                </tr>
-            `;
-        }
-
-        function exportHistoryExcel(kind) {
-            if (!ClanApp.isAdminModeOn) return;
-            const refDate = document.getElementById('historyDate').value || ClanApp.formatYMD(new Date());
-            const refMonth = document.getElementById('historyMonth').value || ClanApp.formatYM(new Date());
-
-            if (kind === 'day') {
-                ClanApp.downloadExcel({ date: refDate });
-            } else if (kind === 'month') {
-                ClanApp.downloadExcel({ month: refMonth });
-            } else {
-                ClanApp.downloadExcel({});
-            }
-        }
-    </script>
-</body><!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>참여내역 - 혈맹 보스탐 체크기</title>
     <link rel="stylesheet" href="/static/common.css?v=63">
     <link rel="stylesheet" href="/static/my_history.css?v=39">
 </head>
@@ -753,7 +243,8 @@
         }
 
         function renderProfileCard(targetId) {
-            const m = allMembers.find(x => x.active_id === targetId) || ClanApp.user;
+            const m = allMembers.find(x => x.active_id === targetId)
+                || (targetId === ClanApp.user.active_id ? ClanApp.user : { active_id: targetId });
             document.getElementById('profUniqueId').textContent = m.unique_id || '-';
             document.getElementById('profActiveId').textContent = m.active_id || targetId;
             document.getElementById('profSubChars').textContent = m.sub_chars || '없음';
@@ -898,8 +389,6 @@
             allRaidsCache.forEach(r => {
                 const participants = ClanApp.extractParticipants(r);
                 const pIds = participants.map(p => p.id);
-                if (!pIds.includes(targetId)) return;
-
                 const memberCount = participants.length;
                 const details = ClanApp.extractItemDetails(r, itemPriceMap);
 
@@ -909,37 +398,61 @@
                     const sType = item.sale_type || '보유중';
                     const isNonDistType = (sType === '연합' || sType === '이벤트');
                     const clanDistDate = isNonDistType ? '' : (item.dist_date || '');
-                    const distInfo = getHistoryItemDistInfo(r, idx, clanDistDate, targetId);
-                    const isDone = isNonDistType ? true : (distInfo.status === '분배완료');
-                    const myPaidDate = isNonDistType ? '' : (distInfo.paid_date || '');
-
-                    let compareDate = r.raid_date;
-                    if (basis === 'dist_date') {
-                        compareDate = clanDistDate;
-                    } else if (basis === 'paid_date') {
-                        compareDate = myPaidDate;
-                    }
-
-                    if (!matchesDateFilter(compareDate, periodMode, refDateVal, refMonthVal)) return;
-
                     const grossPrice = isNonDistType ? 0 : Number(item.price || 0);
                     const netPrice = Math.floor(grossPrice * (1 - currentTaxRate / 100));
                     const myItemShare = (memberCount > 0 && netPrice > 0) ? Math.floor(netPrice / memberCount) : 0;
 
-                    allItemRows.push({
-                        raid_date: r.raid_date,
-                        raid_time: r.raid_time,
-                        memberCount,
-                        item_name: item.name,
-                        sale_type: sType,
-                        net_price: netPrice,
-                        my_share: myItemShare,
-                        clan_dist_date: clanDistDate,
-                        is_done: isDone,
-                        method: distInfo.method || '본인수령',
-                        receiver_id: (distInfo.proxy_name && distInfo.proxy_name.trim()) ? distInfo.proxy_name.trim() : targetId,
-                        paid_date: myPaidDate
-                    });
+                    // ownerId: 이 분배금의 원래 주인(참여자)
+                    // viaBloodTo: 혈귀속으로 targetId(피닉스혈)에게 귀속된 경우의 원 참여자 표시용
+                    const pushRow = (ownerId, isBloodCredit) => {
+                        const distInfo = getHistoryItemDistInfo(r, idx, clanDistDate, ownerId);
+                        const isDone = isNonDistType ? true : (distInfo.status === '분배완료');
+                        const myPaidDate = isNonDistType ? '' : (distInfo.paid_date || '');
+
+                        let compareDate = r.raid_date;
+                        if (basis === 'dist_date') {
+                            compareDate = clanDistDate;
+                        } else if (basis === 'paid_date') {
+                            compareDate = myPaidDate;
+                        }
+                        if (!matchesDateFilter(compareDate, periodMode, refDateVal, refMonthVal)) return;
+
+                        allItemRows.push({
+                            raid_date: r.raid_date,
+                            raid_time: r.raid_time,
+                            memberCount,
+                            item_name: item.name,
+                            sale_type: sType,
+                            net_price: netPrice,
+                            my_share: myItemShare,
+                            clan_dist_date: clanDistDate,
+                            is_done: isDone,
+                            method: isBloodCredit ? '혈귀속' : (distInfo.method || '본인수령'),
+                            receiver_id: isBloodCredit
+                                ? targetId
+                                : ((distInfo.proxy_name && distInfo.proxy_name.trim()) ? distInfo.proxy_name.trim() : ownerId),
+                            paid_date: myPaidDate,
+                            blood_credit_from: isBloodCredit ? ownerId : ''
+                        });
+                    };
+
+                    // 1) 본인이 참여한 보스탐: 기존대로 본인 내역(대리수령이면 본 아이디에 그대로 표시)
+                    if (pIds.includes(targetId)) {
+                        pushRow(targetId, false);
+                    }
+
+                    // 2) 다른 참여자의 분배금이 혈귀속으로 targetId(예: 피닉스혈)에게 귀속된 경우 → targetId 내역에 추가
+                    if (!isNonDistType) {
+                        pIds.forEach(ownerId => {
+                            if (ownerId === targetId) return;
+                            const info = getHistoryItemDistInfo(r, idx, clanDistDate, ownerId);
+                            if (info.status === '분배완료'
+                                && info.method === '혈귀속'
+                                && (info.proxy_name || '').trim() === targetId) {
+                                pushRow(ownerId, true);
+                            }
+                        });
+                    }
                 });
             });
 
@@ -971,7 +484,9 @@
                     if (row.method === '대리수령') {
                         methodLabel = `대리수령 (${row.receiver_id})`;
                     } else if (row.method === '혈귀속') {
-                        methodLabel = `혈귀속 (${row.receiver_id || '피닉스혈'})`;
+                        methodLabel = row.blood_credit_from
+                            ? `혈귀속 수령 (${row.blood_credit_from} 분)`
+                            : `혈귀속 (${row.receiver_id || '피닉스혈'})`;
                     }
                     const datePart = row.paid_date ? `<span class="done-paid-date">${toShortDate(row.paid_date)}</span>` : '';
                     statusHtml = `
@@ -1022,5 +537,4 @@
         }
     </script>
 </body>
-</html>
 </html>
