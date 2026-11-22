@@ -30,8 +30,6 @@ window.ClanApp = {
         return (t === '용레이드' || t === this.SIEGE_TIME) ? ` data-slot="${t}"` : '';
     },
 
-    // 아이템 진행 단계: 연합분배대기(저장값 '보유중') → 연합 선택 → 내판 / 외판 / 이벤트
-    // 저장값은 기존 DB 호환을 위해 '보유중' 그대로 쓰고, 화면에는 '연합분배대기'로 표기
     saleTypeLabel(t) {
         return (!t || t === '보유중') ? '연합분배대기' : t;
     },
@@ -79,11 +77,9 @@ window.ClanApp = {
         ];
 
         const adminTabs = [];
-        // 관리자 모드 ON일 때만 '혈맹원관리' 표시
         if (this.hasAdminPrivilege && (this.isAdminModeOn || activePath === '/admin')) {
             adminTabs.push({ href: '/admin', label: '혈맹원관리' });
         }
-        // '명단'과 '아이템'은 일반회원도 열람 가능하도록 항상 표시
         adminTabs.push({ href: '/member-list', label: '명단' });
         adminTabs.push({ href: '/item-manage', label: '아이템' });
 
@@ -181,7 +177,6 @@ window.ClanApp = {
 
     getSlotStatus(dateStr, timeLabel, now = new Date()) {
         const hourNum = this.parseRaidHour(timeLabel);
-        // 용레이드 등 고정 시각이 없는 특수 타임은 날짜·시간 상관없이 항시 입력 가능
         if (hourNum === null) {
             return 'open';
         }
@@ -247,13 +242,12 @@ window.ClanApp = {
             const winner = foundObj ? (foundObj.winner || '').trim() : '';
             const rawSaleType = foundObj && foundObj.sale_type ? foundObj.sale_type : '보유중';
             const savedPrice = foundObj ? Number(foundObj.price || 0) : 0;
-
             const alliance = foundObj ? String(foundObj.alliance || '').trim() : '';
+            const castleTaxDate = foundObj ? String(foundObj.castle_tax_date || '').trim() : '';
 
             let sType = '보유중';
             let finalPrice = policyPrice;
 
-            // 진행 단계: 연합분배대기(alliance 없음) → 피닉스 선택 시 내판/외판/이벤트, 반항·세븐 선택 시 연합(분배 없음)
             if (alliance === '반항' || alliance === '세븐') {
                 sType = '연합';
                 finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
@@ -261,11 +255,17 @@ window.ClanApp = {
                 if (rawSaleType === '이벤트') {
                     sType = '이벤트';
                     finalPrice = 0;
+                } else if (rawSaleType === '성세금포함') {
+                    sType = '성세금포함';
+                    finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
+                } else if (rawSaleType === '분배금혈귀') {
+                    sType = '분배금혈귀';
+                    finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
                 } else if (rawSaleType === '내판' || rawSaleType === '외판') {
                     sType = rawSaleType;
                     finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
                 } else {
-                    sType = '보유중';   // 피닉스 선택 후 판매구분 대기
+                    sType = '보유중';
                     finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
                 }
             } else if (winner) {
@@ -284,7 +284,6 @@ window.ClanApp = {
                 finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
             }
 
-            // 이벤트템: 분배금 0원, 구분 '이벤트'로 고정
             if (this.isEventItem(name)) {
                 return {
                     name,
@@ -296,11 +295,11 @@ window.ClanApp = {
                     dist_date: '',
                     dist_checked: false,
                     alliance,
+                    castle_tax_date: '',
                     event_item: true
                 };
             }
 
-            // 혈비귀속 아이템: 판매금(정책가) 자동 표시, 분배 대상에서 제외
             if (this.isClanOwnedItem(name)) {
                 return {
                     name,
@@ -312,11 +311,18 @@ window.ClanApp = {
                     dist_date: '',
                     dist_checked: false,
                     alliance,
+                    castle_tax_date: '',
                     clan_owned: true
                 };
             }
 
-            const canDist = Boolean(foundObj && winner && (sType === '내판' || sType === '외판'));
+            // 성세금 아이템 및 성세금포함 아이템도 수령자 없이 체크(분배관리 연동) 가능
+            const isCastleTax = this.isCastleTaxItem(name);
+            const canDist = Boolean(foundObj && (
+                (winner && (sType === '내판' || sType === '외판')) ||
+                sType === '성세금포함' ||
+                (isCastleTax && !['연합', '이벤트', '분배금혈귀'].includes(sType))
+            ));
             const distDate = canDist ? (foundObj.dist_date || '') : '';
             const isChecked = canDist ? Boolean(foundObj.dist_checked || distDate) : false;
 
@@ -329,7 +335,8 @@ window.ClanApp = {
                 taken_date: (foundObj && winner) ? (foundObj.taken_date || '') : '',
                 dist_date: distDate,
                 dist_checked: isChecked,
-                alliance
+                alliance,
+                castle_tax_date: sType === '성세금포함' ? castleTaxDate : ''
             };
         };
 
@@ -349,6 +356,65 @@ window.ClanApp = {
             }
             return resolveItemObj(token, found);
         });
+    },
+
+    isCastleTaxItem(name) {
+        const n = String(name || '').trim();
+        return n === '성세금' || this.getItemAlias(n) === '성세금';
+    },
+
+    // '성세금포함' 아이템 금액을 지정된 날짜(없으면 가장 가까운 날짜)의 '성세금' 풀에 합산
+    buildCastleTaxBonusMap(raids = [], priceMap = {}) {
+        const taxTargets = [];
+        const includedEntries = [];
+
+        (raids || []).forEach(r => {
+            const details = this.extractItemDetails(r, priceMap);
+            details.forEach((item, idx) => {
+                if (this.isCastleTaxItem(item.name)) {
+                    taxTargets.push({
+                        key: `${r.id}_${idx}`,
+                        raid_id: r.id,
+                        raid_date: r.raid_date || ''
+                    });
+                } else if (item.sale_type === '성세금포함') {
+                    includedEntries.push({
+                        name: item.name,
+                        price: Number(item.price || 0),
+                        raid_date: r.raid_date || '',
+                        raid_time: r.raid_time || '',
+                        castle_tax_date: (item.castle_tax_date || '').trim()
+                    });
+                }
+            });
+        });
+
+        taxTargets.sort((a, b) => a.raid_date.localeCompare(b.raid_date) || (a.raid_id - b.raid_id));
+
+        const bonusMap = Object.create(null);
+        if (taxTargets.length === 0) return bonusMap;
+
+        includedEntries.forEach(entry => {
+            let target = null;
+            if (entry.castle_tax_date) {
+                target = taxTargets.find(t => t.raid_date === entry.castle_tax_date) || null;
+            } else {
+                const ym = entry.raid_date.slice(0, 7);
+                target = taxTargets.find(t => t.raid_date >= entry.raid_date);
+                if (!target) {
+                    const sameMonth = taxTargets.filter(t => t.raid_date.startsWith(ym));
+                    target = sameMonth.length ? sameMonth[sameMonth.length - 1] : taxTargets[taxTargets.length - 1];
+                }
+            }
+            if (!target) return;
+            if (!bonusMap[target.key]) {
+                bonusMap[target.key] = { bonusPrice: 0, includedItems: [] };
+            }
+            bonusMap[target.key].bonusPrice += entry.price;
+            bonusMap[target.key].includedItems.push(entry);
+        });
+
+        return bonusMap;
     },
 
     extractParticipants(record) {
@@ -382,7 +448,7 @@ window.ClanApp = {
     }
 };
 
-// 용레이드(:last-child) 버튼: 렌더링 즉시 적용되는 순수 CSS로 깜빡임 원천 차단
+// 용레이드/공성([data-slot]) 버튼: 렌더링 즉시 적용되는 순수 CSS로 깜빡임 원천 차단
 (function initDragonRaidInstantStyle() {
     const style = document.createElement('style');
     style.textContent = `

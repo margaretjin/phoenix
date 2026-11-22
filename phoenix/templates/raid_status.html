@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>일별 기록 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=53">
+    <link rel="stylesheet" href="/static/common.css?v=65">
     <link rel="stylesheet" href="/static/raid_status.css?v=18">
 </head>
 <body>
@@ -44,7 +44,7 @@
                 </div>
             </div>
 
-            <!-- 고정 16개 보스탐 시간 선택 그리드 (8칸 x 2줄) -->
+            <!-- 고정 보스탐 시간 선택 그리드 -->
             <div id="statusTimeGrid" class="common-time-grid"></div>
         </section>
 
@@ -97,7 +97,7 @@
         </div>
     </main>
 
-    <script src="/static/common.js?v=53"></script>
+    <script src="/static/common.js?v=65"></script>
     <script>
         let selectedDate = '';
         let selectedTime = '';
@@ -291,12 +291,11 @@
             return saved > 0 ? saved : Number(itemPriceMap[item.name] || 0);
         }
 
-        // 혈비귀속(연합 판매 포함) 아이템은 판매금은 표시하되 분배금 풀에서는 제외
+        // 혈비귀속(연합 판매 포함), 이벤트, 성세금포함, 분배금혈귀 아이템은 개별 분배금 풀에서 제외
         function isDistExcludedItem(item) {
-            return Boolean(item.clan_owned) || item.sale_type === '연합' || item.sale_type === '이벤트';
+            return Boolean(item.clan_owned) || item.sale_type === '연합' || item.sale_type === '이벤트' || item.sale_type === '성세금포함' || item.sale_type === '분배금혈귀';
         }
 
-        // 일별현황 아이템 구분 배지: 보유중=분배대기, 이후 템보유현황의 보유상태(내판/연합/외판/이벤트)로 변경
         // 템보유현황과 동일한 분배 진행 상태 (내판/외판 전용): 분배대기 → 분배시작 → 분배중(n/m) → 분배완료(n/m)
         function getDistProgressLabel(rec, item, itemIdx) {
             const participants = ClanApp.extractParticipants(rec);
@@ -326,11 +325,9 @@
         }
 
         // 일별현황 아이템 구분 배지 (템보유현황과 동일 로직)
-        // 연합분배대기 → 연합(가져간 곳) / 내판·외판(분배 진행상태) / 이벤트
         function getItemStatusBadge(item, rec, itemIdx) {
             const isPhoenixPending = item.alliance === '피닉스';
             let label = isPhoenixPending ? '피닉스 판매대기' : '연합분배대기';
-            // 연합분배대기=주황, 피닉스 판매대기=분홍, 연합=청록
             let style = isPhoenixPending
                 ? 'color:#f472b6; background:rgba(244,114,182,0.16); border:1px solid #ec4899;'
                 : 'color:#fbbf24; background:rgba(245,158,11,0.16); border:1px solid #f59e0b;';
@@ -350,6 +347,12 @@
                 style = item.sale_type === '내판'
                     ? 'color:#60a5fa; background:rgba(59,130,246,0.18); border:1px solid #3b82f6;'
                     : 'color:#4ade80; background:rgba(34,197,94,0.18); border:1px solid #22c55e;';
+            } else if (item.sale_type === '성세금포함') {
+                label = '성세금포함';
+                style = 'color:#818cf8; background:rgba(99,102,241,0.18); border:1px solid #6366f1;';
+            } else if (item.sale_type === '분배금혈귀') {
+                label = '분배금혈귀';
+                style = 'color:#fb7185; background:rgba(244,63,94,0.18); border:1px solid #f43f5e;';
             } else if (item.sale_type === '이벤트') {
                 label = '이벤트';
                 style = 'color:#c084fc; background:rgba(168,85,247,0.18); border:1px solid #a855f7;';

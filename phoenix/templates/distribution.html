@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>분배관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=63">
+    <link rel="stylesheet" href="/static/common.css?v=67">
     <link rel="stylesheet" href="/static/distribution.css?v=63">
 </head>
 <body>
@@ -179,7 +179,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=63"></script>
+    <script src="/static/common.js?v=67"></script>
     <script>
         let currentTaxRate = 20;
         let itemPriceMap = {};
@@ -271,7 +271,7 @@
             let hasAnyChecked = false;
 
             details.forEach((it, idx) => {
-                if (!it.dist_checked) return;
+                if (!it.dist_checked || it.sale_type === '성세금포함') return;
                 hasAnyChecked = true;
                 const dDate = (it.dist_date || '').trim();
                 const dateKey = dDate ? `${memberId}__date_${dDate}` : '';
@@ -454,6 +454,8 @@
 
         function buildCheckedEntries() {
             checkedEntries = [];
+            const castleTaxBonusMap = ClanApp.buildCastleTaxBonusMap(allRaids, itemPriceMap);
+
             allRaids.forEach(r => {
                 const details = ClanApp.extractItemDetails(r, itemPriceMap);
                 const participants = ClanApp.extractParticipants(r);
@@ -462,31 +464,45 @@
                 details.forEach((item, idx) => {
                     if (!item.dist_checked) return;
 
+                    const isCastleTaxIncluded = (item.sale_type === '성세금포함');
                     const distDate = (item.dist_date || '').trim();
                     const hasDistDate = Boolean(distDate);
                     let doneMemberCount = 0;
 
-                    if (hasDistDate) {
+                    if (hasDistDate && !isCastleTaxIncluded) {
                         participants.forEach(p => {
                             const pDist = getDistInfoByDistDate(r, idx, distDate, p.id);
                             if (pDist.status === '분배완료') doneMemberCount++;
                         });
                     }
 
-                    const isFullyDone = (hasDistDate && pCount > 0 && doneMemberCount === pCount);
-                    const itemState = !hasDistDate ? 'wait' : (isFullyDone ? 'done' : 'progress');
+                    const isFullyDone = isCastleTaxIncluded
+                        ? true
+                        : (hasDistDate && pCount > 0 && doneMemberCount === pCount);
+                    const itemState = isCastleTaxIncluded
+                        ? 'done'
+                        : (!hasDistDate ? 'wait' : (isFullyDone ? 'done' : 'progress'));
 
-                    const price = Number(item.price || 0);
-                    const netPool = Math.floor(price * (1 - currentTaxRate / 100));
-                    const perItemShare = (pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
+                    const entryKey = `${r.id}_${idx}`;
+                    const bonusInfo = ClanApp.isCastleTaxItem(item.name) ? castleTaxBonusMap[entryKey] : null;
+                    const basePrice = Number(item.price || 0);
+                    const bonusPrice = bonusInfo ? bonusInfo.bonusPrice : 0;
+                    const price = basePrice + bonusPrice;
+                    const netPool = isCastleTaxIncluded ? 0 : Math.floor(price * (1 - currentTaxRate / 100));
+                    const perItemShare = (!isCastleTaxIncluded && pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
 
                     checkedEntries.push({
-                        key: `${r.id}_${idx}`,
+                        key: entryKey,
                         raid_id: r.id,
                         item_idx: idx,
                         raid_date: r.raid_date,
                         raid_time: r.raid_time,
                         name: item.name,
+                        is_castle_tax_included: isCastleTaxIncluded,
+                        castle_tax_date: item.castle_tax_date || '',
+                        base_price: basePrice,
+                        bonus_price: bonusPrice,
+                        included_items: bonusInfo ? bonusInfo.includedItems : [],
                         price,
                         net_pool: netPool,
                         per_share: perItemShare,
@@ -510,7 +526,7 @@
             const todayStr = ClanApp.formatYMD(new Date());
 
             return checkedEntries.filter(entry => {
-                const effectiveDistDate = entry.dist_date || todayStr;
+                const effectiveDistDate = entry.dist_date || entry.castle_tax_date || todayStr;
 
                 if (mode === 'month') {
                     if (!effectiveDistDate.startsWith(mVal)) return false;
@@ -544,7 +560,7 @@
         }
 
         function renderDistDateSelectorChips() {
-            const periodList = getPeriodFilteredEntries();
+            const periodList = getPeriodFilteredEntries().filter(e => !e.is_castle_tax_included);
             const dateCountMap = new Map();
             const dateHasWaitMap = new Map();
             let unconfirmedCount = 0;
@@ -624,7 +640,7 @@
         }
 
         function getSelectedKpiDateEntries() {
-            const periodList = getPeriodFilteredEntries();
+            const periodList = getPeriodFilteredEntries().filter(e => !e.is_castle_tax_included);
             if (selectedKpiDistDate === 'all') {
                 return periodList;
             }
@@ -656,11 +672,36 @@
 
             tbody.innerHTML = list.map(entry => {
                 const pCount = entry.participants.length;
+                const slotText = `${toShortDate(entry.raid_date)} ${entry.raid_time}`;
+
+                // 성세금포함 아이템은 상단 표에 '성세금 합산'으로 표시 (중복 분배 방지)
+                if (entry.is_castle_tax_included) {
+                    const ctLabel = entry.castle_tax_date
+                        ? `성세금 합산(${toShortDate(entry.castle_tax_date)})`
+                        : '성세금 합산';
+                    const ctBadge = `<span style="display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:800; color:#818cf8; background:rgba(99,102,241,0.18); border:1px solid #6366f1;">${ctLabel}</span>`;
+                    return `
+                        <tr>
+                            <td class="checked-item-slot">${slotText}</td>
+                            <td class="checked-item-name">${ClanApp.itemNameHtml(entry.name)}</td>
+                            <td class="checked-item-price">${entry.price.toLocaleString()}</td>
+                            <td style="color:#818cf8; font-size:11px; font-weight:700;">성세금 합산</td>
+                            <td style="color:#71717a;">-</td>
+                            <td class="checked-item-pcount">${pCount}명</td>
+                            <td>${ctBadge}</td>
+                            <td>${entry.castle_tax_date ? `<span class="confirmed-dist-date">${toShortDate(entry.castle_tax_date)}</span>` : '자동'}</td>
+                            ${isAdmin ? `<td style="color:#71717a; font-size:11px;">-</td>` : ''}
+                        </tr>
+                    `;
+                }
+
                 const hasDistDate = Boolean(entry.dist_date && entry.dist_date.trim());
                 const isEditingDate = editingDistDateKeys.has(entry.key);
                 const dateVal = entry.dist_date || defaultInputDate;
-                const slotText = `${toShortDate(entry.raid_date)} ${entry.raid_time}`;
                 const shortDistDate = hasDistDate ? toShortDate(entry.dist_date) : '미확정';
+                const bonusSubHtml = (entry.included_items && entry.included_items.length > 0)
+                    ? `<div style="font-size:10px; color:#818cf8; font-weight:700;">(+성세금포함 ${entry.included_items.length}건: +${entry.bonus_price.toLocaleString()})</div>`
+                    : '';
 
                 let statusBadgeHtml = '';
                 if (!hasDistDate) {
@@ -675,7 +716,7 @@
                     return `
                         <tr>
                             <td class="checked-item-slot">${slotText}</td>
-                            <td class="checked-item-name">${ClanApp.itemNameHtml(entry.name)}</td>
+                            <td class="checked-item-name">${ClanApp.itemNameHtml(entry.name)}${bonusSubHtml}</td>
                             <td class="checked-item-price">${entry.price.toLocaleString()}</td>
                             <td class="checked-item-net-price">${entry.net_pool.toLocaleString()}</td>
                             <td style="color:#fbbf24; font-weight:800;">${entry.per_share.toLocaleString()}</td>
@@ -690,7 +731,7 @@
                     return `
                         <tr>
                             <td class="checked-item-slot">${slotText}</td>
-                            <td class="checked-item-name">${ClanApp.itemNameHtml(entry.name)}</td>
+                            <td class="checked-item-name">${ClanApp.itemNameHtml(entry.name)}${bonusSubHtml}</td>
                             <td class="checked-item-price">${entry.price.toLocaleString()}</td>
                             <td class="checked-item-net-price">${entry.net_pool.toLocaleString()}</td>
                             <td style="color:#fbbf24; font-weight:800;">${entry.per_share.toLocaleString()}</td>
@@ -709,7 +750,7 @@
                 return `
                     <tr>
                         <td class="checked-item-slot">${slotText}</td>
-                        <td class="checked-item-name">${ClanApp.itemNameHtml(entry.name)}</td>
+                        <td class="checked-item-name">${ClanApp.itemNameHtml(entry.name)}${bonusSubHtml}</td>
                         <td class="checked-item-price">${entry.price.toLocaleString()}</td>
                         <td class="checked-item-net-price">${entry.net_pool.toLocaleString()}</td>
                         <td style="color:#fbbf24; font-weight:800;">${entry.per_share.toLocaleString()}</td>
@@ -753,7 +794,8 @@
                 winner: it.winner || '',
                 taken_date: it.taken_date || '',
                 dist_date: idx === entry.item_idx ? dist_date : (it.dist_date || ''),
-                dist_checked: idx === entry.item_idx ? true : Boolean(it.dist_checked)
+                dist_checked: idx === entry.item_idx ? true : Boolean(it.dist_checked),
+                castle_tax_date: it.castle_tax_date || ''
             }));
 
             const res = await fetch('/api/raids/item-details', {
@@ -789,7 +831,8 @@
                 winner: it.winner || '',
                 taken_date: it.taken_date || '',
                 dist_date: idx === entry.item_idx ? '' : (it.dist_date || ''),
-                dist_checked: idx === entry.item_idx ? true : Boolean(it.dist_checked)
+                dist_checked: idx === entry.item_idx ? true : Boolean(it.dist_checked),
+                castle_tax_date: it.castle_tax_date || ''
             }));
 
             const res = await fetch('/api/raids/item-details', {
@@ -900,7 +943,6 @@
                             totalShare: 0,
                             method: defaultMethod,
                             proxy_name: defaultProxy,
-                            // 분배받아간일 디폴트값: 현재일(오늘 날짜)
                             paid_date: isItemDone ? (pDist.paid_date || todayStr) : todayStr
                         });
                     }

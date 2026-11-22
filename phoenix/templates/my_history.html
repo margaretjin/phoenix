@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>참여내역 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=63">
+    <link rel="stylesheet" href="/static/common.css?v=65">
     <link rel="stylesheet" href="/static/my_history.css?v=39">
 </head>
 <body>
@@ -147,7 +147,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=63"></script>
+    <script src="/static/common.js?v=65"></script>
     <script>
         let currentTaxRate = 20;
         let allMembers = [];
@@ -385,6 +385,7 @@
             const kw = document.getElementById('historyItemSearch').value.trim().toLowerCase();
 
             const allItemRows = [];
+            const castleTaxBonusMap = ClanApp.buildCastleTaxBonusMap(allRaidsCache, itemPriceMap);
 
             allRaidsCache.forEach(r => {
                 const participants = ClanApp.extractParticipants(r);
@@ -396,16 +397,17 @@
                     if (kw && !item.name.toLowerCase().includes(kw) && !ClanApp.getItemAlias(item.name).toLowerCase().includes(kw)) return;
 
                     const sType = item.sale_type || '보유중';
-                    const isNonDistType = (sType === '연합' || sType === '이벤트');
+                    const isNonDistType = (sType === '연합' || sType === '이벤트' || sType === '성세금포함' || sType === '분배금혈귀');
                     // 연합분배대기(보유중): 연합/내판/외판/이벤트 결정 전이므로 분배금 0원
                     const isAllianceWait = (sType === '보유중');
                     const clanDistDate = isNonDistType ? '' : (item.dist_date || '');
-                    const grossPrice = (isNonDistType || isAllianceWait) ? 0 : Number(item.price || 0);
+                    const bonusInfo = ClanApp.isCastleTaxItem(item.name) ? castleTaxBonusMap[`${r.id}_${idx}`] : null;
+                    const grossPrice = (isNonDistType || isAllianceWait)
+                        ? 0
+                        : (Number(item.price || 0) + (bonusInfo ? bonusInfo.bonusPrice : 0));
                     const netPrice = Math.floor(grossPrice * (1 - currentTaxRate / 100));
                     const myItemShare = (memberCount > 0 && netPrice > 0) ? Math.floor(netPrice / memberCount) : 0;
 
-                    // ownerId: 이 분배금의 원래 주인(참여자)
-                    // viaBloodTo: 혈귀속으로 targetId(피닉스혈)에게 귀속된 경우의 원 참여자 표시용
                     const pushRow = (ownerId, isBloodCredit) => {
                         const distInfo = getHistoryItemDistInfo(r, idx, clanDistDate, ownerId);
                         const isDone = isNonDistType ? true : (distInfo.status === '분배완료');
@@ -482,13 +484,15 @@
             const rowsHtml = targetRows.map(row => {
                 let statusHtml = '';
                 if (row.sale_type === '연합') {
-                    // 반항/세븐 선택 → 연합 (내부 분배 없음)
                     const where = (row.alliance && row.alliance !== '피닉스') ? row.alliance : row.winner;
                     statusHtml = `<span class="badge-gray-done" style="color:#2dd4bf; background:rgba(20,184,166,0.18); border-color:#14b8a6;">${ClanApp.escapeHtml(where ? `연합(${where})` : '연합')} · 분배제외</span>`;
+                } else if (row.sale_type === '성세금포함') {
+                    statusHtml = `<span class="badge-gray-done" style="color:#818cf8; background:rgba(99,102,241,0.18); border-color:#6366f1;">성세금포함</span>`;
+                } else if (row.sale_type === '분배금혈귀') {
+                    statusHtml = `<span class="badge-gray-done" style="color:#fb7185; background:rgba(244,63,94,0.18); border-color:#f43f5e;">분배금혈귀 · 분배제외</span>`;
                 } else if (row.sale_type === '이벤트') {
                     statusHtml = `<span class="badge-gray-done" style="color:#c084fc; background:rgba(168,85,247,0.18); border-color:#a855f7;">이벤트 · 분배제외</span>`;
                 } else if (row.sale_type === '보유중') {
-                    // 연합분배대기(주황) / 피닉스 선택 후 판매구분 대기(분홍)
                     statusHtml = row.alliance === '피닉스'
                         ? `<span class="badge-orange-wait" style="color:#f472b6; background:rgba(244,114,182,0.16); border-color:#ec4899;">피닉스 판매대기</span>`
                         : `<span class="badge-orange-wait">연합분배대기</span>`;

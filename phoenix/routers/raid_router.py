@@ -29,13 +29,14 @@ class RaidSaveRequest(BaseModel):
 
 class ItemDetailEntry(BaseModel):
     name: str
-    sale_type: str = "보유중"       # "보유중"(=연합분배대기) | "연합" | "내판" | "외판" | "이벤트"
+    sale_type: str = "보유중"       # "보유중"(=연합분배대기) | "연합" | "내판" | "외판" | "이벤트" | "성세금포함" | "분배금혈귀"
     alliance: str = ""              # 획득 혈: "" (연합분배대기) | "피닉스" | "반항" | "세븐"
     price: int = 0
     winner: str = ""                # 수령자
     taken_date: str = ""            # 판매완료일
     dist_date: str = ""             # 분배완료일 (혈분배일)
     dist_checked: bool = False      # 디폴트값: 체크 안 된 상태(False)
+    castle_tax_date: str = ""       # 성세금포함 대상 성세금 날짜 (YYYY-MM-DD)
 
 class ItemDetailsUpdateRequest(BaseModel):
     raid_id: int
@@ -98,51 +99,76 @@ def resolve_effective_item_price(item_dict: dict, price_map: Dict[str, int]) -> 
 ALLIANCE_CLANS = ["반항", "세븐"]
 OWN_CLAN = "피닉스"
 
+def is_castle_tax_name(name: Optional[str]) -> bool:
+    return "성세금" in (name or "").strip()
+
 def normalize_detail(d: dict) -> dict:
     """아이템 진행 단계 규칙을 한 곳에서 적용.
-    연합분배대기(alliance 없음) -> 피닉스 선택 시 내판/외판/이벤트 선택, 반항/세븐 선택 시 연합(분배 없음)
+    성세금 / 성세금포함은 수령자 없이도 분배 체크(dist_checked) 및 혈분배일(dist_date) 유지
     """
     out = dict(d)
+    item_name = (out.get("name") or "").strip()
+    is_castle_tax = is_castle_tax_name(item_name)
     alliance = (out.get("alliance") or "").strip()
     sale_type = out.get("sale_type") or "보유중"
     winner = (out.get("winner") or "").strip()
     price = max(0, int(out.get("price") or 0))
+    castle_tax_date = (out.get("castle_tax_date") or "").strip()
 
     def clear_dist():
         out["dist_checked"] = False
         out["dist_date"] = ""
 
     if alliance in ALLIANCE_CLANS:
-        # 반항 / 세븐: 자동 연합 처리, 내부 분배 없음 (수령자는 선택 메모)
         out["alliance"] = alliance
         out["sale_type"] = "연합"
+        out["castle_tax_date"] = ""
         clear_dist()
     elif alliance == OWN_CLAN:
         out["alliance"] = alliance
         if sale_type == "이벤트":
             out["sale_type"] = "이벤트"
+            out["castle_tax_date"] = ""
             price = 0
+            clear_dist()
+        elif sale_type == "성세금포함":
+            # 성세금포함도 체크 표시 및 분배관리 연동 허용
+            out["sale_type"] = "성세금포함"
+            out["castle_tax_date"] = castle_tax_date
+            if not out.get("dist_checked"):
+                out["dist_date"] = ""
+        elif sale_type == "분배금혈귀":
+            out["sale_type"] = "분배금혈귀"
+            out["castle_tax_date"] = ""
             clear_dist()
         elif sale_type in ("내판", "외판"):
             out["sale_type"] = sale_type
-            if not winner:
-                out["dist_checked"] = False
-                out["dist_date"] = ""
+            out["castle_tax_date"] = ""
+            if not winner and not is_castle_tax:
+                clear_dist()
         else:
-            # 피닉스 선택 후 판매구분(내판/외판/이벤트) 대기
             out["sale_type"] = "보유중"
-            clear_dist()
+            out["castle_tax_date"] = ""
+            if not is_castle_tax:
+                clear_dist()
     else:
-        # 레거시(alliance 필드 없는 기존 데이터) 호환
         out["alliance"] = ""
-        if sale_type == "연합":
+        if sale_type == "성세금포함":
+            out["castle_tax_date"] = castle_tax_date
+            if not out.get("dist_checked"):
+                out["dist_date"] = ""
+        elif sale_type == "연합":
+            out["castle_tax_date"] = ""
             clear_dist()
         elif not winner:
             out["sale_type"] = "보유중"
             out["taken_date"] = ""
-            clear_dist()
+            out["castle_tax_date"] = ""
+            if not is_castle_tax:
+                clear_dist()
         elif price == 0 or sale_type == "이벤트":
             out["sale_type"] = "이벤트"
+            out["castle_tax_date"] = ""
             price = 0
             clear_dist()
 
@@ -178,7 +204,8 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
                 "winner": winner_str,
                 "taken_date": matched_item.get("taken_date") or "",
                 "dist_date": matched_item.get("dist_date") or "",
-                "dist_checked": bool(matched_item.get("dist_checked"))
+                "dist_checked": bool(matched_item.get("dist_checked")),
+                "castle_tax_date": matched_item.get("castle_tax_date") or ""
             }))
         else:
             synced.append({
@@ -189,7 +216,8 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
                 "winner": "",
                 "taken_date": "",
                 "dist_date": "",
-                "dist_checked": False
+                "dist_checked": False,
+                "castle_tax_date": ""
             })
     return synced
 
@@ -473,7 +501,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
         tax_rate = float(r.get("clan_tax_rate") if r.get("clan_tax_rate") is not None else default_tax)
         gross_total = sum(
             (resolve_effective_item_price(d, price_map)
-             if (d.get("sale_type") in ["내판", "외판"] and d.get("name") not in clan_owned_set) else 0)  # 분배금은 내판/외판 판매대금에서만
+             if ((d.get("sale_type") in ["내판", "외판"] or is_castle_tax_name(d.get("name"))) and d.get("name") not in clan_owned_set) else 0)
             for d in details
         )
         net_pool = int(gross_total * (1 - tax_rate / 100.0))
@@ -504,7 +532,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
                 it_name = item.get("name", "")
                 s_type = item.get("sale_type", "보유중")
                 it_price = resolve_effective_item_price(item, price_map)
-                chk_str = "O" if (item.get("dist_checked") and s_type in ["내판", "외판"]) else "X"
+                chk_str = "O" if (item.get("dist_checked") and (s_type in ["내판", "외판", "성세금포함"] or is_castle_tax_name(it_name))) else "X"
                 writer.writerow([
                     r_date, r_time, p_count, p_names,
                     it_name, s_type, it_price,

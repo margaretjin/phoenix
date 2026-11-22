@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>참여도 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=61">
-    <link rel="stylesheet" href="/static/attendance.css?v=61">
+    <link rel="stylesheet" href="/static/common.css?v=65">
+    <link rel="stylesheet" href="/static/attendance.css?v=64">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -100,7 +100,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=61"></script>
+    <script src="/static/common.js?v=65"></script>
     <script>
         const MAIN_SLOTS = ['09시', '15시', '21시', '23시(오만)', '03시'];
         let allMembers = [];
@@ -226,6 +226,8 @@
                 });
             });
 
+            const castleTaxBonusMap = ClanApp.buildCastleTaxBonusMap(monthRaids, itemPriceMap);
+
             monthRaids.forEach(r => {
                 const pList = ClanApp.extractParticipants(r);
                 const pCount = pList.length;
@@ -235,10 +237,11 @@
                 const details = ClanApp.extractItemDetails(r, itemPriceMap);
 
                 let raidPerMemberShare = 0;
-                details.forEach(item => {
+                details.forEach((item, idx) => {
                     const sType = item.sale_type || '보유중';
-                    if (sType === '이벤트' || sType === '연합' || sType === '보유중') return;   // 연합분배대기 포함 분배금 제외
-                    const gross = Number(item.price || 0);
+                    if (sType === '이벤트' || sType === '연합' || sType === '보유중' || sType === '성세금포함' || sType === '분배금혈귀') return;
+                    const bonusInfo = ClanApp.isCastleTaxItem(item.name) ? castleTaxBonusMap[`${r.id}_${idx}`] : null;
+                    const gross = Number(item.price || 0) + (bonusInfo ? bonusInfo.bonusPrice : 0);
                     const netPool = Math.floor(gross * (1 - currentTaxRate / 100));
                     if (netPool > 0) {
                         raidPerMemberShare += Math.floor(netPool / pCount);

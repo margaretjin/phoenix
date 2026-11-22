@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=59">
+    <link rel="stylesheet" href="/static/common.css?v=67">
     <link rel="stylesheet" href="/static/item_status.css?v=59">
 </head>
 <body>
@@ -51,7 +51,7 @@
                     <input type="text" class="input-common" value="전체 기간 누적" disabled>
                 </div>
 
-                <!-- 보유상태 필터 (연합 포함) -->
+                <!-- 보유상태 필터 (연합 / 성세금포함 / 분배금혈귀 포함) -->
                 <div class="filter-field">
                     <label>보유상태</label>
                     <select id="holdStateFilter" class="input-common" onchange="renderItemTable()">
@@ -61,10 +61,12 @@
                         <option value="연합">연합</option>
                         <option value="외판">외판</option>
                         <option value="이벤트">이벤트</option>
+                        <option value="성세금포함">성세금포함</option>
+                        <option value="분배금혈귀">분배금혈귀</option>
                     </select>
                 </div>
 
-                <!-- 분배상태 필터 (분배대기 / 분배시작 / 분배중 / 분배완료) -->
+                <!-- 분배상태 필터 (분배대기 / 분배시작 / 분배중 / 분배완료 / 성세금포함 / 분배금혈귀) -->
                 <div class="filter-field">
                     <label>분배상태</label>
                     <select id="distStateFilter" class="input-common" onchange="renderItemTable()">
@@ -78,6 +80,8 @@
                         <option value="이벤트">이벤트</option>
                         <option value="이벤트템">이벤트템</option>
                         <option value="혈비귀속">혈비귀속</option>
+                        <option value="성세금포함">성세금포함</option>
+                        <option value="분배금혈귀">분배금혈귀</option>
                     </select>
                 </div>
 
@@ -119,7 +123,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=59"></script>
+    <script src="/static/common.js?v=67"></script>
     <script>
         let allMembers = [];
         let clanCharPool = [];
@@ -174,6 +178,35 @@
                 ? `<span class="dawn-sub-tag">(새벽)</span>`
                 : '';
             return `<span class="raid-datetime-unified">${shortDate} ${t}${dawnTag}</span>`;
+        }
+
+        // 아이템 획득일 기준 앞뒤 1주(-7일 ~ +7일) 성세금 날짜 드롭다운 옵션 생성
+        function buildCastleTaxDateOptionsHtml(baseDateStr, selectedDate = '') {
+            const wdNames = ['일', '월', '화', '수', '목', '금', '토'];
+            const ref = baseDateStr && baseDateStr.length >= 10 ? baseDateStr : ClanApp.formatYMD(new Date());
+            const [y, m, d] = ref.split('-').map(Number);
+            const sel = (selectedDate || '').trim();
+
+            const dates = [];
+            for (let offset = -7; offset <= 7; offset++) {
+                const dt = new Date(y, m - 1, d + offset);
+                dates.push({
+                    val: ClanApp.formatYMD(dt),
+                    wd: wdNames[dt.getDay()]
+                });
+            }
+
+            if (sel && !dates.some(x => x.val === sel)) {
+                const [sy, sm, sd] = sel.split('-').map(Number);
+                const sdt = new Date(sy, sm - 1, sd);
+                dates.unshift({ val: sel, wd: wdNames[sdt.getDay()] || '' });
+            }
+
+            const opts = [`<option value="" ${!sel ? 'selected' : ''}>성세금일(자동)</option>`];
+            dates.forEach(item => {
+                opts.push(`<option value="${item.val}" ${sel === item.val ? 'selected' : ''}>${toShortDate(item.val)}(${item.wd})</option>`);
+            });
+            return opts.join('');
         }
 
         async function loadMembersForAutocomplete() {
@@ -251,6 +284,12 @@
             if (preferredSaleType === '연합') {
                 return '연합';
             }
+            if (preferredSaleType === '성세금포함') {
+                return '성세금포함';
+            }
+            if (preferredSaleType === '분배금혈귀') {
+                return '분배금혈귀';
+            }
             const isClanMember = clanCharSet.has(w.toLowerCase());
             if (isClanMember) {
                 return '내판';
@@ -258,16 +297,13 @@
             return '외판';
         }
 
-        function isDistributableHoldState(holdState) {
-            return holdState === '내판' || holdState === '외판';
+        // 내판·외판 + 성세금 + 성세금포함 모두 체크박스(분배관리 연동) 표시 허용
+        function isDistributableHoldState(holdState, itemName = '') {
+            if (holdState === '내판' || holdState === '외판' || holdState === '성세금포함') return true;
+            if (ClanApp.isCastleTaxItem(itemName) && !['연합', '이벤트', '분배금혈귀'].includes(holdState)) return true;
+            return false;
         }
 
-        // [수정] 분배상태 4단계 및 인원수(doneCount/pCount) 계산
-        // 1) 체크 안 됨(또는 보유중/연합/이벤트) -> '분배대기'
-        // 2) 체크됨(dist_checked) + 아직 혈분배일(dist_date) 미입력 -> '분배시작'
-        // 3) 혈분배일(dist_date) 입력됨 + 미완료 -> '분배중' / 표기: '분배중(2/6)'
-        // 4) 혈분배일 입력됨 + 전원 수령 완료 -> '분배완료' / 표기: '분배완료(6/6)'
-        // 저장된 구분 → 화면 구분. alliance 필드가 없는 기존 데이터만 명단 기준으로 내판/외판 재판정
         function resolveRowHoldState(item) {
             if (item.event_item) return '이벤트';
             if (item.clan_owned) return '연합';
@@ -278,16 +314,21 @@
             return st;
         }
 
-        // 구분 색상: 연합분배대기=주황, 피닉스(구분대기)=분홍, 연합=청록 (기존 CSS 클래스 + 인라인)
         const AMBER_BADGE_STYLE = 'color:#fbbf24; background:rgba(245,158,11,0.16); border:1px solid #f59e0b;';
         const PINK_BADGE_STYLE = 'color:#f472b6; background:rgba(244,114,182,0.16); border:1px solid #ec4899;';
+        const TAX_BADGE_STYLE = 'color:#818cf8; background:rgba(99,102,241,0.18); border:1px solid #6366f1;';
+        const CLAN_DIST_BADGE_STYLE = 'color:#fb7185; background:rgba(244,63,94,0.18); border:1px solid #f43f5e;';
 
         function holdBadgeStyle(row) {
+            if (row.hold_state === '성세금포함') return TAX_BADGE_STYLE;
+            if (row.hold_state === '분배금혈귀') return CLAN_DIST_BADGE_STYLE;
             if (row.hold_state !== '보유중') return '';
             return row.alliance === '피닉스' ? PINK_BADGE_STYLE : AMBER_BADGE_STYLE;
         }
 
         function distBadgeStyle(state, label) {
+            if (state === '성세금포함') return TAX_BADGE_STYLE;
+            if (state === '분배금혈귀') return CLAN_DIST_BADGE_STYLE;
             return (state === '연합분배대기' && String(label).startsWith('피닉스')) ? PINK_BADGE_STYLE : '';
         }
 
@@ -303,6 +344,7 @@
         function readRowEdit(i, target) {
             const alEl = document.getElementById(`stAlliance_${i}`);
             const stEl = document.getElementById(`stSaleType_${i}`);
+            const taxDateEl = document.getElementById(`stCastleTaxDate_${i}`);
             const wEl = document.getElementById(`stWinner_${i}`);
             const pEl = document.getElementById(`stPrice_${i}`);
             let alliance, saleType;
@@ -315,9 +357,13 @@
                 alliance = target ? (target.alliance || '') : '';
                 saleType = target ? target.hold_state : '보유중';
             }
+            const castleTaxDate = (saleType === '성세금포함')
+                ? (taxDateEl ? taxDateEl.value.trim() : (target ? (target.castle_tax_date || '') : ''))
+                : '';
             return {
                 alliance,
                 saleType,
+                castle_tax_date: castleTaxDate,
                 winner: wEl ? wEl.value.trim() : (target ? target.winner : ''),
                 price: pEl ? Number(pEl.value || 0) : (target ? Number(target.price || 0) : 0)
             };
@@ -332,7 +378,8 @@
                 winner: it.winner || '',
                 taken_date: it.taken_date || '',
                 dist_date: it.dist_date || '',
-                dist_checked: Boolean(it.dist_checked)
+                dist_checked: Boolean(it.dist_checked),
+                castle_tax_date: it.castle_tax_date || ''
             };
         }
 
@@ -341,6 +388,7 @@
             const holdState = resolveRowHoldState(item);
             const distDate = (item.dist_date || '').trim();
             const isChecked = Boolean(item.dist_checked || distDate);
+            const isCastleTax = ClanApp.isCastleTaxItem(item.name);
 
             const participants = ClanApp.extractParticipants(record);
             const distMap = (record && record.distributions) || {};
@@ -371,9 +419,6 @@
                 });
             }
 
-            // 연합 판매(내부 분배 없음) / 이벤트: 분배대기에서 해당 구분으로 변경
-            //  - 연합: 연합(가져간 곳)  / 혈비귀속 아이템(수령처 미입력): 혈비귀속
-            //  - 이벤트: 이벤트
             if (holdState === '연합') {
                 const al = (item.alliance || '').trim();
                 if (item.clan_owned && !winner && !al) {
@@ -388,14 +433,31 @@
                 }
                 return { state: '이벤트', label: '이벤트', doneCount: 0, totalCount: pCount };
             }
+            if (holdState === '성세금포함') {
+                const ctDate = (item.castle_tax_date || '').trim();
+                const ctLabel = ctDate ? `성세금포함(${toShortDate(ctDate)})` : '성세금포함';
+                return { state: '성세금포함', label: ctLabel, doneCount: 0, totalCount: pCount };
+            }
+            if (holdState === '분배금혈귀') {
+                return { state: '분배금혈귀', label: '분배금혈귀', doneCount: 0, totalCount: pCount };
+            }
 
-            // 연합분배대기: 아직 연합 선택 / 내판·외판·이벤트 결정 전
+            // 성세금 아이템은 수령자 없이도 분배 체크/진행 상태 표시
+            if (isCastleTax) {
+                if (!isChecked) return { state: '분배대기', label: '분배대기', doneCount: 0, totalCount: pCount };
+                if (!distDate) return { state: '분배시작', label: '분배시작', doneCount: 0, totalCount: pCount };
+                if (pCount > 0 && doneCount === pCount) {
+                    return { state: '분배완료', label: `분배완료(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
+                }
+                return { state: '분배중', label: `분배중(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
+            }
+
             if (holdState === '보유중') {
                 const pendingLabel = (item.alliance === '피닉스') ? '피닉스 판매대기' : '연합분배대기';
                 return { state: '연합분배대기', label: pendingLabel, doneCount: 0, totalCount: pCount };
             }
 
-            if (!winner || !isDistributableHoldState(holdState) || !isChecked) {
+            if (!winner || !isDistributableHoldState(holdState, item.name) || !isChecked) {
                 return { state: '분배대기', label: '분배대기', doneCount: 0, totalCount: pCount };
             }
 
@@ -410,10 +472,10 @@
             return { state: '분배중', label: `분배중(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
         }
 
-        // 분배상태 배지 클래스 (기존 CSS 재사용: 연합·혈비귀속=청록 배지, 이벤트=보라 배지)
         function distBadgeClass(state) {
             if (state === '혈비귀속' || state === '연합') return 'sale-badge type-연합';
             if (state === '이벤트' || state === '이벤트템') return 'sale-badge type-이벤트';
+            if (state === '성세금포함' || state === '분배금혈귀') return 'sale-badge';
             if (state === '연합분배대기') return 'dist-state-badge state-분배대기';
             return `dist-state-badge state-${state}`;
         }
@@ -480,9 +542,10 @@
                     const policyPrice = Number(itemPriceMap[item.name] || 0);
                     const rawObj = rawSavedDetails[idx] || {};
                     const holdState = resolveRowHoldState(item);
-                    const alliance = item.alliance || (['내판', '외판', '이벤트'].includes(holdState) ? '피닉스' : '');
+                    const alliance = item.alliance || (['내판', '외판', '이벤트', '성세금포함', '분배금혈귀'].includes(holdState) ? '피닉스' : '');
+                    const castleTaxDate = (holdState === '성세금포함') ? (item.castle_tax_date || '') : '';
 
-                    const canDist = isDistributableHoldState(holdState);
+                    const canDist = isDistributableHoldState(holdState, item.name);
                     const distDate = canDist ? (item.dist_date || '').trim() : '';
                     const isChecked = canDist
                         ? (distDate ? true : Boolean(rawObj.dist_checked))
@@ -490,7 +553,16 @@
 
                     const distInfo = computeDistStateInfo(
                         r,
-                        { ...item, alliance, sale_type: holdState, dist_date: distDate, dist_checked: isChecked, clan_owned: Boolean(item.clan_owned), event_item: Boolean(item.event_item) },
+                        {
+                            ...item,
+                            alliance,
+                            sale_type: holdState,
+                            castle_tax_date: castleTaxDate,
+                            dist_date: distDate,
+                            dist_checked: isChecked,
+                            clan_owned: Boolean(item.clan_owned),
+                            event_item: Boolean(item.event_item)
+                        },
                         idx
                     );
 
@@ -503,6 +575,7 @@
                         name: item.name,
                         hold_state: holdState,
                         alliance,
+                        castle_tax_date: castleTaxDate,
                         dist_state: distInfo.state,
                         dist_label: distInfo.label,
                         price,
@@ -550,7 +623,6 @@
             const suggestBox = document.getElementById(`stWinnerSuggest_${i}`);
             if (!winnerEl || !suggestBox) return;
 
-            // 혈원 명단 자동완성은 내판 입력 때만 사용 (외판은 명단에 없는 이름, 연합은 자유 입력)
             const curSel = readRowEdit(i, getFilteredItems()[i]);
             const q = curSel.saleType === '내판' ? winnerEl.value.trim().toLowerCase() : '';
             if (!q) {
@@ -648,13 +720,13 @@
             }
         }
 
-        // 보유상태 선택 로직: 연합분배대기 → (피닉스 → 내판/외판/이벤트) | (반항·세븐 → 연합)
         function onLiveWinnerOrPriceInput(i, currentDistDate, manualHoldChange = false) {
             const targetRow = getFilteredItems()[i];
             if (!targetRow) return;
             const winnerEl = document.getElementById(`stWinner_${i}`);
             const priceEl = document.getElementById(`stPrice_${i}`);
             const stEl = document.getElementById(`stSaleType_${i}`);
+            const taxDateEl = document.getElementById(`stCastleTaxDate_${i}`);
             const distBadgeEl = document.getElementById(`stLiveDistBadge_${i}`);
             const checkCellWrap = document.getElementById(`stCheckCellWrap_${i}`);
             const chkEl = document.getElementById(`stDistChk_${i}`);
@@ -668,38 +740,44 @@
 
             const cur = readRowEdit(i, targetRow);
             const saleType = cur.saleType;
-            const lockedForced = Boolean(targetRow.clan_owned || targetRow.event_item);
-            const sellable = (saleType === '내판' || saleType === '외판');
+            if (taxDateEl) {
+                taxDateEl.classList.toggle('hidden', saleType !== '성세금포함');
+            }
 
-            // 가격칸: 내판/외판만 직접 입력, 이벤트는 0, 그 외는 기준가 자동
+            const isCastleTax = ClanApp.isCastleTaxItem(targetRow.name);
+            const lockedForced = Boolean(targetRow.clan_owned || targetRow.event_item);
+            const canCheck = isDistributableHoldState(saleType, targetRow.name);
+            const priceEditable = canCheck || saleType === '분배금혈귀';
+
             if (priceEl && !lockedForced) {
-                priceEl.disabled = !sellable;
+                priceEl.disabled = !priceEditable;
                 if (saleType === '이벤트') priceEl.value = 0;
-                else if (!sellable) priceEl.value = Number(targetRow.policy_price || targetRow.price || 0);
+                else if (!priceEditable) priceEl.value = Number(targetRow.policy_price || targetRow.price || 0);
                 else if (manualHoldChange && Number(priceEl.value || 0) === 0) priceEl.value = Number(targetRow.policy_price || 0);
             }
-            // 수령자칸 안내
             if (winnerEl && !lockedForced) {
-                winnerEl.disabled = (cur.alliance === '');
-                if (cur.alliance === '') winnerEl.value = '';
+                winnerEl.disabled = (cur.alliance === '' && !isCastleTax);
+                if (cur.alliance === '' && !isCastleTax) winnerEl.value = '';
                 winnerEl.placeholder =
                     saleType === '내판' ? '혈원 아이디 입력' :
                     saleType === '외판' ? '명단에 없는 이름' :
-                    saleType === '이벤트' ? '(선택) 수령자' :
+                    (saleType === '이벤트' || saleType === '성세금포함' || saleType === '분배금혈귀' || isCastleTax) ? '(선택) 수령자' :
                     cur.alliance === '반항' || cur.alliance === '세븐' ? '(선택) 가져간 혈원' :
                     cur.alliance === '피닉스' ? '(선택) 수령자' : '연합 선택 후 입력';
             }
 
             const winnerVal = winnerEl ? winnerEl.value.trim() : cur.winner;
-            const isCurrentlyChecked = sellable && Boolean((chkEl && chkEl.checked) || targetRow.dist_checked);
+            const isCurrentlyChecked = canCheck && Boolean((chkEl && chkEl.checked) || targetRow.dist_checked);
             const tempItem = {
+                name: targetRow.name,
                 clan_owned: Boolean(targetRow.clan_owned),
                 event_item: Boolean(targetRow.event_item),
                 alliance: cur.alliance,
+                castle_tax_date: cur.castle_tax_date,
                 winner: winnerVal,
                 price: saleType === '이벤트' ? 0 : (priceEl ? Number(priceEl.value || 0) : cur.price),
                 sale_type: saleType,
-                dist_date: sellable ? currentDistDate : '',
+                dist_date: canCheck ? currentDistDate : '',
                 dist_checked: isCurrentlyChecked
             };
             const distInfo = computeDistStateInfo(targetRow.record_ref || { distributions: {} }, tempItem, targetRow.item_idx);
@@ -710,7 +788,7 @@
                 distBadgeEl.textContent = distInfo.label;
             }
             if (checkCellWrap) {
-                if (sellable) {
+                if (canCheck) {
                     checkCellWrap.innerHTML = `
                         <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
                                ${isCurrentlyChecked ? 'checked' : ''}
@@ -764,9 +842,9 @@
                     ? `<span class="dist-date-text">${toShortDate(row.dist_date)}</span>`
                     : '-';
 
-                const canCheck = isDistributableHoldState(row.hold_state);
+                const canCheck = isDistributableHoldState(row.hold_state, row.name);
+                const isCastleTax = ClanApp.isCastleTaxItem(row.name);
 
-                // 일반회원 뷰: 체크 열 없음 (총 8열)
                 if (!isAdmin) {
                     return `
                         <tr>
@@ -817,6 +895,8 @@
                     `;
                 }
 
+                const priceCanEdit = row.clan_owned || row.event_item || canCheck || row.hold_state === '분배금혈귀';
+
                 return `
                     <tr>
                         <td>${dateTimeHtml}</td>
@@ -824,19 +904,25 @@
                         <td>
                             ${(row.clan_owned || row.event_item)
                                 ? `<span class="sale-badge type-${row.hold_state}">${row.event_item ? '이벤트템' : '혈비귀속'}</span>`
-                                : `<select id="stAlliance_${i}" class="tbl-input tbl-hold-select" style="width:98px;"
+                                : `<select id="stAlliance_${i}" class="tbl-input tbl-hold-select" style="width:104px;"
                                         onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}', true)">
                                     <option value="" ${!row.alliance ? 'selected' : ''}>연합분배대기</option>
                                     <option value="피닉스" ${row.alliance === '피닉스' ? 'selected' : ''}>피닉스</option>
                                     <option value="반항" ${row.alliance === '반항' ? 'selected' : ''}>반항</option>
                                     <option value="세븐" ${row.alliance === '세븐' ? 'selected' : ''}>세븐</option>
                                 </select>
-                                <select id="stSaleType_${i}" class="tbl-input tbl-hold-select ${row.alliance === '피닉스' ? '' : 'hidden'}" style="width:98px; display:block; margin-top:4px;"
+                                <select id="stSaleType_${i}" class="tbl-input tbl-hold-select ${row.alliance === '피닉스' ? '' : 'hidden'}" style="width:104px; display:block; margin-top:4px;"
                                         onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}', true)">
                                     <option value="">판매구분 선택</option>
                                     <option value="내판" ${row.hold_state === '내판' ? 'selected' : ''}>내판</option>
                                     <option value="외판" ${row.hold_state === '외판' ? 'selected' : ''}>외판</option>
                                     <option value="이벤트" ${row.hold_state === '이벤트' ? 'selected' : ''}>이벤트</option>
+                                    <option value="성세금포함" ${row.hold_state === '성세금포함' ? 'selected' : ''}>성세금포함</option>
+                                    <option value="분배금혈귀" ${row.hold_state === '분배금혈귀' ? 'selected' : ''}>분배금혈귀</option>
+                                </select>
+                                <select id="stCastleTaxDate_${i}" class="tbl-input tbl-hold-select ${row.hold_state === '성세금포함' ? '' : 'hidden'}" style="width:104px; display:block; margin-top:4px;"
+                                        onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}')">
+                                    ${buildCastleTaxDateOptionsHtml(row.raid_date, row.castle_tax_date)}
                                 </select>`}
                         </td>
                         <td>
@@ -844,14 +930,14 @@
                         </td>
                         <td>
                             <input type="number" id="stPrice_${i}" class="tbl-input tbl-price-input" value="${row.price}" min="0"
-                                   ${(row.clan_owned || row.event_item || row.hold_state === '내판' || row.hold_state === '외판') ? '' : 'disabled'}
+                                   ${priceCanEdit ? '' : 'disabled'}
                                    oninput="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}')">
                         </td>
                         <td>
                             <div class="winner-autocomplete-wrap">
                                 <input type="text" id="stWinner_${i}" class="tbl-input tbl-winner-input"
-                                       value="${row.winner}" placeholder="${row.hold_state === '내판' ? '혈원 아이디 입력' : row.hold_state === '외판' ? '명단에 없는 이름' : row.alliance ? '(선택) 수령자' : '연합 선택 후 입력'}" autocomplete="off"
-                                       ${(!row.alliance && !(row.clan_owned || row.event_item)) ? 'disabled' : ''}
+                                       value="${row.winner}" placeholder="${row.hold_state === '내판' ? '혈원 아이디 입력' : row.hold_state === '외판' ? '명단에 없는 이름' : (row.alliance || isCastleTax) ? '(선택) 수령자' : '연합 선택 후 입력'}" autocomplete="off"
+                                       ${(!row.alliance && !isCastleTax && !(row.clan_owned || row.event_item)) ? 'disabled' : ''}
                                        oninput="onWinnerTypeSearch(${i}, '${row.dist_date}')"
                                        onkeydown="onWinnerKeydown(event, ${i}, '${row.dist_date}')">
                                 <div id="stWinnerSuggest_${i}" class="winner-suggest-list hidden"></div>
@@ -890,7 +976,6 @@
             }
         }
 
-        // 내판/외판 입력 검증 (내판=혈원 명단 아이디, 외판=명단에 없는 이름)
         function validateSaleInput(alliance, saleType, winner) {
             if (alliance === '피닉스' && (saleType === '내판' || saleType === '외판')) {
                 if (!winner) return `${saleType}은 수령자 이름을 입력해야 합니다.`;
@@ -932,10 +1017,14 @@
             const chkEl = document.getElementById(`stDistChk_${i}`);
             const takenEl = document.getElementById(`stTaken_${i}`);
             const cur = readRowEdit(i, target);
-            const canCheck = (cur.saleType === '내판' || cur.saleType === '외판') && Boolean(cur.winner);
+            const isCastleTax = ClanApp.isCastleTaxItem(target.name);
+            const canCheck =
+                ((cur.saleType === '내판' || cur.saleType === '외판') && Boolean(cur.winner)) ||
+                cur.saleType === '성세금포함' ||
+                (isCastleTax && !['연합', '이벤트', '분배금혈귀'].includes(cur.saleType));
 
             if (!canCheck) {
-                alert('수령자가 입력된 내판 또는 외판 상태일 때만 체크할 수 있습니다. (연합·이벤트·연합분배대기는 체크 불가)');
+                alert('내판·외판(수령자 입력) 또는 성세금·성세금포함 상태일 때만 체크할 수 있습니다.');
                 if (chkEl) chkEl.checked = false;
                 return;
             }
@@ -953,9 +1042,10 @@
                 alliance: cur.alliance,
                 price: cur.price,
                 winner: cur.winner,
-                taken_date: takenEl ? takenEl.value : (target.taken_date || ClanApp.formatYMD(new Date())),
+                taken_date: takenEl ? takenEl.value : (target.taken_date || (cur.winner ? ClanApp.formatYMD(new Date()) : '')),
                 dist_date: dist_checked ? (target.dist_date || '') : '',
-                dist_checked
+                dist_checked,
+                castle_tax_date: cur.saleType === '성세금포함' ? cur.castle_tax_date : ''
             };
             await postItemDetails(target, buildUpdatedDetails(target, mine), '체크 저장 실패');
         }
@@ -973,8 +1063,13 @@
             const msg = validateSaleInput(cur.alliance, cur.saleType, winner);
             if (msg) return alert(msg);
 
-            const sellable = (cur.saleType === '내판' || cur.saleType === '외판');
-            const dist_checked = sellable && winner ? (chkEl ? chkEl.checked : Boolean(target.dist_checked)) : false;
+            const isCastleTax = ClanApp.isCastleTaxItem(target.name);
+            const canDist =
+                ((cur.saleType === '내판' || cur.saleType === '외판') && Boolean(winner)) ||
+                cur.saleType === '성세금포함' ||
+                (isCastleTax && !['연합', '이벤트', '분배금혈귀'].includes(cur.saleType));
+
+            const dist_checked = canDist ? (chkEl ? chkEl.checked : Boolean(target.dist_checked)) : false;
             const hasWho = Boolean(winner);
             const taken_date = hasWho
                 ? ((takenInputEl && takenInputEl.value) ? takenInputEl.value : (target.taken_date || ClanApp.formatYMD(new Date())))
@@ -985,10 +1080,11 @@
                 sale_type: cur.saleType,
                 alliance: cur.alliance,
                 price: cur.saleType === '이벤트' ? 0 : cur.price,
-                winner: cur.alliance === '' && !(target.clan_owned || target.event_item) ? '' : winner,
+                winner: (cur.alliance === '' && !isCastleTax && !(target.clan_owned || target.event_item)) ? '' : winner,
                 taken_date,
-                dist_date: sellable ? (target.dist_date || '') : '',
-                dist_checked
+                dist_date: canDist ? (target.dist_date || '') : '',
+                dist_checked,
+                castle_tax_date: cur.saleType === '성세금포함' ? cur.castle_tax_date : ''
             };
             await postItemDetails(target, buildUpdatedDetails(target, mine), '저장 실패');
         }
