@@ -76,7 +76,7 @@
                 <div class="item-section-header">
                     <span id="slotParticipantCount" class="section-label">총 0파티 (0명)</span>
                     <div class="header-right-group">
-                        <span class="slot-gray-note">혈비 20% 제외 분배 <br> (실제 분배금은 변경될수있습니다)</span>
+                        <span class="slot-gray-note"><span id="taxLabel">혈비 20%</span> 제외 분배 <br> (실제 분배금은 변경될수있습니다)</span>
                         <button type="button" id="deleteEntireRaidBtn" class="btn-sm btn-sm-red admin-only" style="padding: 2px 6px; font-size: 10px;" onclick="deleteEntireRaidSlot()">
                             전체삭제
                         </button>
@@ -106,6 +106,8 @@
         let aliasMap = {};
         let itemAliasMap = {};
         let itemPriceMap = {};
+        let currentTaxRate = 20;
+        let castleBonusMap = {};   // 공성 기록의 성세금 아이템 key -> { bonusPrice, includedItems }
 
         window.onload = async () => {
             const user = ClanApp.initPage('/raid-status', () => {
@@ -120,9 +122,20 @@
 
             document.getElementById('statusDatePicker').value = selectedDate;
             updateDateDisplay();
-            await Promise.all([loadMemberDirectory(), loadItemDirectory()]);
+            await Promise.all([loadMemberDirectory(), loadItemDirectory(), loadTaxRate()]);
             await loadDateRaids();
         };
+
+        async function loadTaxRate() {
+            try {
+                const res = await fetch('/api/raids/tax-rate');
+                currentTaxRate = Number((await res.json()).tax_rate ?? 20);
+            } catch (e) {
+                currentTaxRate = 20;
+            }
+            const el = document.getElementById('taxLabel');
+            if (el) el.textContent = `혈비 ${currentTaxRate}%`;
+        }
 
         async function loadMemberDirectory() {
             aliasMap = {};
@@ -212,9 +225,25 @@
             loadDateRaids();
         }
 
+        // 성세금포함 아이템은 드랍탐 기록에 남고, 금액은 지정한 일자의 성세금 아이템 풀에 합산된다.
+        // 이 날짜에 성세금 아이템이 있으면 전체 기록에서 합산 대상을 찾아 둔다.
+        async function loadCastleBonusMap() {
+            castleBonusMap = {};
+            const hasTax = dayRaids.some(r => ClanApp.extractItemDetails(r, itemPriceMap).some(it => ClanApp.isCastleTaxItem(it.name)));
+            if (!hasTax) return;
+            try {
+                const res = await fetch('/api/raids');
+                if (!res.ok) return;
+                castleBonusMap = ClanApp.buildCastleTaxBonusMap(await res.json(), itemPriceMap);
+            } catch (e) {
+                castleBonusMap = {};
+            }
+        }
+
         async function loadDateRaids() {
             const res = await fetch(`/api/raids?date=${encodeURIComponent(selectedDate)}`);
             dayRaids = await res.json();
+            await loadCastleBonusMap();
 
             updateDaySummaryKPI();
             renderTimeGrid();
@@ -369,11 +398,19 @@
             document.getElementById('slotParticipantCount').textContent = `총 ${parties.length}파티 (${pCount}명)`;
 
             // 분배대기(보유중)는 금액 미표시·합계 제외, 분배금은 내판/외판 판매대금에서만 계산
+            const includedTotal = Object.keys(castleBonusMap).reduce((acc, k) => {
+                if (!rec || !k.startsWith(`${rec.id}_`)) return acc;
+                return acc + castleBonusMap[k].bonusPrice;
+            }, 0);
             const totalItemPrice = editableItems.reduce(
-                (acc, it) => acc + (it.sale_type === '보유중' ? 0 : getEffectiveItemPrice(it)), 0);
-            const distributablePrice = editableItems.reduce(
-                (acc, it) => acc + ((it.sale_type === '내판' || it.sale_type === '외판') ? getEffectiveItemPrice(it) : 0), 0);
-            const netPool = Math.floor(distributablePrice * 0.8);
+                (acc, it) => acc + (it.sale_type === '보유중' ? 0 : getEffectiveItemPrice(it)), 0) + includedTotal;
+            const distributablePrice = editableItems.reduce((acc, it, i) => {
+                if (!(it.sale_type === '내판' || it.sale_type === '외판')) return acc;
+                const bonus = (rec && ClanApp.isCastleTaxItem(it.name) && castleBonusMap[`${rec.id}_${i}`])
+                    ? castleBonusMap[`${rec.id}_${i}`].bonusPrice : 0;
+                return acc + getEffectiveItemPrice(it) + bonus;
+            }, 0);
+            const netPool = Math.floor(distributablePrice * (1 - currentTaxRate / 100));
             const perMemberShare = (pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
 
             document.getElementById('slotItemTotalBadge').textContent = `총 ${totalItemPrice.toLocaleString()} (단위:아데나)`;
@@ -435,6 +472,17 @@
                 const delBtn = ClanApp.isAdminModeOn
                     ? `<button type="button" class="btn-sm btn-sm-red" style="padding: 2px 6px; font-size: 10px;" onclick="removeDropItemRow(${idx})">삭제</button>`
                     : '';
+                const rec = getCurrentRecord();
+                const bonus = (rec && ClanApp.isCastleTaxItem(item.name)) ? castleBonusMap[`${rec.id}_${idx}`] : null;
+                const includedRows = bonus ? bonus.includedItems.map(inc => `
+                    <div class="item-row-card">
+                        <div class="item-view-line">
+                            <span class="item-badge-name">↳ 🎁 ${ClanApp.itemNameHtml(inc.name)}
+                                <span style="font-size:10px; color:#9ca3af; font-weight:600;">(${inc.raid_date.slice(2)} ${ClanApp.escapeHtml(inc.raid_time)} 획득)</span></span>
+                            <span style="font-size:10.5px; font-weight:800; border-radius:4px; padding:1px 6px; white-space:nowrap; margin-left:auto; color:#818cf8; background:rgba(99,102,241,0.18); border:1px solid #6366f1;">성세금포함</span>
+                            ${inc.price > 0 ? `<span class="item-matched-price" style="margin-left:6px;">${Number(inc.price).toLocaleString()}</span>` : ''}
+                        </div>
+                    </div>`).join('') : '';
                 return `
                     <div class="item-row-card">
                         <div class="item-view-line">
@@ -444,6 +492,7 @@
                             ${delBtn}
                         </div>
                     </div>
+                    ${includedRows}
                 `;
             }).join('');
         }

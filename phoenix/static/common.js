@@ -364,7 +364,8 @@ window.ClanApp = {
     },
 
     // '성세금포함' 아이템 금액을 지정된 날짜(없으면 가장 가까운 날짜)의 '성세금' 풀에 합산
-    buildCastleTaxBonusMap(raids = [], priceMap = {}) {
+    // bonusMap: 성세금 아이템 key -> 합산 정보 / sourceMap: 성세금포함 아이템 key -> 합산 대상 성세금 정보
+    _resolveCastleTax(raids = [], priceMap = {}) {
         const taxTargets = [];
         const includedEntries = [];
 
@@ -379,6 +380,7 @@ window.ClanApp = {
                     });
                 } else if (item.sale_type === '성세금포함') {
                     includedEntries.push({
+                        source_key: `${r.id}_${idx}`,
                         name: item.name,
                         price: Number(item.price || 0),
                         raid_date: r.raid_date || '',
@@ -392,7 +394,8 @@ window.ClanApp = {
         taxTargets.sort((a, b) => a.raid_date.localeCompare(b.raid_date) || (a.raid_id - b.raid_id));
 
         const bonusMap = Object.create(null);
-        if (taxTargets.length === 0) return bonusMap;
+        const sourceMap = Object.create(null);
+        if (taxTargets.length === 0) return { bonusMap, sourceMap };
 
         includedEntries.forEach(entry => {
             let target = null;
@@ -412,9 +415,18 @@ window.ClanApp = {
             }
             bonusMap[target.key].bonusPrice += entry.price;
             bonusMap[target.key].includedItems.push(entry);
+            sourceMap[entry.source_key] = { target_key: target.key, target_raid_id: target.raid_id };
         });
 
-        return bonusMap;
+        return { bonusMap, sourceMap };
+    },
+
+    buildCastleTaxBonusMap(raids = [], priceMap = {}) {
+        return this._resolveCastleTax(raids, priceMap).bonusMap;
+    },
+
+    buildCastleTaxSourceMap(raids = [], priceMap = {}) {
+        return this._resolveCastleTax(raids, priceMap).sourceMap;
     },
 
     extractParticipants(record) {

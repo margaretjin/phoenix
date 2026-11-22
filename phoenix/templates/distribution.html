@@ -179,7 +179,7 @@
         </section>
     </main>
 
-    <script src="/static/common.js?v=67"></script>
+    <script src="/static/common.js?v=68"></script>
     <script>
         let currentTaxRate = 20;
         let itemPriceMap = {};
@@ -455,22 +455,43 @@
         function buildCheckedEntries() {
             checkedEntries = [];
             const castleTaxBonusMap = ClanApp.buildCastleTaxBonusMap(allRaids, itemPriceMap);
+            const castleTaxSourceMap = ClanApp.buildCastleTaxSourceMap(allRaids, itemPriceMap);
 
             allRaids.forEach(r => {
                 const details = ClanApp.extractItemDetails(r, itemPriceMap);
-                const participants = ClanApp.extractParticipants(r);
+                let participants = ClanApp.extractParticipants(r);
                 const pCount = participants.length;
 
                 details.forEach((item, idx) => {
-                    if (!item.dist_checked) return;
+                    // 성세금포함 금액이 합산된 성세금 아이템은 체크하지 않아도 분배관리에 표시(공성 참여자 대상)
+                    const preBonus = ClanApp.isCastleTaxItem(item.name) ? castleTaxBonusMap[`${r.id}_${idx}`] : null;
+                    const hasIncludedBonus = Boolean(preBonus && preBonus.includedItems.length > 0);
+                    if (!item.dist_checked && !hasIncludedBonus && item.sale_type !== '성세금포함') return;
 
-                    const isCastleTaxIncluded = (item.sale_type === '성세금포함');
-                    const distDate = (item.dist_date || '').trim();
+                    const isIncludedType = (item.sale_type === '성세금포함');
+                    // 합산 대상 성세금 아이템이 없으면 합산 불가 → 성세금포함 아이템을 공성 참여자 대상 일반 항목처럼 분배
+                    const hasMergeTarget = Boolean((castleTaxSourceMap[`${r.id}_${idx}`] || {}).target_key);
+                    const isCastleTaxIncluded = isIncludedType && hasMergeTarget;
+                    // 성세금포함 아이템의 분배 대상은 드랍탐이 아니라 해당 일자 공성 참여자
+                    let siegeParticipants = null;
+                    if (isIncludedType) {
+                        const src = castleTaxSourceMap[`${r.id}_${idx}`];
+                        let siegeRaid = src ? allRaids.find(x => x.id === src.target_raid_id) : null;
+                        if (!siegeRaid && item.castle_tax_date) {
+                            siegeRaid = allRaids.find(x => x.raid_date === item.castle_tax_date && x.raid_time === '공성') || null;
+                        }
+                        siegeParticipants = siegeRaid ? ClanApp.extractParticipants(siegeRaid) : [];
+                    }
+                    // 혈분배일 미지정 성세금(합산분 있음)은 오늘 날짜를 혈분배일 기준으로 간주해 칩에 노출
+                    const effParticipants = siegeParticipants || participants;
+                    const effCount = effParticipants.length;
+                    const distDate = (item.dist_date || '').trim()
+                        || (hasIncludedBonus ? ClanApp.formatYMD(new Date()) : '');
                     const hasDistDate = Boolean(distDate);
                     let doneMemberCount = 0;
 
                     if (hasDistDate && !isCastleTaxIncluded) {
-                        participants.forEach(p => {
+                        effParticipants.forEach(p => {
                             const pDist = getDistInfoByDistDate(r, idx, distDate, p.id);
                             if (pDist.status === '분배완료') doneMemberCount++;
                         });
@@ -478,7 +499,7 @@
 
                     const isFullyDone = isCastleTaxIncluded
                         ? true
-                        : (hasDistDate && pCount > 0 && doneMemberCount === pCount);
+                        : (hasDistDate && effCount > 0 && doneMemberCount === effCount);
                     const itemState = isCastleTaxIncluded
                         ? 'done'
                         : (!hasDistDate ? 'wait' : (isFullyDone ? 'done' : 'progress'));
@@ -489,7 +510,7 @@
                     const bonusPrice = bonusInfo ? bonusInfo.bonusPrice : 0;
                     const price = basePrice + bonusPrice;
                     const netPool = isCastleTaxIncluded ? 0 : Math.floor(price * (1 - currentTaxRate / 100));
-                    const perItemShare = (!isCastleTaxIncluded && pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
+                    const perItemShare = (!isCastleTaxIncluded && effCount > 0 && netPool > 0) ? Math.floor(netPool / effCount) : 0;
 
                     checkedEntries.push({
                         key: entryKey,
@@ -500,17 +521,21 @@
                         name: item.name,
                         is_castle_tax_included: isCastleTaxIncluded,
                         castle_tax_date: item.castle_tax_date || '',
+                        target_key: isCastleTaxIncluded ? ((castleTaxSourceMap[entryKey] || {}).target_key || '') : '',
                         base_price: basePrice,
                         bonus_price: bonusPrice,
                         included_items: bonusInfo ? bonusInfo.includedItems : [],
                         price,
                         net_pool: netPool,
+                        info_net: isCastleTaxIncluded ? Math.floor(price * (1 - currentTaxRate / 100)) : 0,
+                        info_share: (isCastleTaxIncluded && siegeParticipants && siegeParticipants.length > 0)
+                            ? Math.floor(Math.floor(price * (1 - currentTaxRate / 100)) / siegeParticipants.length) : 0,
                         per_share: perItemShare,
                         dist_date: distDate,
                         item_state: itemState,
                         is_done: isFullyDone,
                         done_count: doneMemberCount,
-                        participants,
+                        participants: effParticipants,
                         raid_ref: r,
                         full_details_ref: details
                     });
@@ -680,17 +705,32 @@
                         ? `성세금 합산(${toShortDate(entry.castle_tax_date)})`
                         : '성세금 합산';
                     const ctBadge = `<span style="display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:800; color:#818cf8; background:rgba(99,102,241,0.18); border:1px solid #6366f1;">${ctLabel}</span>`;
+                    const isEditingCt = isAdmin && editingDistDateKeys.has(entry.key);
+                    const ctTarget = checkedEntries.find(e => e.key === entry.target_key);
+                    const ctDistDate = (ctTarget && ctTarget.dist_date) || entry.dist_date || '';
+                    const ctDateCell = isEditingCt
+                        ? `<input type="date" id="chkCtDate_${entry.key}" class="dist-tbl-input paid-date-input-compact" value="${ctDistDate || ClanApp.formatYMD(new Date())}">`
+                        : (ctDistDate ? `<span class="confirmed-dist-date">${toShortDate(ctDistDate)}</span>` : '미확정');
+                    let ctAdminCell = '';
+                    if (isAdmin) {
+                        ctAdminCell = isEditingCt
+                            ? `<td><div class="dist-date-btn-group">
+                                   <button type="button" class="btn-sm btn-sm-green" style="padding: 4px 8px; font-size: 11px;" onclick="saveCastleTaxIncludedDate('${entry.key}')">저장</button>
+                                   <button type="button" class="btn-row-del" onclick="cancelDistDateEdit('${entry.key}')">취소</button>
+                               </div></td>`
+                            : `<td><div class="dist-date-btn-group"><button type="button" class="btn-row-edit" onclick="enableDistDateEdit('${entry.key}')">수정</button></div></td>`;
+                    }
                     return `
                         <tr>
                             <td class="checked-item-slot">${slotText}</td>
                             <td class="checked-item-name">${ClanApp.itemNameHtml(entry.name)}</td>
                             <td class="checked-item-price">${entry.price.toLocaleString()}</td>
-                            <td style="color:#818cf8; font-size:11px; font-weight:700;">성세금 합산</td>
-                            <td style="color:#71717a;">-</td>
+                            <td style="color:#818cf8; font-size:11px; font-weight:700;">${entry.info_net.toLocaleString()}</td>
+                            <td style="color:#818cf8; font-weight:700;">${entry.info_share > 0 ? entry.info_share.toLocaleString() : '-'}</td>
                             <td class="checked-item-pcount">${pCount}명</td>
                             <td>${ctBadge}</td>
-                            <td>${entry.castle_tax_date ? `<span class="confirmed-dist-date">${toShortDate(entry.castle_tax_date)}</span>` : '자동'}</td>
-                            ${isAdmin ? `<td style="color:#71717a; font-size:11px;">-</td>` : ''}
+                            <td>${ctDateCell}</td>
+                            ${ctAdminCell}
                         </tr>
                     `;
                 }
@@ -769,6 +809,52 @@
                     </tr>
                 `;
             }).join('');
+        }
+
+        function cancelDistDateEdit(key) {
+            editingDistDateKeys.delete(key);
+            renderCheckedItemsTable();
+        }
+
+        // 성세금합산 행: 달력으로 고른 날짜를 합산 대상 성세금 아이템의 혈분배일(dist_date)로 저장
+        async function saveCastleTaxIncludedDate(key) {
+            if (!ClanApp.isAdminModeOn) return;
+            const entry = checkedEntries.find(e => e.key === key);
+            if (!entry) return;
+            // 합산 대상 성세금 아이템이 없으면 성세금포함 아이템 자체에 혈분배일 저장
+            const target = checkedEntries.find(e => e.key === entry.target_key) || entry;
+            const el = document.getElementById(`chkCtDate_${key}`);
+            const distDate = (el && el.value) ? el.value : ClanApp.formatYMD(new Date());
+            selectedKpiDistDate = distDate;
+
+            const updatedDetails = target.full_details_ref.map((it, idx) => ({
+                name: it.name,
+                sale_type: it.sale_type || '보유중',
+                alliance: it.alliance || '',
+                price: Number(it.price || 0),
+                winner: it.winner || '',
+                taken_date: it.taken_date || '',
+                dist_date: idx === target.item_idx ? distDate : (it.dist_date || ''),
+                dist_checked: idx === target.item_idx ? true : Boolean(it.dist_checked),
+                castle_tax_date: it.castle_tax_date || ''
+            }));
+
+            const res = await fetch('/api/raids/item-details', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raid_id: target.raid_id,
+                    item_details: updatedDetails,
+                    requester_role: ClanApp.role
+                })
+            });
+            if (res.ok) {
+                editingDistDateKeys.delete(key);
+                await loadAllRaidsForDistribution();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || '저장 실패');
+            }
         }
 
         function enableDistDateEdit(key) {
@@ -1516,9 +1602,9 @@
             let changed = false;
 
             const updated = details.map((it, idx) => {
-                if (idxSet.has(idx) && it.dist_checked && (!it.dist_date || !it.dist_date.trim())) {
+                if (idxSet.has(idx) && (it.dist_checked || ClanApp.isCastleTaxItem(it.name)) && (!it.dist_date || !it.dist_date.trim())) {
                     changed = true;
-                    return { ...it, dist_date: fallbackDate };
+                    return { ...it, dist_checked: true, dist_date: fallbackDate };
                 }
                 return it;
             });

@@ -354,10 +354,22 @@ def update_item_details(req: ItemDetailsUpdateRequest):
 
     dropped_str = " ".join([d["name"] for d in details_list if d.get("name")])
 
-    res = supabase.table("raid_logs").update({
+    update_payload = {
         "item_details": details_list,
         "dropped_items": dropped_str
-    }).eq("id", req.raid_id).execute()
+    }
+
+    # 성세금포함 아이템은 드랍 당시 참여자가 아니라 '해당 일자 공성 참여자'가 가져간다.
+    # 따라서 이 보스탐 기록의 아이템이 전부 성세금포함이면 기존 참여자(파티)·분배 기록을 비운다.
+    # (다른 아이템이 섞여 있으면 그 아이템의 분배 대상이 사라지므로 참여자는 유지)
+    if details_list and all(d.get("sale_type") == "성세금포함" for d in details_list):
+        raid_row = supabase.table("raid_logs").select("raid_time").eq("id", req.raid_id).execute()
+        raid_time = (raid_row.data[0].get("raid_time") if raid_row.data else "") or ""
+        if raid_time != "공성":
+            update_payload["parties"] = []
+            update_payload["distributions"] = {}
+
+    res = supabase.table("raid_logs").update(update_payload).eq("id", req.raid_id).execute()
     return {"status": "updated", "data": res.data[0]}
 
 @router.delete("/item-details/{raid_id}/{item_idx}")

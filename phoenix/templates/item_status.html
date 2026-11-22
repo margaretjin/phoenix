@@ -180,21 +180,20 @@
             return `<span class="raid-datetime-unified">${shortDate} ${t}${dawnTag}</span>`;
         }
 
-        // 아이템 획득일 기준 앞뒤 1주(-7일 ~ +7일) 성세금 날짜 드롭다운 옵션 생성
+        // 성세금 날짜 드롭다운: 공성은 일요일에만 열리므로 일요일만 3개 표시
+        // (획득일 이전 가장 가까운 일요일 + 이후 일요일 2개)
         function buildCastleTaxDateOptionsHtml(baseDateStr, selectedDate = '') {
             const wdNames = ['일', '월', '화', '수', '목', '금', '토'];
             const ref = baseDateStr && baseDateStr.length >= 10 ? baseDateStr : ClanApp.formatYMD(new Date());
             const [y, m, d] = ref.split('-').map(Number);
             const sel = (selectedDate || '').trim();
 
-            const dates = [];
-            for (let offset = -7; offset <= 7; offset++) {
-                const dt = new Date(y, m - 1, d + offset);
-                dates.push({
-                    val: ClanApp.formatYMD(dt),
-                    wd: wdNames[dt.getDay()]
-                });
-            }
+            const base = new Date(y, m - 1, d);
+            const prevSunday = new Date(y, m - 1, d - base.getDay());
+            const dates = [0, 7, 14].map(off => {
+                const dt = new Date(prevSunday.getFullYear(), prevSunday.getMonth(), prevSunday.getDate() + off);
+                return { val: ClanApp.formatYMD(dt), wd: wdNames[dt.getDay()] };
+            });
 
             if (sel && !dates.some(x => x.val === sel)) {
                 const [sy, sm, sd] = sel.split('-').map(Number);
