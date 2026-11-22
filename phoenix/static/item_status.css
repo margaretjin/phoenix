@@ -1,1109 +1,331 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>혈맹 아이템 현황 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=67">
-    <link rel="stylesheet" href="/static/item_status.css?v=59">
-</head>
-<body>
-    <nav class="navbar" id="appNavbar"></nav>
-
-    <main class="main-container">
-        <!-- 상단 타이틀 & 관리자 전용 4종 엑셀 다운로드 -->
-        <div class="top-bar">
-            <h1 class="page-title">💎 혈맹 아이템 현황</h1>
-            <div class="excel-btn-group admin-only">
-                <button type="button" class="btn-excel-sm" onclick="exportItemExcel('day')">📥 일</button>
-                <button type="button" class="btn-excel-sm" onclick="exportItemExcel('week')">주</button>
-                <button type="button" class="btn-excel-sm" onclick="exportItemExcel('month')">월</button>
-                <button type="button" class="btn-excel-sm" onclick="exportItemExcel('all')">전체목록</button>
-            </div>
-        </div>
-
-        <!-- 1. 조회 기준 및 보유상태 / 분배상태 필터 -->
-        <section class="card-box">
-            <div class="filter-grid-box">
-                <div class="filter-field">
-                    <label>조회 기준 (5종)</label>
-                    <select id="viewModeSelect" class="input-common" onchange="onViewModeChange()">
-                        <option value="month">월별</option>
-                        <option value="week">주별</option>
-                        <option value="today">일별 (오늘)</option>
-                        <option value="all">전체</option>
-                        <option value="custom_date">특정일</option>
-                    </select>
-                </div>
-
-                <div id="monthPickerBox" class="filter-field">
-                    <label>기준 월 선택</label>
-                    <input type="month" id="filterMonth" class="input-common" onchange="loadItemStatusData()">
-                </div>
-
-                <div id="datePickerBox" class="filter-field hidden">
-                    <label id="datePickerLabel">기준 날짜 선택</label>
-                    <input type="date" id="filterDate" class="input-common" onchange="loadItemStatusData()">
-                </div>
-
-                <div id="allModeNoticeBox" class="filter-field hidden">
-                    <label>조회 범위</label>
-                    <input type="text" class="input-common" value="전체 기간 누적" disabled>
-                </div>
-
-                <!-- 보유상태 필터 (연합 / 성세금포함 / 분배금혈귀 포함) -->
-                <div class="filter-field">
-                    <label>보유상태</label>
-                    <select id="holdStateFilter" class="input-common" onchange="renderItemTable()">
-                        <option value="all">전체아이템현황</option>
-                        <option value="보유중">연합분배대기</option>
-                        <option value="내판">내판</option>
-                        <option value="연합">연합</option>
-                        <option value="외판">외판</option>
-                        <option value="이벤트">이벤트</option>
-                        <option value="성세금포함">성세금포함</option>
-                        <option value="분배금혈귀">분배금혈귀</option>
-                    </select>
-                </div>
-
-                <!-- 분배상태 필터 (분배대기 / 분배시작 / 분배중 / 분배완료 / 성세금포함 / 분배금혈귀) -->
-                <div class="filter-field">
-                    <label>분배상태</label>
-                    <select id="distStateFilter" class="input-common" onchange="renderItemTable()">
-                        <option value="all">전체 분배상태</option>
-                        <option value="연합분배대기">연합분배대기</option>
-                        <option value="분배대기">분배대기 (내판·외판)</option>
-                        <option value="분배시작">분배시작</option>
-                        <option value="분배중">분배중</option>
-                        <option value="분배완료">분배완료</option>
-                        <option value="연합">연합</option>
-                        <option value="이벤트">이벤트</option>
-                        <option value="이벤트템">이벤트템</option>
-                        <option value="혈비귀속">혈비귀속</option>
-                        <option value="성세금포함">성세금포함</option>
-                        <option value="분배금혈귀">분배금혈귀</option>
-                    </select>
-                </div>
-
-                <div class="filter-field search-full-mobile">
-                    <label>아이템 / 수령자 검색</label>
-                    <input type="text" id="keywordSearch" class="input-common" placeholder="아이템명 또는 수령자" oninput="renderItemTable()">
-                </div>
-            </div>
-        </section>
-
-        <!-- 2. 아이템 목록 테이블 -->
-        <section class="card-box">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span class="section-label">📋 아이템 목록</span>
-                <span id="itemTotalCountBadge" style="font-size: 12px; font-weight: bold; color: #60a5fa;">총 0건</span>
-            </div>
-
-            <div class="status-table-wrap">
-                <table class="item-status-table">
-                    <thead>
-                        <tr>
-                            <th>획득일시</th>
-                            <th>아이템명</th>
-                            <th>보유상태</th>
-                            <th>분배상태</th>
-                            <th>판매가격</th>
-                            <th>수령자</th>
-                            <th>판매<br>완료일</th>
-                            <th id="adminCheckHeader" class="hidden">체크</th>
-                            <th>분배<br>완료일</th>
-                            <th id="adminSaveHeader" class="hidden">관리</th>
-                        </tr>
-                    </thead>
-                    <tbody id="itemStatusTableBody">
-                        <tr><td colspan="10" class="empty-party-msg">조회 중...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
-
-    <script src="/static/common.js?v=67"></script>
-    <script>
-        let allMembers = [];
-        let clanCharPool = [];
-        let clanCharSet = new Set();
-        let itemPriceMap = {};
-        let flattenedItems = [];
-        let editingItemKeys = new Set();
-        let activeSuggestIdxMap = {};
-        const DAWN_SLOTS = new Set(['01시', '03시', '05시']);
-
-        window.onload = async () => {
-            const user = ClanApp.initPage('/item-status', () => {
-                applyTableAdminHeaders();
-                if (!ClanApp.isAdminModeOn) {
-                    editingItemKeys.clear();
-                }
-                renderItemTable();
-            });
-            if (!user) return;
-
-            applyTableAdminHeaders();
-
-            const now = new Date();
-            document.getElementById('filterMonth').value = ClanApp.formatYM(now);
-            document.getElementById('filterDate').value = ClanApp.formatYMD(now);
-
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('.winner-autocomplete-wrap')) {
-                    document.querySelectorAll('.winner-suggest-list').forEach(el => el.classList.add('hidden'));
-                }
-            });
-
-            await Promise.all([loadMembersForAutocomplete(), loadItemMasterPrices()]);
-            await loadItemStatusData();
-        };
-
-        function applyTableAdminHeaders() {
-            const isAdmin = ClanApp.isAdminModeOn;
-            document.getElementById('adminCheckHeader').classList.toggle('hidden', !isAdmin);
-            document.getElementById('adminSaveHeader').classList.toggle('hidden', !isAdmin);
-        }
-
-        function toShortDate(dateStr) {
-            if (!dateStr || dateStr.length < 8) return '-';
-            return dateStr.length >= 10 ? dateStr.slice(2, 10) : dateStr;
-        }
-
-        function formatRaidDateTimeCell(dateStr, timeStr) {
-            const shortDate = toShortDate(dateStr);
-            const t = (timeStr || '').trim();
-            const dawnTag = DAWN_SLOTS.has(t)
-                ? `<span class="dawn-sub-tag">(새벽)</span>`
-                : '';
-            return `<span class="raid-datetime-unified">${shortDate} ${t}${dawnTag}</span>`;
-        }
-
-        // 성세금 날짜 드롭다운: 공성은 일요일에만 열리므로 일요일만 3개 표시
-        // (획득일 이전 가장 가까운 일요일 + 이후 일요일 2개)
-        function buildCastleTaxDateOptionsHtml(baseDateStr, selectedDate = '') {
-            const wdNames = ['일', '월', '화', '수', '목', '금', '토'];
-            const ref = baseDateStr && baseDateStr.length >= 10 ? baseDateStr : ClanApp.formatYMD(new Date());
-            const [y, m, d] = ref.split('-').map(Number);
-            const sel = (selectedDate || '').trim();
-
-            const base = new Date(y, m - 1, d);
-            const prevSunday = new Date(y, m - 1, d - base.getDay());
-            const dates = [0, 7, 14].map(off => {
-                const dt = new Date(prevSunday.getFullYear(), prevSunday.getMonth(), prevSunday.getDate() + off);
-                return { val: ClanApp.formatYMD(dt), wd: wdNames[dt.getDay()] };
-            });
-
-            if (sel && !dates.some(x => x.val === sel)) {
-                const [sy, sm, sd] = sel.split('-').map(Number);
-                const sdt = new Date(sy, sm - 1, sd);
-                dates.unshift({ val: sel, wd: wdNames[sdt.getDay()] || '' });
-            }
-
-            const opts = [`<option value="" ${!sel ? 'selected' : ''}>성세금일(자동)</option>`];
-            dates.forEach(item => {
-                opts.push(`<option value="${item.val}" ${sel === item.val ? 'selected' : ''}>${toShortDate(item.val)}(${item.wd})</option>`);
-            });
-            return opts.join('');
-        }
-
-        async function loadMembersForAutocomplete() {
-            clanCharPool = [];
-            clanCharSet = new Set();
-            const seenChar = new Set();
-
-            try {
-                const res = await fetch('/api/auth/search-members');
-                allMembers = await res.json();
-
-                allMembers.forEach(m => {
-                    const activeId = (m.active_id || '').trim();
-                    const cClass = m.char_class || '';
-                    const subs = (m.sub_chars || '').split(',').map(s => s.trim()).filter(Boolean);
-
-                    if (activeId) {
-                        const lowMain = activeId.toLowerCase();
-                        clanCharSet.add(lowMain);
-                        if (!seenChar.has(lowMain)) {
-                            seenChar.add(lowMain);
-                            clanCharPool.push({
-                                charId: activeId,
-                                labelInfo: `${cClass} · 본캐`,
-                                searchKey: `${activeId} ${subs.join(' ')}`.toLowerCase()
-                            });
-                        }
-                    }
-
-                    subs.forEach(subId => {
-                        const lowSub = subId.toLowerCase();
-                        clanCharSet.add(lowSub);
-                        if (!seenChar.has(lowSub)) {
-                            seenChar.add(lowSub);
-                            clanCharPool.push({
-                                charId: subId,
-                                labelInfo: `쫄 (본캐: ${activeId})`,
-                                searchKey: `${subId} ${activeId}`.toLowerCase()
-                            });
-                        }
-                    });
-                });
-            } catch (e) {
-                allMembers = [];
-                clanCharPool = [];
-                clanCharSet = new Set();
-            }
-        }
-
-        async function loadItemMasterPrices() {
-            itemPriceMap = {};
-            try {
-                const res = await fetch('/api/items');
-                if (!res.ok) return;
-                const list = await res.json();
-                ClanApp.setItemAliases(list);
-                list.forEach(it => {
-                    if (it.item_name) itemPriceMap[it.item_name] = Number(it.default_price || 0);
-                });
-            } catch (e) {
-                itemPriceMap = {};
-            }
-        }
-
-        function computeHoldState(winnerRaw, priceVal, preferredSaleType = '') {
-            const w = (winnerRaw || '').trim();
-            const p = Number(priceVal || 0);
-
-            if (!w) {
-                return '보유중';
-            }
-            if (p === 0 || preferredSaleType === '이벤트') {
-                return '이벤트';
-            }
-            if (preferredSaleType === '연합') {
-                return '연합';
-            }
-            if (preferredSaleType === '성세금포함') {
-                return '성세금포함';
-            }
-            if (preferredSaleType === '분배금혈귀') {
-                return '분배금혈귀';
-            }
-            const isClanMember = clanCharSet.has(w.toLowerCase());
-            if (isClanMember) {
-                return '내판';
-            }
-            return '외판';
-        }
-
-        // 내판·외판 + 성세금 + 성세금포함 모두 체크박스(분배관리 연동) 표시 허용
-        function isDistributableHoldState(holdState, itemName = '') {
-            if (holdState === '내판' || holdState === '외판' || holdState === '성세금포함') return true;
-            if (ClanApp.isCastleTaxItem(itemName) && !['연합', '이벤트', '분배금혈귀'].includes(holdState)) return true;
-            return false;
-        }
-
-        function resolveRowHoldState(item) {
-            if (item.event_item) return '이벤트';
-            if (item.clan_owned) return '연합';
-            const st = item.sale_type || '보유중';
-            if (!item.alliance && (st === '내판' || st === '외판')) {
-                return clanCharSet.has((item.winner || '').trim().toLowerCase()) ? '내판' : '외판';
-            }
-            return st;
-        }
-
-        const AMBER_BADGE_STYLE = 'color:#fbbf24; background:rgba(245,158,11,0.16); border:1px solid #f59e0b;';
-        const PINK_BADGE_STYLE = 'color:#f472b6; background:rgba(244,114,182,0.16); border:1px solid #ec4899;';
-        const TAX_BADGE_STYLE = 'color:#818cf8; background:rgba(99,102,241,0.18); border:1px solid #6366f1;';
-        const CLAN_DIST_BADGE_STYLE = 'color:#fb7185; background:rgba(244,63,94,0.18); border:1px solid #f43f5e;';
-
-        function holdBadgeStyle(row) {
-            if (row.hold_state === '성세금포함') return TAX_BADGE_STYLE;
-            if (row.hold_state === '분배금혈귀') return CLAN_DIST_BADGE_STYLE;
-            if (row.hold_state !== '보유중') return '';
-            return row.alliance === '피닉스' ? PINK_BADGE_STYLE : AMBER_BADGE_STYLE;
-        }
-
-        function distBadgeStyle(state, label) {
-            if (state === '성세금포함') return TAX_BADGE_STYLE;
-            if (state === '분배금혈귀') return CLAN_DIST_BADGE_STYLE;
-            return (state === '연합분배대기' && String(label).startsWith('피닉스')) ? PINK_BADGE_STYLE : '';
-        }
-
-        function holdLabelOf(row) {
-            if (row.hold_state === '보유중') return row.alliance === '피닉스' ? '피닉스(구분대기)' : '연합분배대기';
-            if (row.hold_state === '연합') {
-                const al = row.alliance && row.alliance !== '피닉스' ? row.alliance : '';
-                return al ? `연합(${al})` : '연합';
-            }
-            return row.hold_state;
-        }
-
-        function readRowEdit(i, target) {
-            const alEl = document.getElementById(`stAlliance_${i}`);
-            const stEl = document.getElementById(`stSaleType_${i}`);
-            const taxDateEl = document.getElementById(`stCastleTaxDate_${i}`);
-            const wEl = document.getElementById(`stWinner_${i}`);
-            const pEl = document.getElementById(`stPrice_${i}`);
-            let alliance, saleType;
-            if (alEl) {
-                alliance = alEl.value;
-                if (alliance === '반항' || alliance === '세븐') saleType = '연합';
-                else if (alliance === '피닉스') saleType = (stEl && stEl.value) ? stEl.value : '보유중';
-                else saleType = '보유중';
-            } else {
-                alliance = target ? (target.alliance || '') : '';
-                saleType = target ? target.hold_state : '보유중';
-            }
-            const castleTaxDate = (saleType === '성세금포함')
-                ? (taxDateEl ? taxDateEl.value.trim() : (target ? (target.castle_tax_date || '') : ''))
-                : '';
-            return {
-                alliance,
-                saleType,
-                castle_tax_date: castleTaxDate,
-                winner: wEl ? wEl.value.trim() : (target ? target.winner : ''),
-                price: pEl ? Number(pEl.value || 0) : (target ? Number(target.price || 0) : 0)
-            };
-        }
-
-        function toDetailPayload(it) {
-            return {
-                name: it.name,
-                sale_type: it.sale_type || '보유중',
-                alliance: it.alliance || '',
-                price: Number(it.price || 0),
-                winner: it.winner || '',
-                taken_date: it.taken_date || '',
-                dist_date: it.dist_date || '',
-                dist_checked: Boolean(it.dist_checked),
-                castle_tax_date: it.castle_tax_date || ''
-            };
-        }
-
-        function computeDistStateInfo(record, item, itemIdx = 0) {
-            const winner = (item.winner || '').trim();
-            const holdState = resolveRowHoldState(item);
-            const distDate = (item.dist_date || '').trim();
-            const isChecked = Boolean(item.dist_checked || distDate);
-            const isCastleTax = ClanApp.isCastleTaxItem(item.name);
-
-            const participants = ClanApp.extractParticipants(record);
-            const distMap = (record && record.distributions) || {};
-            const pCount = participants.length;
-
-            let doneCount = 0;
-            if (pCount > 0 && distDate) {
-                participants.forEach(p => {
-                    const dateInfo = distMap[`${p.id}__date_${distDate}`];
-                    const itemInfo = distMap[`${p.id}__item_${itemIdx}`];
-                    const legacyInfo = distMap[p.id];
-                    let st = '';
-                    if (dateInfo) {
-                        st = dateInfo.status;
-                    } else if (itemInfo) {
-                        st = itemInfo.status;
-                    } else if (legacyInfo) {
-                        const paidDate = (legacyInfo.paid_date || '').trim();
-                        if (legacyInfo.status === '분배완료' && paidDate && distDate > paidDate) {
-                            st = '분배대기';
-                        } else {
-                            st = legacyInfo.status;
-                        }
-                    }
-                    if (st === '분배완료') {
-                        doneCount++;
-                    }
-                });
-            }
-
-            if (holdState === '연합') {
-                const al = (item.alliance || '').trim();
-                if (item.clan_owned && !winner && !al) {
-                    return { state: '혈비귀속', label: '혈비귀속', doneCount: 0, totalCount: pCount };
-                }
-                const where = al || winner;
-                return { state: '연합', label: where ? `연합(${where})` : '연합', doneCount: 0, totalCount: pCount };
-            }
-            if (holdState === '이벤트') {
-                if (item.event_item) {
-                    return { state: '이벤트템', label: '이벤트템', doneCount: 0, totalCount: pCount };
-                }
-                return { state: '이벤트', label: '이벤트', doneCount: 0, totalCount: pCount };
-            }
-            if (holdState === '성세금포함') {
-                const ctDate = (item.castle_tax_date || '').trim();
-                const ctLabel = ctDate ? `성세금포함(${toShortDate(ctDate)})` : '성세금포함';
-                return { state: '성세금포함', label: ctLabel, doneCount: 0, totalCount: pCount };
-            }
-            if (holdState === '분배금혈귀') {
-                return { state: '분배금혈귀', label: '분배금혈귀', doneCount: 0, totalCount: pCount };
-            }
-
-            // 성세금 아이템은 수령자 없이도 분배 체크/진행 상태 표시
-            if (isCastleTax) {
-                if (!isChecked) return { state: '분배대기', label: '분배대기', doneCount: 0, totalCount: pCount };
-                if (!distDate) return { state: '분배시작', label: '분배시작', doneCount: 0, totalCount: pCount };
-                if (pCount > 0 && doneCount === pCount) {
-                    return { state: '분배완료', label: `분배완료(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
-                }
-                return { state: '분배중', label: `분배중(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
-            }
-
-            if (holdState === '보유중') {
-                const pendingLabel = (item.alliance === '피닉스') ? '피닉스 판매대기' : '연합분배대기';
-                return { state: '연합분배대기', label: pendingLabel, doneCount: 0, totalCount: pCount };
-            }
-
-            if (!winner || !isDistributableHoldState(holdState, item.name) || !isChecked) {
-                return { state: '분배대기', label: '분배대기', doneCount: 0, totalCount: pCount };
-            }
-
-            if (!distDate) {
-                return { state: '분배시작', label: '분배시작', doneCount: 0, totalCount: pCount };
-            }
-
-            if (pCount > 0 && doneCount === pCount) {
-                return { state: '분배완료', label: `분배완료(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
-            }
-
-            return { state: '분배중', label: `분배중(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
-        }
-
-        function distBadgeClass(state) {
-            if (state === '혈비귀속' || state === '연합') return 'sale-badge type-연합';
-            if (state === '이벤트' || state === '이벤트템') return 'sale-badge type-이벤트';
-            if (state === '성세금포함' || state === '분배금혈귀') return 'sale-badge';
-            if (state === '연합분배대기') return 'dist-state-badge state-분배대기';
-            return `dist-state-badge state-${state}`;
-        }
-
-        function onViewModeChange() {
-            const mode = document.getElementById('viewModeSelect').value;
-            const monthBox = document.getElementById('monthPickerBox');
-            const dateBox = document.getElementById('datePickerBox');
-            const allBox = document.getElementById('allModeNoticeBox');
-            const dateLabel = document.getElementById('datePickerLabel');
-
-            monthBox.classList.add('hidden');
-            dateBox.classList.add('hidden');
-            allBox.classList.add('hidden');
-
-            if (mode === 'month') {
-                monthBox.classList.remove('hidden');
-            } else if (mode === 'week') {
-                dateLabel.textContent = '주간 기준일 선택';
-                dateBox.classList.remove('hidden');
-            } else if (mode === 'today') {
-                document.getElementById('filterDate').value = ClanApp.formatYMD(new Date());
-                dateLabel.textContent = '오늘 날짜';
-                dateBox.classList.remove('hidden');
-            } else if (mode === 'custom_date') {
-                dateLabel.textContent = '특정일 선택';
-                dateBox.classList.remove('hidden');
-            } else {
-                allBox.classList.remove('hidden');
-            }
-
-            loadItemStatusData();
-        }
-
-        async function loadItemStatusData() {
-            const mode = document.getElementById('viewModeSelect').value;
-            const dateVal = document.getElementById('filterDate').value || ClanApp.formatYMD(new Date());
-            const monthVal = document.getElementById('filterMonth').value || ClanApp.formatYM(new Date());
-
-            let query = '';
-            if (mode === 'month') {
-                query = `?month=${encodeURIComponent(monthVal)}`;
-            } else if (mode === 'week') {
-                const { start, end } = ClanApp.getWeekRange(dateVal);
-                query = `?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
-            } else if (mode === 'today' || mode === 'custom_date') {
-                query = `?date=${encodeURIComponent(dateVal)}`;
-            } else {
-                query = '';
-            }
-
-            const res = await fetch(`/api/raids${query}`);
-            const raids = await res.json();
-            const todayStr = ClanApp.formatYMD(new Date());
-
-            flattenedItems = [];
-            raids.forEach(r => {
-                const rawSavedDetails = Array.isArray(r.item_details) ? r.item_details : [];
-                const details = ClanApp.extractItemDetails(r, itemPriceMap);
-
-                details.forEach((item, idx) => {
-                    const winner = (item.winner || '').trim();
-                    const price = Number(item.price || 0);
-                    const policyPrice = Number(itemPriceMap[item.name] || 0);
-                    const rawObj = rawSavedDetails[idx] || {};
-                    const holdState = resolveRowHoldState(item);
-                    const alliance = item.alliance || (['내판', '외판', '이벤트', '성세금포함', '분배금혈귀'].includes(holdState) ? '피닉스' : '');
-                    const castleTaxDate = (holdState === '성세금포함') ? (item.castle_tax_date || '') : '';
-
-                    const canDist = isDistributableHoldState(holdState, item.name);
-                    const distDate = canDist ? (item.dist_date || '').trim() : '';
-                    const isChecked = canDist
-                        ? (distDate ? true : Boolean(rawObj.dist_checked))
-                        : false;
-
-                    const distInfo = computeDistStateInfo(
-                        r,
-                        {
-                            ...item,
-                            alliance,
-                            sale_type: holdState,
-                            castle_tax_date: castleTaxDate,
-                            dist_date: distDate,
-                            dist_checked: isChecked,
-                            clan_owned: Boolean(item.clan_owned),
-                            event_item: Boolean(item.event_item)
-                        },
-                        idx
-                    );
-
-                    flattenedItems.push({
-                        key: `${r.id}_${idx}`,
-                        raid_id: r.id,
-                        item_idx: idx,
-                        raid_date: r.raid_date,
-                        raid_time: r.raid_time,
-                        name: item.name,
-                        hold_state: holdState,
-                        alliance,
-                        castle_tax_date: castleTaxDate,
-                        dist_state: distInfo.state,
-                        dist_label: distInfo.label,
-                        price,
-                        policy_price: policyPrice,
-                        clan_owned: Boolean(item.clan_owned),
-                        event_item: Boolean(item.event_item),
-                        winner,
-                        taken_date: item.taken_date || '',
-                        default_taken_date: item.taken_date || todayStr,
-                        dist_date: distDate,
-                        dist_checked: isChecked,
-                        full_details_ref: details,
-                        record_ref: r
-                    });
-                });
-            });
-
-            renderItemTable();
-        }
-
-        function getFilteredItems() {
-            const holdFilter = document.getElementById('holdStateFilter').value;
-            const distFilter = document.getElementById('distStateFilter').value;
-            const kw = document.getElementById('keywordSearch').value.trim().toLowerCase();
-
-            return flattenedItems.filter(row => {
-                if (holdFilter !== 'all' && row.hold_state !== holdFilter) return false;
-                if (distFilter !== 'all' && row.dist_state !== distFilter) return false;
-                const alias = ClanApp.getItemAlias(row.name).toLowerCase();
-                if (kw && !row.name.toLowerCase().includes(kw) && !alias.includes(kw) && !row.winner.toLowerCase().includes(kw)) return false;
-                return true;
-            });
-        }
-
-        function startEditItemRow(key) {
-            if (!ClanApp.isAdminModeOn) return;
-            editingItemKeys.add(key);
-            renderItemTable();
-        }
-
-        function onWinnerTypeSearch(i, currentDistDate) {
-            onLiveWinnerOrPriceInput(i, currentDistDate);
-
-            const winnerEl = document.getElementById(`stWinner_${i}`);
-            const suggestBox = document.getElementById(`stWinnerSuggest_${i}`);
-            if (!winnerEl || !suggestBox) return;
-
-            const curSel = readRowEdit(i, getFilteredItems()[i]);
-            const q = curSel.saleType === '내판' ? winnerEl.value.trim().toLowerCase() : '';
-            if (!q) {
-                suggestBox.innerHTML = '';
-                suggestBox.classList.add('hidden');
-                activeSuggestIdxMap[i] = -1;
-                return;
-            }
-
-            const matches = clanCharPool.filter(entry => entry.searchKey.includes(q))
-                .sort((a, b) => {
-                    const aDirect = a.charId.toLowerCase().includes(q) ? 0 : 1;
-                    const bDirect = b.charId.toLowerCase().includes(q) ? 0 : 1;
-                    return aDirect - bDirect;
-                })
-                .slice(0, 12);
-
-            if (matches.length === 0) {
-                suggestBox.innerHTML = '';
-                suggestBox.classList.add('hidden');
-                activeSuggestIdxMap[i] = -1;
-                return;
-            }
-
-            activeSuggestIdxMap[i] = 0;
-
-            suggestBox.innerHTML = matches.map((entry, idx) => {
-                const safeCharId = entry.charId.replace(/'/g, "\\'");
-                return `
-                    <div class="winner-suggest-item ${idx === 0 ? 'active' : ''}"
-                         data-char-id="${entry.charId}"
-                         onmousedown="selectAndCommitWinner(event, ${i}, '${safeCharId}')">
-                        <span class="suggest-main-id">${entry.charId}</span>
-                        <span class="suggest-sub-info">${entry.labelInfo}</span>
-                    </div>
-                `;
-            }).join('');
-
-            suggestBox.classList.remove('hidden');
-        }
-
-        async function selectAndCommitWinner(event, i, selectedCharId) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            const winnerEl = document.getElementById(`stWinner_${i}`);
-            const suggestBox = document.getElementById(`stWinnerSuggest_${i}`);
-            if (winnerEl) {
-                winnerEl.value = selectedCharId;
-            }
-            if (suggestBox) {
-                suggestBox.innerHTML = '';
-                suggestBox.classList.add('hidden');
-            }
-            await saveItemRow(i, selectedCharId);
-        }
-
-        function onWinnerKeydown(event, i, currentDistDate) {
-            if (event.isComposing || event.keyCode === 229) return;
-
-            const suggestBox = document.getElementById(`stWinnerSuggest_${i}`);
-            const items = suggestBox ? [...suggestBox.querySelectorAll('.winner-suggest-item')] : [];
-            const isOpen = suggestBox && !suggestBox.classList.contains('hidden') && items.length > 0;
-
-            if (event.key === 'ArrowDown' && isOpen) {
-                event.preventDefault();
-                let cur = activeSuggestIdxMap[i] ?? 0;
-                cur = (cur + 1) % items.length;
-                activeSuggestIdxMap[i] = cur;
-                items.forEach((el, idx) => el.classList.toggle('active', idx === cur));
-                items[cur].scrollIntoView({ block: 'nearest' });
-            } else if (event.key === 'ArrowUp' && isOpen) {
-                event.preventDefault();
-                let cur = activeSuggestIdxMap[i] ?? 0;
-                cur = (cur - 1 + items.length) % items.length;
-                activeSuggestIdxMap[i] = cur;
-                items.forEach((el, idx) => el.classList.toggle('active', idx === cur));
-                items[cur].scrollIntoView({ block: 'nearest' });
-            } else if (event.key === 'Enter') {
-                event.preventDefault();
-                if (isOpen) {
-                    const cur = (activeSuggestIdxMap[i] >= 0 && activeSuggestIdxMap[i] < items.length)
-                        ? activeSuggestIdxMap[i]
-                        : 0;
-                    const chosenId = items[cur].getAttribute('data-char-id');
-                    if (chosenId) {
-                        selectAndCommitWinner(null, i, chosenId);
-                        return;
-                    }
-                }
-                saveItemRow(i);
-            } else if (event.key === 'Escape' && suggestBox) {
-                suggestBox.classList.add('hidden');
-            }
-        }
-
-        function onLiveWinnerOrPriceInput(i, currentDistDate, manualHoldChange = false) {
-            const targetRow = getFilteredItems()[i];
-            if (!targetRow) return;
-            const winnerEl = document.getElementById(`stWinner_${i}`);
-            const priceEl = document.getElementById(`stPrice_${i}`);
-            const stEl = document.getElementById(`stSaleType_${i}`);
-            const taxDateEl = document.getElementById(`stCastleTaxDate_${i}`);
-            const distBadgeEl = document.getElementById(`stLiveDistBadge_${i}`);
-            const checkCellWrap = document.getElementById(`stCheckCellWrap_${i}`);
-            const chkEl = document.getElementById(`stDistChk_${i}`);
-
-            if (stEl && manualHoldChange) {
-                const alEl = document.getElementById(`stAlliance_${i}`);
-                if (alEl && alEl.value !== '피닉스') stEl.value = '';
-            }
-            const alEl2 = document.getElementById(`stAlliance_${i}`);
-            if (stEl && alEl2) stEl.classList.toggle('hidden', alEl2.value !== '피닉스');
-
-            const cur = readRowEdit(i, targetRow);
-            const saleType = cur.saleType;
-            if (taxDateEl) {
-                taxDateEl.classList.toggle('hidden', saleType !== '성세금포함');
-            }
-
-            const isCastleTax = ClanApp.isCastleTaxItem(targetRow.name);
-            const lockedForced = Boolean(targetRow.clan_owned || targetRow.event_item);
-            const canCheck = isDistributableHoldState(saleType, targetRow.name);
-            const priceEditable = canCheck || saleType === '분배금혈귀';
-
-            if (priceEl && !lockedForced) {
-                priceEl.disabled = !priceEditable;
-                if (saleType === '이벤트') priceEl.value = 0;
-                else if (!priceEditable) priceEl.value = Number(targetRow.policy_price || targetRow.price || 0);
-                else if (manualHoldChange && Number(priceEl.value || 0) === 0) priceEl.value = Number(targetRow.policy_price || 0);
-            }
-            if (winnerEl && !lockedForced) {
-                winnerEl.disabled = (cur.alliance === '' && !isCastleTax);
-                if (cur.alliance === '' && !isCastleTax) winnerEl.value = '';
-                winnerEl.placeholder =
-                    saleType === '내판' ? '혈원 아이디 입력' :
-                    saleType === '외판' ? '명단에 없는 이름' :
-                    (saleType === '이벤트' || saleType === '성세금포함' || saleType === '분배금혈귀' || isCastleTax) ? '(선택) 수령자' :
-                    cur.alliance === '반항' || cur.alliance === '세븐' ? '(선택) 가져간 혈원' :
-                    cur.alliance === '피닉스' ? '(선택) 수령자' : '연합 선택 후 입력';
-            }
-
-            const winnerVal = winnerEl ? winnerEl.value.trim() : cur.winner;
-            const isCurrentlyChecked = canCheck && Boolean((chkEl && chkEl.checked) || targetRow.dist_checked);
-            const tempItem = {
-                name: targetRow.name,
-                clan_owned: Boolean(targetRow.clan_owned),
-                event_item: Boolean(targetRow.event_item),
-                alliance: cur.alliance,
-                castle_tax_date: cur.castle_tax_date,
-                winner: winnerVal,
-                price: saleType === '이벤트' ? 0 : (priceEl ? Number(priceEl.value || 0) : cur.price),
-                sale_type: saleType,
-                dist_date: canCheck ? currentDistDate : '',
-                dist_checked: isCurrentlyChecked
-            };
-            const distInfo = computeDistStateInfo(targetRow.record_ref || { distributions: {} }, tempItem, targetRow.item_idx);
-
-            if (distBadgeEl) {
-                distBadgeEl.className = distBadgeClass(distInfo.state);
-                distBadgeEl.style.cssText = distBadgeStyle(distInfo.state, distInfo.label);
-                distBadgeEl.textContent = distInfo.label;
-            }
-            if (checkCellWrap) {
-                if (canCheck) {
-                    checkCellWrap.innerHTML = `
-                        <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
-                               ${isCurrentlyChecked ? 'checked' : ''}
-                               title="체크 시 분배금 관리로 넘어갑니다."
-                               onchange="onDistCheckToggle(${i})">
-                    `;
-                } else {
-                    checkCellWrap.innerHTML = `<span style="color:#52525b;">-</span>`;
-                }
-            }
-        }
-
-        function formatPriceWithPolicyHint(row) {
-            if (row.hold_state === '이벤트') {
-                return '0 (이벤트)';
-            }
-            const actual = Number(row.price || 0);
-            const policy = Number(row.policy_price || 0);
-            if (actual <= 0) return '-';
-
-            if (policy > 0 && actual !== policy) {
-                return `
-                    <div>${actual.toLocaleString()}</div>
-                    <div style="font-size:10px; color:#9ca3af; font-weight:600;">(정책: ${policy.toLocaleString()})</div>
-                `;
-            }
-            return actual.toLocaleString();
-        }
-
-        function renderItemTable() {
-            const filtered = getFilteredItems();
-            document.getElementById('itemTotalCountBadge').textContent = `총 ${filtered.length}건`;
-
-            const tbody = document.getElementById('itemStatusTableBody');
-            const isAdmin = ClanApp.isAdminModeOn;
-            const isSuperAdmin = ClanApp.isSuperAdmin;
-            const colSpan = isAdmin ? 10 : 8;
-
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty-party-msg">조회된 아이템 내역이 없습니다.</td></tr>`;
-                return;
-            }
-
-            tbody.innerHTML = filtered.map((row, i) => {
-                const dateTimeHtml = formatRaidDateTimeCell(row.raid_date, row.raid_time);
-                const holdBadgeHtml = `<span class="sale-badge type-${row.hold_state}" style="${holdBadgeStyle(row)}">${ClanApp.escapeHtml(holdLabelOf(row))}</span>`;
-                const distBadgeHtml = `<span class="${distBadgeClass(row.dist_state)}" style="${distBadgeStyle(row.dist_state, row.dist_label)}">${ClanApp.escapeHtml(row.dist_label)}</span>`;
-                const priceDisplay = formatPriceWithPolicyHint(row);
-
-                const distDateHtml = row.dist_date
-                    ? `<span class="dist-date-text">${toShortDate(row.dist_date)}</span>`
-                    : '-';
-
-                const canCheck = isDistributableHoldState(row.hold_state, row.name);
-                const isCastleTax = ClanApp.isCastleTaxItem(row.name);
-
-                if (!isAdmin) {
-                    return `
-                        <tr>
-                            <td>${dateTimeHtml}</td>
-                            <td style="color:#fbbf24; font-weight:800;">${ClanApp.itemNameHtml(row.name)}</td>
-                            <td>${holdBadgeHtml}</td>
-                            <td>${distBadgeHtml}</td>
-                            <td style="color:#4ade80; font-weight:700;">${priceDisplay}</td>
-                            <td style="color:#a7f3d0; font-weight:700;">${row.winner || '-'}</td>
-                            <td>${row.taken_date ? toShortDate(row.taken_date) : '-'}</td>
-                            <td>${distDateHtml}</td>
-                        </tr>
-                    `;
-                }
-
-                const isEditingRow = editingItemKeys.has(row.key);
-
-                const checkCellHtml = canCheck
-                    ? `<div id="stCheckCellWrap_${i}" class="dist-check-cell">
-                           <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
-                                  ${row.dist_checked ? 'checked' : ''}
-                                  title="체크 시 분배금 관리 템플릿으로 넘어갑니다."
-                                  onchange="onDistCheckToggle(${i})">
-                       </div>`
-                    : `<div id="stCheckCellWrap_${i}" class="dist-check-cell"><span style="color:#52525b;">-</span></div>`;
-
-                const superAdminDeleteBtn = isSuperAdmin
-                    ? `<button type="button" class="btn-row-del-item" onclick="deleteItemRow('${row.raid_id}', ${row.item_idx}, '${row.name}')">삭제</button>`
-                    : '';
-
-                if (!isEditingRow) {
-                    return `
-                        <tr>
-                            <td>${dateTimeHtml}</td>
-                            <td style="color:#fbbf24; font-weight:800;">${ClanApp.itemNameHtml(row.name)}</td>
-                            <td>${holdBadgeHtml}</td>
-                            <td>${distBadgeHtml}</td>
-                            <td style="color:#4ade80; font-weight:700;">${priceDisplay}</td>
-                            <td style="color:#a7f3d0; font-weight:700;">${row.winner || '-'}</td>
-                            <td>${row.taken_date ? toShortDate(row.taken_date) : '-'}</td>
-                            <td>${checkCellHtml}</td>
-                            <td>${distDateHtml}</td>
-                            <td>
-                                <button type="button" class="btn-row-edit" onclick="startEditItemRow('${row.key}')">수정</button>
-                                ${superAdminDeleteBtn}
-                            </td>
-                        </tr>
-                    `;
-                }
-
-                const priceCanEdit = row.clan_owned || row.event_item || canCheck || row.hold_state === '분배금혈귀';
-
-                return `
-                    <tr>
-                        <td>${dateTimeHtml}</td>
-                        <td style="color:#fbbf24; font-weight:800;">${ClanApp.itemNameHtml(row.name)}</td>
-                        <td>
-                            ${(row.clan_owned || row.event_item)
-                                ? `<span class="sale-badge type-${row.hold_state}">${row.event_item ? '이벤트템' : '혈비귀속'}</span>`
-                                : `<select id="stAlliance_${i}" class="tbl-input tbl-hold-select" style="width:104px;"
-                                        onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}', true)">
-                                    <option value="" ${!row.alliance ? 'selected' : ''}>연합분배대기</option>
-                                    <option value="피닉스" ${row.alliance === '피닉스' ? 'selected' : ''}>피닉스</option>
-                                    <option value="반항" ${row.alliance === '반항' ? 'selected' : ''}>반항</option>
-                                    <option value="세븐" ${row.alliance === '세븐' ? 'selected' : ''}>세븐</option>
-                                </select>
-                                <select id="stSaleType_${i}" class="tbl-input tbl-hold-select ${row.alliance === '피닉스' ? '' : 'hidden'}" style="width:104px; display:block; margin-top:4px;"
-                                        onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}', true)">
-                                    <option value="">판매구분 선택</option>
-                                    <option value="내판" ${row.hold_state === '내판' ? 'selected' : ''}>내판</option>
-                                    <option value="외판" ${row.hold_state === '외판' ? 'selected' : ''}>외판</option>
-                                    <option value="이벤트" ${row.hold_state === '이벤트' ? 'selected' : ''}>이벤트</option>
-                                    <option value="성세금포함" ${row.hold_state === '성세금포함' ? 'selected' : ''}>성세금포함</option>
-                                    <option value="분배금혈귀" ${row.hold_state === '분배금혈귀' ? 'selected' : ''}>분배금혈귀</option>
-                                </select>
-                                <select id="stCastleTaxDate_${i}" class="tbl-input tbl-hold-select ${row.hold_state === '성세금포함' ? '' : 'hidden'}" style="width:104px; display:block; margin-top:4px;"
-                                        onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}')">
-                                    ${buildCastleTaxDateOptionsHtml(row.raid_date, row.castle_tax_date)}
-                                </select>`}
-                        </td>
-                        <td>
-                            <span id="stLiveDistBadge_${i}" class="${distBadgeClass(row.dist_state)}" style="${distBadgeStyle(row.dist_state, row.dist_label)}">${ClanApp.escapeHtml(row.dist_label)}</span>
-                        </td>
-                        <td>
-                            <input type="number" id="stPrice_${i}" class="tbl-input tbl-price-input" value="${row.price}" min="0"
-                                   ${priceCanEdit ? '' : 'disabled'}
-                                   oninput="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}')">
-                        </td>
-                        <td>
-                            <div class="winner-autocomplete-wrap">
-                                <input type="text" id="stWinner_${i}" class="tbl-input tbl-winner-input"
-                                       value="${row.winner}" placeholder="${row.hold_state === '내판' ? '혈원 아이디 입력' : row.hold_state === '외판' ? '명단에 없는 이름' : (row.alliance || isCastleTax) ? '(선택) 수령자' : '연합 선택 후 입력'}" autocomplete="off"
-                                       ${(!row.alliance && !isCastleTax && !(row.clan_owned || row.event_item)) ? 'disabled' : ''}
-                                       oninput="onWinnerTypeSearch(${i}, '${row.dist_date}')"
-                                       onkeydown="onWinnerKeydown(event, ${i}, '${row.dist_date}')">
-                                <div id="stWinnerSuggest_${i}" class="winner-suggest-list hidden"></div>
-                            </div>
-                        </td>
-                        <td>
-                            <input type="date" id="stTaken_${i}" class="tbl-input tbl-date-input" value="${row.default_taken_date}">
-                        </td>
-                        <td>${checkCellHtml}</td>
-                        <td>${distDateHtml}</td>
-                        <td>
-                            <button type="button" class="btn-sm btn-sm-green" style="padding: 4px 8px; font-size: 11px;" onclick="saveItemRow(${i})">저장</button>
-                            ${superAdminDeleteBtn}
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        async function deleteItemRow(raidId, itemIdx, itemName) {
-            if (!ClanApp.isSuperAdmin) {
-                alert('슈퍼관리자만 아이템을 삭제할 수 있습니다.');
-                return;
-            }
-            if (!confirm(`[${itemName}] 아이템을 완전히 삭제하시겠습니까?`)) return;
-
-            const res = await fetch(`/api/raids/item-details/${raidId}/${itemIdx}?role=${encodeURIComponent(ClanApp.role)}`, {
-                method: 'DELETE'
-            });
-
-            if (res.ok) {
-                await loadItemStatusData();
-            } else {
-                const err = await res.json().catch(() => ({}));
-                alert(err.detail || '아이템 삭제 실패');
-            }
-        }
-
-        function validateSaleInput(alliance, saleType, winner) {
-            if (alliance === '피닉스' && (saleType === '내판' || saleType === '외판')) {
-                if (!winner) return `${saleType}은 수령자 이름을 입력해야 합니다.`;
-                const inRoster = clanCharSet.has(winner.toLowerCase());
-                if (saleType === '내판' && !inRoster) return `[${winner}] 은(는) 혈원 명단에 없는 이름입니다. 혈원이면 정확한 아이디를, 명단 밖이면 외판을 선택해 주세요.`;
-                if (saleType === '외판' && inRoster) return `[${winner}] 은(는) 혈원 명단에 있는 이름입니다. 혈원이면 내판을 선택해 주세요.`;
-            }
-            return '';
-        }
-
-        async function postItemDetails(target, updatedDetails, errMsg) {
-            const res = await fetch('/api/raids/item-details', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    raid_id: target.raid_id,
-                    item_details: updatedDetails,
-                    requester_role: ClanApp.role
-                })
-            });
-            if (res.ok) {
-                editingItemKeys.delete(target.key);
-                await loadItemStatusData();
-            } else {
-                const err = await res.json().catch(() => ({}));
-                alert(err.detail || errMsg);
-            }
-        }
-
-        function buildUpdatedDetails(target, mine) {
-            return target.full_details_ref.map((it, idx) => idx === target.item_idx ? mine : toDetailPayload(it));
-        }
-
-        async function onDistCheckToggle(i) {
-            if (!ClanApp.isAdminModeOn) return;
-            const target = getFilteredItems()[i];
-            if (!target) return;
-
-            const chkEl = document.getElementById(`stDistChk_${i}`);
-            const takenEl = document.getElementById(`stTaken_${i}`);
-            const cur = readRowEdit(i, target);
-            const isCastleTax = ClanApp.isCastleTaxItem(target.name);
-            const canCheck =
-                ((cur.saleType === '내판' || cur.saleType === '외판') && Boolean(cur.winner)) ||
-                cur.saleType === '성세금포함' ||
-                (isCastleTax && !['연합', '이벤트', '분배금혈귀'].includes(cur.saleType));
-
-            if (!canCheck) {
-                alert('내판·외판(수령자 입력) 또는 성세금·성세금포함 상태일 때만 체크할 수 있습니다.');
-                if (chkEl) chkEl.checked = false;
-                return;
-            }
-            const msg = validateSaleInput(cur.alliance, cur.saleType, cur.winner);
-            if (msg) {
-                alert(msg);
-                if (chkEl) chkEl.checked = false;
-                return;
-            }
-
-            const dist_checked = chkEl ? chkEl.checked : false;
-            const mine = {
-                name: target.name,
-                sale_type: cur.saleType,
-                alliance: cur.alliance,
-                price: cur.price,
-                winner: cur.winner,
-                taken_date: takenEl ? takenEl.value : (target.taken_date || (cur.winner ? ClanApp.formatYMD(new Date()) : '')),
-                dist_date: dist_checked ? (target.dist_date || '') : '',
-                dist_checked,
-                castle_tax_date: cur.saleType === '성세금포함' ? cur.castle_tax_date : ''
-            };
-            await postItemDetails(target, buildUpdatedDetails(target, mine), '체크 저장 실패');
-        }
-
-        async function saveItemRow(i, forcedWinner = null) {
-            if (!ClanApp.isAdminModeOn) return;
-            const target = getFilteredItems()[i];
-            if (!target) return;
-
-            const takenInputEl = document.getElementById(`stTaken_${i}`);
-            const chkEl = document.getElementById(`stDistChk_${i}`);
-            const cur = readRowEdit(i, target);
-            const winner = forcedWinner !== null ? forcedWinner.trim() : cur.winner;
-
-            const msg = validateSaleInput(cur.alliance, cur.saleType, winner);
-            if (msg) return alert(msg);
-
-            const isCastleTax = ClanApp.isCastleTaxItem(target.name);
-            const canDist =
-                ((cur.saleType === '내판' || cur.saleType === '외판') && Boolean(winner)) ||
-                cur.saleType === '성세금포함' ||
-                (isCastleTax && !['연합', '이벤트', '분배금혈귀'].includes(cur.saleType));
-
-            const dist_checked = canDist ? (chkEl ? chkEl.checked : Boolean(target.dist_checked)) : false;
-            const hasWho = Boolean(winner);
-            const taken_date = hasWho
-                ? ((takenInputEl && takenInputEl.value) ? takenInputEl.value : (target.taken_date || ClanApp.formatYMD(new Date())))
-                : '';
-
-            const mine = {
-                name: target.name,
-                sale_type: cur.saleType,
-                alliance: cur.alliance,
-                price: cur.saleType === '이벤트' ? 0 : cur.price,
-                winner: (cur.alliance === '' && !isCastleTax && !(target.clan_owned || target.event_item)) ? '' : winner,
-                taken_date,
-                dist_date: canDist ? (target.dist_date || '') : '',
-                dist_checked,
-                castle_tax_date: cur.saleType === '성세금포함' ? cur.castle_tax_date : ''
-            };
-            await postItemDetails(target, buildUpdatedDetails(target, mine), '저장 실패');
-        }
-
-        function exportItemExcel(kind) {
-            if (!ClanApp.isAdminModeOn) return;
-            const refDate = document.getElementById('filterDate').value || ClanApp.formatYMD(new Date());
-            const refMonth = document.getElementById('filterMonth').value || ClanApp.formatYM(new Date());
-
-            if (kind === 'day') {
-                ClanApp.downloadExcel({ date: refDate });
-            } else if (kind === 'week') {
-                const { start, end } = ClanApp.getWeekRange(refDate);
-                ClanApp.downloadExcel({ start, end });
-            } else if (kind === 'month') {
-                ClanApp.downloadExcel({ month: refMonth });
-            } else {
-                ClanApp.downloadExcel({});
-            }
-        }
-    </script>
-</body>
-</html>
+/* =========================================================
+   [item_status.css] 혈맹 아이템 현황 페이지 전용 스타일
+   ========================================================= */
+
+.excel-btn-group {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.btn-excel-sm {
+    background-color: #15803d;
+    color: #ffffff;
+    border: 1px solid #16a34a;
+    border-radius: 5px;
+    padding: 3px 7px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+/* 1. 상단 조회 필터 그리드 */
+.filter-grid-box {
+    display: grid;
+    grid-template-columns: 120px 140px 135px 145px 1fr;
+    gap: 8px;
+    align-items: end;
+}
+
+.filter-field label {
+    display: block;
+    font-size: 11px;
+    color: #9ca3af;
+    font-weight: bold;
+    margin-bottom: 3px;
+}
+
+/* 2. 아이템 목록 테이블 */
+.status-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 120px;
+}
+
+.item-status-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.item-status-table th,
+.item-status-table td {
+    padding: 8px 5px;
+    border-bottom: 1px solid #2e2e32;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.item-status-table th {
+    background-color: #27272a;
+    color: #fbbf24;
+    font-weight: 800;
+    font-size: 11.5px;
+    line-height: 1.25;
+}
+
+/* 획득일시 */
+.raid-datetime-unified {
+    font-weight: 800;
+    color: #d4d4d8;
+    font-size: 11.5px;
+}
+
+.dawn-sub-tag {
+    color: #60a5fa;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 2px;
+}
+
+/* 보유상태 배지 */
+.sale-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.sale-badge.type-보유중 {
+    color: #fbbf24;
+    background-color: rgba(245, 158, 11, 0.16);
+    border: 1px solid #f59e0b;
+}
+
+.sale-badge.type-내판 {
+    color: #60a5fa;
+    background-color: rgba(59, 130, 246, 0.18);
+    border: 1px solid #3b82f6;
+}
+
+.sale-badge.type-외판 {
+    color: #4ade80;
+    background-color: rgba(34, 197, 94, 0.18);
+    border: 1px solid #22c55e;
+}
+
+.sale-badge.type-연합 {
+    color: #2dd4bf;
+    background-color: rgba(20, 184, 166, 0.18);
+    border: 1px solid #14b8a6;
+}
+
+.sale-badge.type-이벤트 {
+    color: #c084fc;
+    background-color: rgba(168, 85, 247, 0.18);
+    border: 1px solid #a855f7;
+}
+
+/* 분배상태 배지 */
+.dist-state-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.dist-state-badge.state-분배대기 {
+    color: #fbbf24;
+    background-color: rgba(245, 158, 11, 0.16);
+    border: 1px solid #f59e0b;
+}
+
+.dist-state-badge.state-분배시작 {
+    color: #38bdf8;
+    background-color: rgba(56, 189, 248, 0.18);
+    border: 1px solid #0ea5e9;
+}
+
+.dist-state-badge.state-분배중 {
+    color: #60a5fa;
+    background-color: rgba(59, 130, 246, 0.18);
+    border: 1px solid #3b82f6;
+}
+
+.dist-state-badge.state-분배완료 {
+    color: #9ca3af;
+    background-color: #27272a;
+    border: 1px solid #52525b;
+}
+
+/* 분배완료일 텍스트 */
+.dist-date-text {
+    color: #60a5fa;
+    font-weight: 800;
+    font-size: 11.5px;
+}
+
+/* 체크박스 셀 */
+.dist-check-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dist-target-checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: #f59e0b;
+    cursor: pointer;
+}
+
+/* 테이블 내 입력창 */
+.tbl-input {
+    background-color: #141414;
+    border: 1px solid #3f3f46;
+    border-radius: 5px;
+    padding: 4px 5px;
+    color: #ffffff;
+    font-size: 11.5px;
+}
+
+.tbl-input:focus {
+    border-color: #3b82f6;
+}
+
+.tbl-input:disabled {
+    background-color: #1a1a1d;
+    border-color: #27272a;
+    color: #71717a;
+    cursor: not-allowed;
+}
+
+.tbl-hold-select {
+    font-weight: 700;
+}
+
+.tbl-price-input {
+    width: 82px;
+    text-align: right;
+    font-weight: 700;
+    color: #4ade80;
+}
+
+.tbl-winner-input {
+    width: 96px;
+    text-align: center;
+    font-weight: 700;
+    color: #a7f3d0;
+}
+
+.tbl-date-input {
+    width: 112px;
+}
+
+/* 수령자 자동완성 드롭다운 */
+.winner-autocomplete-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.winner-suggest-list {
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 0;
+    min-width: 155px;
+    max-height: 180px;
+    overflow-y: auto;
+    background-color: #18181b;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.78);
+    z-index: 999;
+    text-align: left;
+}
+
+.winner-suggest-item {
+    padding: 6px 9px;
+    font-size: 12px;
+    color: #ffffff;
+    cursor: pointer;
+    border-bottom: 1px solid #27272a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+}
+
+.winner-suggest-item:last-child {
+    border-bottom: none;
+}
+
+.winner-suggest-item:hover,
+.winner-suggest-item.active {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+.suggest-main-id {
+    font-weight: 800;
+    color: #fbbf24;
+}
+
+.winner-suggest-item:hover .suggest-main-id,
+.winner-suggest-item.active .suggest-main-id {
+    color: #ffffff;
+}
+
+.suggest-sub-info {
+    font-size: 10.5px;
+    color: #9ca3af;
+}
+
+.winner-suggest-item:hover .suggest-sub-info,
+.winner-suggest-item.active .suggest-sub-info {
+    color: #e5e7eb;
+}
+
+/* 수정 / 삭제 버튼 */
+.btn-row-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #2563eb;
+    color: #ffffff;
+    border: 1px solid #3b82f6;
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-row-del-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border: 1px solid #ef4444;
+    border-radius: 5px;
+    padding: 4px 7px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-left: 3px;
+}
+
+@media (max-width: 768px) {
+    .filter-grid-box {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .filter-field.search-full-mobile {
+        grid-column: 1 / -1;
+    }
+
+    .item-status-table {
+        font-size: 11px;
+    }
+}

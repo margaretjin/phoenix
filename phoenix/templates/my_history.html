@@ -386,6 +386,64 @@
 
             const allItemRows = [];
             const castleTaxBonusMap = ClanApp.buildCastleTaxBonusMap(allRaidsCache, itemPriceMap);
+            const castleTaxSourceMap = ClanApp.buildCastleTaxSourceMap(allRaidsCache, itemPriceMap);
+            const todayStr = ClanApp.formatYMD(new Date());
+
+            // 분배관리 기준: 성세금포함 아이템은 해당 일자 공성 참여자에게 귀속
+            const pushCastleIncludedRows = (r, item, idx, sType) => {
+                const src = castleTaxSourceMap[`${r.id}_${idx}`];
+                let siegeRaid = src ? allRaidsCache.find(x => x.id === src.target_raid_id) : null;
+                if (!siegeRaid && item.castle_tax_date) {
+                    siegeRaid = allRaidsCache.find(x => x.raid_date === item.castle_tax_date && x.raid_time === '공성') || null;
+                }
+                if (!siegeRaid) return;
+                const siegeIds = ClanApp.extractParticipants(siegeRaid).map(p => p.id);
+                if (!siegeIds.includes(targetId)) return;
+
+                const merged = Boolean(src && src.target_key);
+                const netPrice = Math.floor(Number(item.price || 0) * (1 - currentTaxRate / 100));
+                const myShare = (siegeIds.length > 0 && netPrice > 0) ? Math.floor(netPrice / siegeIds.length) : 0;
+
+                let clanDistDate = (item.dist_date || '').trim();
+                let distInfo;
+                if (merged) {
+                    const tIdx = Number(String(src.target_key).split('_').pop());
+                    const tDetails = ClanApp.extractItemDetails(siegeRaid, itemPriceMap);
+                    const tItem = tDetails[tIdx] || {};
+                    clanDistDate = (tItem.dist_date || '').trim() || todayStr;
+                    distInfo = getHistoryItemDistInfo(siegeRaid, tIdx, clanDistDate, targetId);
+                } else {
+                    distInfo = getHistoryItemDistInfo(r, idx, clanDistDate, targetId);
+                }
+                const myPaidDate = distInfo.paid_date || '';
+
+                let compareDate = r.raid_date;
+                if (basis === 'dist_date') compareDate = clanDistDate;
+                else if (basis === 'paid_date') compareDate = myPaidDate;
+                if (!matchesDateFilter(compareDate, periodMode, refDateVal, refMonthVal)) return;
+
+                allItemRows.push({
+                    raid_date: r.raid_date,
+                    raid_time: r.raid_time,
+                    memberCount: siegeIds.length,
+                    item_name: item.name,
+                    sale_type: sType,
+                    alliance: item.alliance || '',
+                    winner: item.winner || '',
+                    net_price: netPrice,
+                    my_share: myShare,
+                    clan_dist_date: clanDistDate,
+                    is_done: distInfo.status === '분배완료',
+                    method: distInfo.method || '본인수령',
+                    receiver_id: (distInfo.proxy_name && distInfo.proxy_name.trim()) ? distInfo.proxy_name.trim() : targetId,
+                    paid_date: myPaidDate,
+                    blood_credit_from: '',
+                    castle_merged: merged,
+                    castle_target_date: siegeRaid.raid_date,
+                    info_only: merged,
+                    force_dist: !merged
+                });
+            };
 
             allRaidsCache.forEach(r => {
                 const participants = ClanApp.extractParticipants(r);
@@ -397,11 +455,16 @@
                     if (kw && !item.name.toLowerCase().includes(kw) && !ClanApp.getItemAlias(item.name).toLowerCase().includes(kw)) return;
 
                     const sType = item.sale_type || '보유중';
+                    if (sType === '성세금포함') {
+                        pushCastleIncludedRows(r, item, idx, sType);
+                        return;
+                    }
                     const isNonDistType = (sType === '연합' || sType === '이벤트' || sType === '성세금포함' || sType === '분배금혈귀');
                     // 연합분배대기(보유중): 연합/내판/외판/이벤트 결정 전이므로 분배금 0원
                     const isAllianceWait = (sType === '보유중');
-                    const clanDistDate = isNonDistType ? '' : (item.dist_date || '');
                     const bonusInfo = ClanApp.isCastleTaxItem(item.name) ? castleTaxBonusMap[`${r.id}_${idx}`] : null;
+                    const hasIncludedBonus = Boolean(bonusInfo && bonusInfo.includedItems.length > 0);
+                    const clanDistDate = isNonDistType ? '' : ((item.dist_date || '').trim() || (hasIncludedBonus ? todayStr : ''));
                     const grossPrice = (isNonDistType || isAllianceWait)
                         ? 0
                         : (Number(item.price || 0) + (bonusInfo ? bonusInfo.bonusPrice : 0));
@@ -479,14 +542,17 @@
                 return;
             }
 
-            const totalMyShare = targetRows.reduce((acc, cur) => acc + cur.my_share, 0);
+            const totalMyShare = targetRows.reduce((acc, cur) => acc + (cur.info_only ? 0 : cur.my_share), 0);
 
             const rowsHtml = targetRows.map(row => {
                 let statusHtml = '';
-                if (row.sale_type === '연합') {
+                if (row.sale_type === '성세금포함' && row.castle_merged) {
+                    const st = row.is_done ? '분배완료' : '분배대기';
+                    statusHtml = `<span class="badge-gray-done" style="color:#818cf8; background:rgba(99,102,241,0.18); border-color:#6366f1;">↳ 성세금합산(${toShortDate(row.castle_target_date)}) · ${st}</span>`;
+                } else if (row.sale_type === '연합') {
                     const where = (row.alliance && row.alliance !== '피닉스') ? row.alliance : row.winner;
                     statusHtml = `<span class="badge-gray-done" style="color:#2dd4bf; background:rgba(20,184,166,0.18); border-color:#14b8a6;">${ClanApp.escapeHtml(where ? `연합(${where})` : '연합')} · 분배제외</span>`;
-                } else if (row.sale_type === '성세금포함') {
+                } else if (row.sale_type === '성세금포함' && !row.force_dist) {
                     statusHtml = `<span class="badge-gray-done" style="color:#818cf8; background:rgba(99,102,241,0.18); border-color:#6366f1;">성세금포함</span>`;
                 } else if (row.sale_type === '분배금혈귀') {
                     statusHtml = `<span class="badge-gray-done" style="color:#fb7185; background:rgba(244,63,94,0.18); border-color:#f43f5e;">분배금혈귀 · 분배제외</span>`;
@@ -513,7 +579,7 @@
                         </div>
                     `;
                 } else {
-                    statusHtml = `<span class="badge-orange-wait">${row.sale_type} · 분배대기</span>`;
+                    statusHtml = `<span class="badge-orange-wait">${row.force_dist ? '성세금포함' : row.sale_type} · 분배대기</span>`;
                 }
 
                 return `
