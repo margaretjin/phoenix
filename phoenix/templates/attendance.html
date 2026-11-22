@@ -237,7 +237,7 @@
                 let raidPerMemberShare = 0;
                 details.forEach(item => {
                     const sType = item.sale_type || '보유중';
-                    if (sType === '이벤트' || sType === '연합') return;
+                    if (sType === '이벤트' || sType === '연합' || sType === '보유중') return;   // 연합분배대기 포함 분배금 제외
                     const gross = Number(item.price || 0);
                     const netPool = Math.floor(gross * (1 - currentTaxRate / 100));
                     if (netPool > 0) {

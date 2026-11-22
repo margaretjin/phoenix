@@ -12,6 +12,8 @@ class ItemPayload(BaseModel):
     item_name: str
     aliases: Optional[str] = ""
     default_price: int = 0
+    clan_owned: bool = False   # 혈비귀속(분배금 제외) 아이템 여부
+    event_item: bool = False   # 이벤트템 여부 (분배금 0원)
     requester_role: Optional[str] = ""
 
 
@@ -53,7 +55,9 @@ def create_item(payload: ItemPayload):
     res = supabase.table("item_master").insert({
         "item_name": name,
         "aliases": _clean_aliases(name, payload.aliases),
-        "default_price": max(0, int(payload.default_price or 0))
+        "default_price": max(0, int(payload.default_price or 0)),
+        "clan_owned": bool(payload.clan_owned) and not payload.event_item,
+        "event_item": bool(payload.event_item)
     }).execute()
     return {"ok": True, "data": (res.data or [None])[0]}
 
@@ -72,7 +76,9 @@ def update_item(item_id: int, payload: ItemPayload):
     res = supabase.table("item_master").update({
         "item_name": name,
         "aliases": _clean_aliases(name, payload.aliases),
-        "default_price": max(0, int(payload.default_price or 0))
+        "default_price": max(0, int(payload.default_price or 0)),
+        "clan_owned": bool(payload.clan_owned) and not payload.event_item,
+        "event_item": bool(payload.event_item)
     }).eq("id", item_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="아이템을 찾을 수 없습니다.")

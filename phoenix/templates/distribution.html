@@ -748,6 +748,7 @@
             const updatedDetails = entry.full_details_ref.map((it, idx) => ({
                 name: it.name,
                 sale_type: it.sale_type || '보유중',
+                alliance: it.alliance || '',
                 price: Number(it.price || 0),
                 winner: it.winner || '',
                 taken_date: it.taken_date || '',
@@ -783,6 +784,7 @@
             const updatedDetails = entry.full_details_ref.map((it, idx) => ({
                 name: it.name,
                 sale_type: it.sale_type || '보유중',
+                alliance: it.alliance || '',
                 price: Number(it.price || 0),
                 winner: it.winner || '',
                 taken_date: it.taken_date || '',

@@ -180,6 +180,9 @@
         }
 
         function updateDateDisplay() {
+            if (!ClanApp.getRaidTimes(selectedDate).includes(selectedTime)) {
+                selectedTime = ClanApp.getDefaultRaidTime(new Date());
+            }
             document.getElementById('displaySelectedDate').textContent = formatHeaderLabel(selectedDate, selectedTime);
             document.getElementById('statusDatePicker').value = selectedDate;
         }
@@ -245,7 +248,7 @@
         function renderTimeGrid() {
             const grid = document.getElementById('statusTimeGrid');
 
-            grid.innerHTML = ClanApp.RAID_TIMES.map(t => {
+            grid.innerHTML = ClanApp.getRaidTimes(selectedDate).map(t => {
                 const rec = dayRaids.find(r => r.raid_time === t);
                 const participants = rec ? ClanApp.extractParticipants(rec) : [];
                 const items = rec ? ClanApp.extractItemDetails(rec, itemPriceMap) : [];
@@ -256,7 +259,7 @@
 
                 return `
                     <button type="button"
-                            class="common-time-btn status-time-btn ${hasRecord ? 'has-record' : ''} ${isActive ? 'active' : ''}"
+                            class="common-time-btn status-time-btn ${hasRecord ? 'has-record' : ''} ${isActive ? 'active' : ''}"${ClanApp.slotAttr(t)}
                             onclick="selectRaidTime('${t}')">
                         <span>${t}</span>
                         <span class="common-time-sub status-time-sub">${subText}</span>
@@ -288,6 +291,72 @@
             return saved > 0 ? saved : Number(itemPriceMap[item.name] || 0);
         }
 
+        // 혈비귀속(연합 판매 포함) 아이템은 판매금은 표시하되 분배금 풀에서는 제외
+        function isDistExcludedItem(item) {
+            return Boolean(item.clan_owned) || item.sale_type === '연합' || item.sale_type === '이벤트';
+        }
+
+        // 일별현황 아이템 구분 배지: 보유중=분배대기, 이후 템보유현황의 보유상태(내판/연합/외판/이벤트)로 변경
+        // 템보유현황과 동일한 분배 진행 상태 (내판/외판 전용): 분배대기 → 분배시작 → 분배중(n/m) → 분배완료(n/m)
+        function getDistProgressLabel(rec, item, itemIdx) {
+            const participants = ClanApp.extractParticipants(rec);
+            const pCount = participants.length;
+            const distDate = (item.dist_date || '').trim();
+            const isChecked = Boolean(item.dist_checked || distDate);
+            if (!isChecked) return '분배대기';
+            if (!distDate) return '분배시작';
+
+            const distMap = (rec && rec.distributions) || {};
+            let doneCount = 0;
+            participants.forEach(p => {
+                const dateInfo = distMap[`${p.id}__date_${distDate}`];
+                const itemInfo = distMap[`${p.id}__item_${itemIdx}`];
+                const legacyInfo = distMap[p.id];
+                let st = '';
+                if (dateInfo) st = dateInfo.status;
+                else if (itemInfo) st = itemInfo.status;
+                else if (legacyInfo) {
+                    const paidDate = (legacyInfo.paid_date || '').trim();
+                    st = (legacyInfo.status === '분배완료' && paidDate && distDate > paidDate) ? '분배대기' : legacyInfo.status;
+                }
+                if (st === '분배완료') doneCount++;
+            });
+            if (pCount > 0 && doneCount === pCount) return `분배완료(${doneCount}/${pCount})`;
+            return `분배중(${doneCount}/${pCount})`;
+        }
+
+        // 일별현황 아이템 구분 배지 (템보유현황과 동일 로직)
+        // 연합분배대기 → 연합(가져간 곳) / 내판·외판(분배 진행상태) / 이벤트
+        function getItemStatusBadge(item, rec, itemIdx) {
+            const isPhoenixPending = item.alliance === '피닉스';
+            let label = isPhoenixPending ? '피닉스 판매대기' : '연합분배대기';
+            // 연합분배대기=주황, 피닉스 판매대기=분홍, 연합=청록
+            let style = isPhoenixPending
+                ? 'color:#f472b6; background:rgba(244,114,182,0.16); border:1px solid #ec4899;'
+                : 'color:#fbbf24; background:rgba(245,158,11,0.16); border:1px solid #f59e0b;';
+            const winner = (item.winner || '').trim();
+            if (item.event_item) {
+                label = '이벤트템';
+                style = 'color:#c084fc; background:rgba(168,85,247,0.18); border:1px solid #a855f7;';
+            } else if (item.clan_owned) {
+                label = winner ? `연합(${winner})` : '혈비귀속';
+                style = 'color:#2dd4bf; background:rgba(20,184,166,0.18); border:1px solid #14b8a6;';
+            } else if (item.sale_type === '연합') {
+                const where = (item.alliance && item.alliance !== '피닉스') ? item.alliance : winner;
+                label = where ? `연합(${where})` : '연합';
+                style = 'color:#2dd4bf; background:rgba(20,184,166,0.18); border:1px solid #14b8a6;';
+            } else if (item.sale_type === '내판' || item.sale_type === '외판') {
+                label = `${item.sale_type} · ${getDistProgressLabel(rec, item, itemIdx)}`;
+                style = item.sale_type === '내판'
+                    ? 'color:#60a5fa; background:rgba(59,130,246,0.18); border:1px solid #3b82f6;'
+                    : 'color:#4ade80; background:rgba(34,197,94,0.18); border:1px solid #22c55e;';
+            } else if (item.sale_type === '이벤트') {
+                label = '이벤트';
+                style = 'color:#c084fc; background:rgba(168,85,247,0.18); border:1px solid #a855f7;';
+            }
+            return `<span style="font-size:10.5px; font-weight:800; border-radius:4px; padding:1px 6px; white-space:nowrap; margin-left:auto; ${style}">${ClanApp.escapeHtml(label)}</span>`;
+        }
+
         function renderSlotDetails() {
             const rec = getCurrentRecord();
             const parties = (rec && rec.parties) ? rec.parties : [];
@@ -296,8 +365,12 @@
 
             document.getElementById('slotParticipantCount').textContent = `총 ${parties.length}파티 (${pCount}명)`;
 
-            const totalItemPrice = editableItems.reduce((acc, it) => acc + getEffectiveItemPrice(it), 0);
-            const netPool = Math.floor(totalItemPrice * 0.8);
+            // 분배대기(보유중)는 금액 미표시·합계 제외, 분배금은 내판/외판 판매대금에서만 계산
+            const totalItemPrice = editableItems.reduce(
+                (acc, it) => acc + (it.sale_type === '보유중' ? 0 : getEffectiveItemPrice(it)), 0);
+            const distributablePrice = editableItems.reduce(
+                (acc, it) => acc + ((it.sale_type === '내판' || it.sale_type === '외판') ? getEffectiveItemPrice(it) : 0), 0);
+            const netPool = Math.floor(distributablePrice * 0.8);
             const perMemberShare = (pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
 
             document.getElementById('slotItemTotalBadge').textContent = `총 ${totalItemPrice.toLocaleString()} (단위:아데나)`;
@@ -354,7 +427,8 @@
 
             itemContainer.innerHTML = editableItems.map((item, idx) => {
                 const effectivePrice = getEffectiveItemPrice(item);
-                const priceLabel = effectivePrice.toLocaleString();
+                const priceLabel = item.sale_type === '보유중' ? '' : effectivePrice.toLocaleString();
+                const excludedTag = getItemStatusBadge(item, getCurrentRecord(), idx);
                 const delBtn = ClanApp.isAdminModeOn
                     ? `<button type="button" class="btn-sm btn-sm-red" style="padding: 2px 6px; font-size: 10px;" onclick="removeDropItemRow(${idx})">삭제</button>`
                     : '';
@@ -362,7 +436,8 @@
                     <div class="item-row-card">
                         <div class="item-view-line">
                             <span class="item-badge-name">🎁 ${ClanApp.itemNameHtml(item.name)}</span>
-                            <span class="item-matched-price">${priceLabel}</span>
+                            ${excludedTag}
+                            ${priceLabel ? `<span class="item-matched-price" style="margin-left:6px;">${priceLabel}</span>` : ''}
                             ${delBtn}
                         </div>
                     </div>

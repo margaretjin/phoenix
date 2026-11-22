@@ -45,6 +45,14 @@
                 <input type="number" id="newItemPrice" class="input-common" placeholder="내판가 (예: 40000)" min="0">
                 <button type="button" class="btn-sm btn-sm-blue item-add-btn" onclick="addItem()">+ 추가</button>
             </div>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                <label style="margin:0; font-size:12.5px; font-weight:700; color:#9ca3af; white-space:nowrap;">구분</label>
+                <select id="newItemKind" class="input-common" style="width:auto; min-width:200px;">
+                    <option value="normal">일반 아이템</option>
+                    <option value="clan">혈비귀속 (판매금 혈비 귀속 · 분배금 제외템)</option>
+                    <option value="event">이벤트템 (분배금 0원)</option>
+                </select>
+            </div>
         </section>
 
         <!-- 3. 등록된 아이템 목록 (일반회원/관리자 모두 조회 가능: 아이템명 | 내판가 | 혈비제외가) -->
@@ -58,14 +66,16 @@
                 <table class="item-master-table">
                     <thead>
                         <tr>
-                            <th>아이템명</th>
+                            <th>아이템명 (풀네임)</th>
+                            <th>별칭</th>
                             <th>내판가</th>
                             <th>혈비제외가</th>
+                            <th>구분</th>
                             <th id="itemAdminColHeader" class="hidden">관리</th>
                         </tr>
                     </thead>
                     <tbody id="itemTableBody">
-                        <tr><td colspan="4" class="empty-party-msg">불러오는 중...</td></tr>
+                        <tr><td colspan="6" class="empty-party-msg">불러오는 중...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -152,7 +162,7 @@
             } catch (e) {
                 items = [];
                 document.getElementById('itemTableBody').innerHTML =
-                    `<tr><td colspan="4" class="empty-party-msg">아이템 목록을 불러오지 못했습니다. (${esc(e.message)})</td></tr>`;
+                    `<tr><td colspan="6" class="empty-party-msg">아이템 목록을 불러오지 못했습니다. (${esc(e.message)})</td></tr>`;
                 return;
             }
             renderItems();
@@ -167,7 +177,7 @@
             document.getElementById('itemCountBadge').textContent = `총 ${items.length}개`;
 
             const tbody = document.getElementById('itemTableBody');
-            const colSpan = isAdminOn ? 4 : 3;
+            const colSpan = isAdminOn ? 6 : 5;
 
             if (list.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty-party-msg">${items.length === 0 ? '등록된 아이템이 없습니다.' : '검색 결과가 없습니다.'}</td></tr>`;
@@ -183,14 +193,23 @@
                     return `
                         <tr>
                             <td>
-                                <input type="text" id="editName" class="input-common edit-inline-input" value="${esc(it.item_name)}" placeholder="아이템명">
-                                <input type="text" id="editAliases" class="input-common edit-inline-input" style="margin-top:4px;" value="${esc(it.aliases)}" placeholder="별칭(콤마 구분)">
+                                <input type="text" id="editName" class="input-common edit-inline-input" style="min-width:130px;" value="${esc(it.item_name)}" placeholder="아이템명 (풀네임)">
                             </td>
                             <td>
-                                <input type="number" id="editPrice" class="input-common edit-inline-input" value="${grossPrice}" placeholder="내판가" min="0"
+                                <input type="text" id="editAliases" class="input-common edit-inline-input" style="min-width:130px;" value="${esc(it.aliases)}" placeholder="별칭(콤마 구분)">
+                            </td>
+                            <td>
+                                <input type="number" id="editPrice" class="input-common edit-inline-input" style="min-width:110px;" value="${grossPrice}" placeholder="내판가" min="0"
                                        oninput="updateLiveNetPreview(this.value)">
                             </td>
                             <td id="editNetPreview" class="item-net-cell">${netPrice.toLocaleString()}</td>
+                            <td>
+                                <select id="editKind" class="input-common edit-inline-input" style="min-width:110px;">
+                                    <option value="normal" ${(!it.clan_owned && !it.event_item) ? 'selected' : ''}>일반</option>
+                                    <option value="clan" ${(it.clan_owned && !it.event_item) ? 'selected' : ''}>혈비귀속</option>
+                                    <option value="event" ${it.event_item ? 'selected' : ''}>이벤트템</option>
+                                </select>
+                            </td>
                             <td>
                                 <div class="item-row-actions">
                                     <button type="button" class="btn-sm btn-sm-green" onclick="saveEdit(${it.id})">저장</button>
@@ -201,10 +220,13 @@
                     `;
                 }
 
-                // 관리자 모드에서만 별칭 서브텍스트와 수정/삭제 버튼 노출
-                const aliasSubHtml = (isAdminOn && it.aliases)
-                    ? `<span class="item-alias-sub">별칭: ${esc(it.aliases)}</span>`
-                    : '';
+                // 별칭 칸: 첫 번째 별칭이 사이트 전체에서 아이템 표기로 공통 사용됨
+                const aliasList = String(it.aliases || '').split(/[,，]+/).map(a => a.trim()).filter(Boolean);
+                const aliasCellHtml = aliasList.length
+                    ? aliasList.map((a, i) => i === 0
+                        ? `<span style="color:#fbbf24; font-weight:800;">${esc(a)}</span>`
+                        : `<span style="color:#9ca3af;">${esc(a)}</span>`).join(', ')
+                    : '<span style="color:#52525b;">-</span>';
 
                 const adminActionCell = isAdminOn ? `
                     <td>
@@ -217,12 +239,15 @@
 
                 return `
                     <tr>
-                        <td class="item-name-cell">
-                            ${ClanApp.itemNameHtml(it.item_name)}
-                            ${aliasSubHtml}
-                        </td>
+                        <td class="item-name-cell">${esc(it.item_name)}</td>
+                        <td>${aliasCellHtml}</td>
                         <td class="item-gross-cell">${grossPrice.toLocaleString()}</td>
                         <td class="item-net-cell">${netPrice.toLocaleString()}</td>
+                        <td>${it.event_item
+                            ? '<span style="font-size:11px; font-weight:800; color:#c084fc; background:rgba(168,85,247,0.18); border:1px solid #a855f7; border-radius:4px; padding:2px 8px; white-space:nowrap;">이벤트템 (분배 0원)</span>'
+                            : it.clan_owned
+                            ? '<span style="font-size:11px; font-weight:800; color:#2dd4bf; background:rgba(20,184,166,0.18); border:1px solid #14b8a6; border-radius:4px; padding:2px 8px; white-space:nowrap;">혈비귀속 (분배제외)</span>'
+                            : '<span style="color:#52525b;">-</span>'}</td>
                         ${adminActionCell}
                     </tr>
                 `;
@@ -252,10 +277,13 @@
                     item_name: name,
                     aliases: aliasEl.value.trim(),
                     default_price: Number(priceEl.value || 0),
+                    clan_owned: document.getElementById('newItemKind').value === 'clan',
+                    event_item: document.getElementById('newItemKind').value === 'event',
                     requester_role: ClanApp.role
                 })
             });
             if (res.ok) {
+                document.getElementById('newItemKind').value = 'normal';
                 nameEl.value = '';
                 aliasEl.value = '';
                 priceEl.value = '';
@@ -289,6 +317,8 @@
                     item_name: name,
                     aliases: document.getElementById('editAliases').value.trim(),
                     default_price: Number(document.getElementById('editPrice').value || 0),
+                    clan_owned: document.getElementById('editKind').value === 'clan',
+                    event_item: document.getElementById('editKind').value === 'event',
                     requester_role: ClanApp.role
                 })
             });

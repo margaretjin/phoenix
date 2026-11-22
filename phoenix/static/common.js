@@ -6,11 +6,43 @@ window.ClanApp = {
     hasAdminPrivilege: false,
     isAdminModeOn: false,
     itemAliases: Object.create(null),
+    eventItems: Object.create(null),       // 이벤트템(분배금 0원) 아이템 목록
+    clanOwnedItems: Object.create(null),   // 혈비귀속(분배금 제외) 아이템 목록
 
     RAID_TIMES: [
         '01시', '03시', '05시', '06시', '07시', '09시', '11시', '12시',
         '13시', '15시', '17시', '18시', '19시', '21시', '23시(오만)', '24시', '용레이드'
     ],
+
+    // 일요일에만 용레이드 옆에 공성 시간 추가
+    SIEGE_TIME: '공성',
+
+    getRaidTimes(dateStr) {
+        const times = this.RAID_TIMES.slice();
+        if (dateStr) {
+            const [y, m, d] = String(dateStr).split('-').map(Number);
+            if (y && m && d && new Date(y, m - 1, d).getDay() === 0) times.push(this.SIEGE_TIME);
+        }
+        return times;
+    },
+
+    slotAttr(t) {
+        return (t === '용레이드' || t === this.SIEGE_TIME) ? ` data-slot="${t}"` : '';
+    },
+
+    // 아이템 진행 단계: 연합분배대기(저장값 '보유중') → 연합 선택 → 내판 / 외판 / 이벤트
+    // 저장값은 기존 DB 호환을 위해 '보유중' 그대로 쓰고, 화면에는 '연합분배대기'로 표기
+    saleTypeLabel(t) {
+        return (!t || t === '보유중') ? '연합분배대기' : t;
+    },
+
+    isEventItem(name) {
+        return Boolean(this.eventItems[String(name || '').trim().toLowerCase()]);
+    },
+
+    isClanOwnedItem(name) {
+        return Boolean(this.clanOwnedItems[String(name || '').trim().toLowerCase()]);
+    },
 
     MAIN_RAID_TIMES: ['09시', '15시', '21시', '23시(오만)', '03시'],
 
@@ -165,9 +197,13 @@ window.ClanApp = {
 
     setItemAliases(items = []) {
         const aliases = Object.create(null);
+        const owned = Object.create(null);
+        const events = Object.create(null);
         items.forEach(item => {
             const fullName = String(item.item_name || '').trim();
             if (!fullName) return;
+            if (item.clan_owned) owned[fullName.toLowerCase()] = true;
+            if (item.event_item) events[fullName.toLowerCase()] = true;
             const alias = String(item.aliases || '')
                 .split(/[,，]+/)
                 .map(value => value.trim())
@@ -175,6 +211,8 @@ window.ClanApp = {
             aliases[fullName.toLowerCase()] = alias || fullName;
         });
         this.itemAliases = aliases;
+        this.clanOwnedItems = owned;
+        this.eventItems = events;
     },
 
     getItemAlias(fullName) {
@@ -210,10 +248,27 @@ window.ClanApp = {
             const rawSaleType = foundObj && foundObj.sale_type ? foundObj.sale_type : '보유중';
             const savedPrice = foundObj ? Number(foundObj.price || 0) : 0;
 
+            const alliance = foundObj ? String(foundObj.alliance || '').trim() : '';
+
             let sType = '보유중';
             let finalPrice = policyPrice;
 
-            if (winner) {
+            // 진행 단계: 연합분배대기(alliance 없음) → 피닉스 선택 시 내판/외판/이벤트, 반항·세븐 선택 시 연합(분배 없음)
+            if (alliance === '반항' || alliance === '세븐') {
+                sType = '연합';
+                finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
+            } else if (alliance === '피닉스') {
+                if (rawSaleType === '이벤트') {
+                    sType = '이벤트';
+                    finalPrice = 0;
+                } else if (rawSaleType === '내판' || rawSaleType === '외판') {
+                    sType = rawSaleType;
+                    finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
+                } else {
+                    sType = '보유중';   // 피닉스 선택 후 판매구분 대기
+                    finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
+                }
+            } else if (winner) {
                 const isEvent = (rawSaleType === '이벤트') || (savedPrice === 0);
                 if (isEvent) {
                     sType = '이벤트';
@@ -229,6 +284,38 @@ window.ClanApp = {
                 finalPrice = savedPrice > 0 ? savedPrice : policyPrice;
             }
 
+            // 이벤트템: 분배금 0원, 구분 '이벤트'로 고정
+            if (this.isEventItem(name)) {
+                return {
+                    name,
+                    sale_type: '이벤트',
+                    price: 0,
+                    policy_price: policyPrice,
+                    winner,
+                    taken_date: (foundObj && winner) ? (foundObj.taken_date || '') : '',
+                    dist_date: '',
+                    dist_checked: false,
+                    alliance,
+                    event_item: true
+                };
+            }
+
+            // 혈비귀속 아이템: 판매금(정책가) 자동 표시, 분배 대상에서 제외
+            if (this.isClanOwnedItem(name)) {
+                return {
+                    name,
+                    sale_type: '연합',
+                    price: policyPrice,
+                    policy_price: policyPrice,
+                    winner,
+                    taken_date: (foundObj && winner) ? (foundObj.taken_date || '') : '',
+                    dist_date: '',
+                    dist_checked: false,
+                    alliance,
+                    clan_owned: true
+                };
+            }
+
             const canDist = Boolean(foundObj && winner && (sType === '내판' || sType === '외판'));
             const distDate = canDist ? (foundObj.dist_date || '') : '';
             const isChecked = canDist ? Boolean(foundObj.dist_checked || distDate) : false;
@@ -241,7 +328,8 @@ window.ClanApp = {
                 winner,
                 taken_date: (foundObj && winner) ? (foundObj.taken_date || '') : '',
                 dist_date: distDate,
-                dist_checked: isChecked
+                dist_checked: isChecked,
+                alliance
             };
         };
 
@@ -298,15 +386,15 @@ window.ClanApp = {
 (function initDragonRaidInstantStyle() {
     const style = document.createElement('style');
     style.textContent = `
-        .common-time-grid .common-time-btn:last-child:not(.active):not(.selected):not(.participated) {
+        .common-time-grid .common-time-btn[data-slot]:not(.active):not(.selected):not(.participated) {
             background-color: #141414 !important;
             border-color: #27272a !important;
             color: #71717a !important;
         }
-        .common-time-grid .common-time-btn:last-child:not(.active):not(.selected):not(.participated) .common-time-sub {
+        .common-time-grid .common-time-btn[data-slot]:not(.active):not(.selected):not(.participated) .common-time-sub {
             color: #52525b !important;
         }
-        body.page-raid-record .common-time-grid .common-time-btn:last-child .common-time-sub {
+        body.page-raid-record .common-time-grid .common-time-btn[data-slot] .common-time-sub {
             display: none !important;
         }
     `;

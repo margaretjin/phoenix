@@ -56,7 +56,7 @@
                     <label>보유상태</label>
                     <select id="holdStateFilter" class="input-common" onchange="renderItemTable()">
                         <option value="all">전체아이템현황</option>
-                        <option value="보유중">보유중</option>
+                        <option value="보유중">연합분배대기</option>
                         <option value="내판">내판</option>
                         <option value="연합">연합</option>
                         <option value="외판">외판</option>
@@ -69,10 +69,15 @@
                     <label>분배상태</label>
                     <select id="distStateFilter" class="input-common" onchange="renderItemTable()">
                         <option value="all">전체 분배상태</option>
-                        <option value="분배대기">분배대기</option>
+                        <option value="연합분배대기">연합분배대기</option>
+                        <option value="분배대기">분배대기 (내판·외판)</option>
                         <option value="분배시작">분배시작</option>
                         <option value="분배중">분배중</option>
                         <option value="분배완료">분배완료</option>
+                        <option value="연합">연합</option>
+                        <option value="이벤트">이벤트</option>
+                        <option value="이벤트템">이벤트템</option>
+                        <option value="혈비귀속">혈비귀속</option>
                     </select>
                 </div>
 
@@ -262,9 +267,78 @@
         // 2) 체크됨(dist_checked) + 아직 혈분배일(dist_date) 미입력 -> '분배시작'
         // 3) 혈분배일(dist_date) 입력됨 + 미완료 -> '분배중' / 표기: '분배중(2/6)'
         // 4) 혈분배일 입력됨 + 전원 수령 완료 -> '분배완료' / 표기: '분배완료(6/6)'
+        // 저장된 구분 → 화면 구분. alliance 필드가 없는 기존 데이터만 명단 기준으로 내판/외판 재판정
+        function resolveRowHoldState(item) {
+            if (item.event_item) return '이벤트';
+            if (item.clan_owned) return '연합';
+            const st = item.sale_type || '보유중';
+            if (!item.alliance && (st === '내판' || st === '외판')) {
+                return clanCharSet.has((item.winner || '').trim().toLowerCase()) ? '내판' : '외판';
+            }
+            return st;
+        }
+
+        // 구분 색상: 연합분배대기=주황, 피닉스(구분대기)=분홍, 연합=청록 (기존 CSS 클래스 + 인라인)
+        const AMBER_BADGE_STYLE = 'color:#fbbf24; background:rgba(245,158,11,0.16); border:1px solid #f59e0b;';
+        const PINK_BADGE_STYLE = 'color:#f472b6; background:rgba(244,114,182,0.16); border:1px solid #ec4899;';
+
+        function holdBadgeStyle(row) {
+            if (row.hold_state !== '보유중') return '';
+            return row.alliance === '피닉스' ? PINK_BADGE_STYLE : AMBER_BADGE_STYLE;
+        }
+
+        function distBadgeStyle(state, label) {
+            return (state === '연합분배대기' && String(label).startsWith('피닉스')) ? PINK_BADGE_STYLE : '';
+        }
+
+        function holdLabelOf(row) {
+            if (row.hold_state === '보유중') return row.alliance === '피닉스' ? '피닉스(구분대기)' : '연합분배대기';
+            if (row.hold_state === '연합') {
+                const al = row.alliance && row.alliance !== '피닉스' ? row.alliance : '';
+                return al ? `연합(${al})` : '연합';
+            }
+            return row.hold_state;
+        }
+
+        function readRowEdit(i, target) {
+            const alEl = document.getElementById(`stAlliance_${i}`);
+            const stEl = document.getElementById(`stSaleType_${i}`);
+            const wEl = document.getElementById(`stWinner_${i}`);
+            const pEl = document.getElementById(`stPrice_${i}`);
+            let alliance, saleType;
+            if (alEl) {
+                alliance = alEl.value;
+                if (alliance === '반항' || alliance === '세븐') saleType = '연합';
+                else if (alliance === '피닉스') saleType = (stEl && stEl.value) ? stEl.value : '보유중';
+                else saleType = '보유중';
+            } else {
+                alliance = target ? (target.alliance || '') : '';
+                saleType = target ? target.hold_state : '보유중';
+            }
+            return {
+                alliance,
+                saleType,
+                winner: wEl ? wEl.value.trim() : (target ? target.winner : ''),
+                price: pEl ? Number(pEl.value || 0) : (target ? Number(target.price || 0) : 0)
+            };
+        }
+
+        function toDetailPayload(it) {
+            return {
+                name: it.name,
+                sale_type: it.sale_type || '보유중',
+                alliance: it.alliance || '',
+                price: Number(it.price || 0),
+                winner: it.winner || '',
+                taken_date: it.taken_date || '',
+                dist_date: it.dist_date || '',
+                dist_checked: Boolean(it.dist_checked)
+            };
+        }
+
         function computeDistStateInfo(record, item, itemIdx = 0) {
             const winner = (item.winner || '').trim();
-            const holdState = computeHoldState(winner, item.price, item.sale_type);
+            const holdState = resolveRowHoldState(item);
             const distDate = (item.dist_date || '').trim();
             const isChecked = Boolean(item.dist_checked || distDate);
 
@@ -297,6 +371,30 @@
                 });
             }
 
+            // 연합 판매(내부 분배 없음) / 이벤트: 분배대기에서 해당 구분으로 변경
+            //  - 연합: 연합(가져간 곳)  / 혈비귀속 아이템(수령처 미입력): 혈비귀속
+            //  - 이벤트: 이벤트
+            if (holdState === '연합') {
+                const al = (item.alliance || '').trim();
+                if (item.clan_owned && !winner && !al) {
+                    return { state: '혈비귀속', label: '혈비귀속', doneCount: 0, totalCount: pCount };
+                }
+                const where = al || winner;
+                return { state: '연합', label: where ? `연합(${where})` : '연합', doneCount: 0, totalCount: pCount };
+            }
+            if (holdState === '이벤트') {
+                if (item.event_item) {
+                    return { state: '이벤트템', label: '이벤트템', doneCount: 0, totalCount: pCount };
+                }
+                return { state: '이벤트', label: '이벤트', doneCount: 0, totalCount: pCount };
+            }
+
+            // 연합분배대기: 아직 연합 선택 / 내판·외판·이벤트 결정 전
+            if (holdState === '보유중') {
+                const pendingLabel = (item.alliance === '피닉스') ? '피닉스 판매대기' : '연합분배대기';
+                return { state: '연합분배대기', label: pendingLabel, doneCount: 0, totalCount: pCount };
+            }
+
             if (!winner || !isDistributableHoldState(holdState) || !isChecked) {
                 return { state: '분배대기', label: '분배대기', doneCount: 0, totalCount: pCount };
             }
@@ -310,6 +408,14 @@
             }
 
             return { state: '분배중', label: `분배중(${doneCount}/${pCount})`, doneCount, totalCount: pCount };
+        }
+
+        // 분배상태 배지 클래스 (기존 CSS 재사용: 연합·혈비귀속=청록 배지, 이벤트=보라 배지)
+        function distBadgeClass(state) {
+            if (state === '혈비귀속' || state === '연합') return 'sale-badge type-연합';
+            if (state === '이벤트' || state === '이벤트템') return 'sale-badge type-이벤트';
+            if (state === '연합분배대기') return 'dist-state-badge state-분배대기';
+            return `dist-state-badge state-${state}`;
         }
 
         function onViewModeChange() {
@@ -373,7 +479,8 @@
                     const price = Number(item.price || 0);
                     const policyPrice = Number(itemPriceMap[item.name] || 0);
                     const rawObj = rawSavedDetails[idx] || {};
-                    const holdState = computeHoldState(winner, price, rawObj.sale_type || item.sale_type);
+                    const holdState = resolveRowHoldState(item);
+                    const alliance = item.alliance || (['내판', '외판', '이벤트'].includes(holdState) ? '피닉스' : '');
 
                     const canDist = isDistributableHoldState(holdState);
                     const distDate = canDist ? (item.dist_date || '').trim() : '';
@@ -383,7 +490,7 @@
 
                     const distInfo = computeDistStateInfo(
                         r,
-                        { ...item, sale_type: holdState, dist_date: distDate, dist_checked: isChecked },
+                        { ...item, alliance, sale_type: holdState, dist_date: distDate, dist_checked: isChecked, clan_owned: Boolean(item.clan_owned), event_item: Boolean(item.event_item) },
                         idx
                     );
 
@@ -395,10 +502,13 @@
                         raid_time: r.raid_time,
                         name: item.name,
                         hold_state: holdState,
+                        alliance,
                         dist_state: distInfo.state,
                         dist_label: distInfo.label,
                         price,
                         policy_price: policyPrice,
+                        clan_owned: Boolean(item.clan_owned),
+                        event_item: Boolean(item.event_item),
                         winner,
                         taken_date: item.taken_date || '',
                         default_taken_date: item.taken_date || todayStr,
@@ -440,7 +550,9 @@
             const suggestBox = document.getElementById(`stWinnerSuggest_${i}`);
             if (!winnerEl || !suggestBox) return;
 
-            const q = winnerEl.value.trim().toLowerCase();
+            // 혈원 명단 자동완성은 내판 입력 때만 사용 (외판은 명단에 없는 이름, 연합은 자유 입력)
+            const curSel = readRowEdit(i, getFilteredItems()[i]);
+            const q = curSel.saleType === '내판' ? winnerEl.value.trim().toLowerCase() : '';
             if (!q) {
                 suggestBox.innerHTML = '';
                 suggestBox.classList.add('hidden');
@@ -536,53 +648,69 @@
             }
         }
 
+        // 보유상태 선택 로직: 연합분배대기 → (피닉스 → 내판/외판/이벤트) | (반항·세븐 → 연합)
         function onLiveWinnerOrPriceInput(i, currentDistDate, manualHoldChange = false) {
+            const targetRow = getFilteredItems()[i];
+            if (!targetRow) return;
             const winnerEl = document.getElementById(`stWinner_${i}`);
             const priceEl = document.getElementById(`stPrice_${i}`);
-            const holdSelectEl = document.getElementById(`stHoldSelect_${i}`);
+            const stEl = document.getElementById(`stSaleType_${i}`);
             const distBadgeEl = document.getElementById(`stLiveDistBadge_${i}`);
             const checkCellWrap = document.getElementById(`stCheckCellWrap_${i}`);
             const chkEl = document.getElementById(`stDistChk_${i}`);
 
-            const wVal = winnerEl ? winnerEl.value.trim() : '';
-            const pVal = priceEl ? Number(priceEl.value || 0) : 0;
+            if (stEl && manualHoldChange) {
+                const alEl = document.getElementById(`stAlliance_${i}`);
+                if (alEl && alEl.value !== '피닉스') stEl.value = '';
+            }
+            const alEl2 = document.getElementById(`stAlliance_${i}`);
+            if (stEl && alEl2) stEl.classList.toggle('hidden', alEl2.value !== '피닉스');
 
-            let newHold = '보유중';
-            if (manualHoldChange && holdSelectEl) {
-                newHold = holdSelectEl.value;
-                if (newHold === '이벤트' && priceEl) {
-                    priceEl.value = 0;
-                }
-            } else {
-                const preferred = (holdSelectEl && holdSelectEl.value === '연합') ? '연합' : '';
-                newHold = computeHoldState(wVal, pVal, preferred);
-                if (holdSelectEl) {
-                    holdSelectEl.value = newHold;
-                }
+            const cur = readRowEdit(i, targetRow);
+            const saleType = cur.saleType;
+            const lockedForced = Boolean(targetRow.clan_owned || targetRow.event_item);
+            const sellable = (saleType === '내판' || saleType === '외판');
+
+            // 가격칸: 내판/외판만 직접 입력, 이벤트는 0, 그 외는 기준가 자동
+            if (priceEl && !lockedForced) {
+                priceEl.disabled = !sellable;
+                if (saleType === '이벤트') priceEl.value = 0;
+                else if (!sellable) priceEl.value = Number(targetRow.policy_price || targetRow.price || 0);
+                else if (manualHoldChange && Number(priceEl.value || 0) === 0) priceEl.value = Number(targetRow.policy_price || 0);
+            }
+            // 수령자칸 안내
+            if (winnerEl && !lockedForced) {
+                winnerEl.disabled = (cur.alliance === '');
+                if (cur.alliance === '') winnerEl.value = '';
+                winnerEl.placeholder =
+                    saleType === '내판' ? '혈원 아이디 입력' :
+                    saleType === '외판' ? '명단에 없는 이름' :
+                    saleType === '이벤트' ? '(선택) 수령자' :
+                    cur.alliance === '반항' || cur.alliance === '세븐' ? '(선택) 가져간 혈원' :
+                    cur.alliance === '피닉스' ? '(선택) 수령자' : '연합 선택 후 입력';
             }
 
-            const targetRow = getFilteredItems()[i];
-            const canDist = isDistributableHoldState(newHold);
-            const isCurrentlyChecked = canDist && Boolean((chkEl && chkEl.checked) || (targetRow && targetRow.dist_checked));
+            const winnerVal = winnerEl ? winnerEl.value.trim() : cur.winner;
+            const isCurrentlyChecked = sellable && Boolean((chkEl && chkEl.checked) || targetRow.dist_checked);
             const tempItem = {
-                winner: wVal,
-                price: newHold === '이벤트' ? 0 : pVal,
-                sale_type: newHold,
-                dist_date: canDist ? currentDistDate : '',
+                clan_owned: Boolean(targetRow.clan_owned),
+                event_item: Boolean(targetRow.event_item),
+                alliance: cur.alliance,
+                winner: winnerVal,
+                price: saleType === '이벤트' ? 0 : (priceEl ? Number(priceEl.value || 0) : cur.price),
+                sale_type: saleType,
+                dist_date: sellable ? currentDistDate : '',
                 dist_checked: isCurrentlyChecked
             };
-            const distInfo = computeDistStateInfo(
-                targetRow ? targetRow.record_ref : { distributions: {} },
-                tempItem,
-                targetRow ? targetRow.item_idx : 0
-            );
+            const distInfo = computeDistStateInfo(targetRow.record_ref || { distributions: {} }, tempItem, targetRow.item_idx);
 
             if (distBadgeEl) {
-                distBadgeEl.className = `dist-state-badge state-${distInfo.state}`;
+                distBadgeEl.className = distBadgeClass(distInfo.state);
+                distBadgeEl.style.cssText = distBadgeStyle(distInfo.state, distInfo.label);
                 distBadgeEl.textContent = distInfo.label;
             }
             if (checkCellWrap) {
-                if (canDist) {
+                if (sellable) {
                     checkCellWrap.innerHTML = `
                         <input type="checkbox" id="stDistChk_${i}" class="dist-target-checkbox"
                                ${isCurrentlyChecked ? 'checked' : ''}
@@ -628,8 +756,8 @@
 
             tbody.innerHTML = filtered.map((row, i) => {
                 const dateTimeHtml = formatRaidDateTimeCell(row.raid_date, row.raid_time);
-                const holdBadgeHtml = `<span class="sale-badge type-${row.hold_state}">${row.hold_state}</span>`;
-                const distBadgeHtml = `<span class="dist-state-badge state-${row.dist_state}">${row.dist_label}</span>`;
+                const holdBadgeHtml = `<span class="sale-badge type-${row.hold_state}" style="${holdBadgeStyle(row)}">${ClanApp.escapeHtml(holdLabelOf(row))}</span>`;
+                const distBadgeHtml = `<span class="${distBadgeClass(row.dist_state)}" style="${distBadgeStyle(row.dist_state, row.dist_label)}">${ClanApp.escapeHtml(row.dist_label)}</span>`;
                 const priceDisplay = formatPriceWithPolicyHint(row);
 
                 const distDateHtml = row.dist_date
@@ -694,26 +822,36 @@
                         <td>${dateTimeHtml}</td>
                         <td style="color:#fbbf24; font-weight:800;">${ClanApp.itemNameHtml(row.name)}</td>
                         <td>
-                            <select id="stHoldSelect_${i}" class="tbl-input tbl-hold-select"
-                                    onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}', true)">
-                                <option value="보유중" ${row.hold_state === '보유중' ? 'selected' : ''}>보유중</option>
-                                <option value="내판" ${row.hold_state === '내판' ? 'selected' : ''}>내판</option>
-                                <option value="연합" ${row.hold_state === '연합' ? 'selected' : ''}>연합</option>
-                                <option value="외판" ${row.hold_state === '외판' ? 'selected' : ''}>외판</option>
-                                <option value="이벤트" ${row.hold_state === '이벤트' ? 'selected' : ''}>이벤트</option>
-                            </select>
+                            ${(row.clan_owned || row.event_item)
+                                ? `<span class="sale-badge type-${row.hold_state}">${row.event_item ? '이벤트템' : '혈비귀속'}</span>`
+                                : `<select id="stAlliance_${i}" class="tbl-input tbl-hold-select" style="width:98px;"
+                                        onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}', true)">
+                                    <option value="" ${!row.alliance ? 'selected' : ''}>연합분배대기</option>
+                                    <option value="피닉스" ${row.alliance === '피닉스' ? 'selected' : ''}>피닉스</option>
+                                    <option value="반항" ${row.alliance === '반항' ? 'selected' : ''}>반항</option>
+                                    <option value="세븐" ${row.alliance === '세븐' ? 'selected' : ''}>세븐</option>
+                                </select>
+                                <select id="stSaleType_${i}" class="tbl-input tbl-hold-select ${row.alliance === '피닉스' ? '' : 'hidden'}" style="width:98px; display:block; margin-top:4px;"
+                                        onchange="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}', true)">
+                                    <option value="">판매구분 선택</option>
+                                    <option value="내판" ${row.hold_state === '내판' ? 'selected' : ''}>내판</option>
+                                    <option value="외판" ${row.hold_state === '외판' ? 'selected' : ''}>외판</option>
+                                    <option value="이벤트" ${row.hold_state === '이벤트' ? 'selected' : ''}>이벤트</option>
+                                </select>`}
                         </td>
                         <td>
-                            <span id="stLiveDistBadge_${i}" class="dist-state-badge state-${row.dist_state}">${row.dist_label}</span>
+                            <span id="stLiveDistBadge_${i}" class="${distBadgeClass(row.dist_state)}" style="${distBadgeStyle(row.dist_state, row.dist_label)}">${ClanApp.escapeHtml(row.dist_label)}</span>
                         </td>
                         <td>
                             <input type="number" id="stPrice_${i}" class="tbl-input tbl-price-input" value="${row.price}" min="0"
+                                   ${(row.clan_owned || row.event_item || row.hold_state === '내판' || row.hold_state === '외판') ? '' : 'disabled'}
                                    oninput="onLiveWinnerOrPriceInput(${i}, '${row.dist_date}')">
                         </td>
                         <td>
                             <div class="winner-autocomplete-wrap">
                                 <input type="text" id="stWinner_${i}" class="tbl-input tbl-winner-input"
-                                       value="${row.winner}" placeholder="아이디 입력" autocomplete="off"
+                                       value="${row.winner}" placeholder="${row.hold_state === '내판' ? '혈원 아이디 입력' : row.hold_state === '외판' ? '명단에 없는 이름' : row.alliance ? '(선택) 수령자' : '연합 선택 후 입력'}" autocomplete="off"
+                                       ${(!row.alliance && !(row.clan_owned || row.event_item)) ? 'disabled' : ''}
                                        oninput="onWinnerTypeSearch(${i}, '${row.dist_date}')"
                                        onkeydown="onWinnerKeydown(event, ${i}, '${row.dist_date}')">
                                 <div id="stWinnerSuggest_${i}" class="winner-suggest-list hidden"></div>
@@ -752,55 +890,18 @@
             }
         }
 
-        async function onDistCheckToggle(i) {
-            if (!ClanApp.isAdminModeOn) return;
-            const target = getFilteredItems()[i];
-            if (!target) return;
-
-            const chkEl = document.getElementById(`stDistChk_${i}`);
-            const priceEl = document.getElementById(`stPrice_${i}`);
-            const winnerEl = document.getElementById(`stWinner_${i}`);
-            const takenEl = document.getElementById(`stTaken_${i}`);
-            const holdSelectEl = document.getElementById(`stHoldSelect_${i}`);
-
-            const rawWinner = winnerEl ? winnerEl.value.trim() : target.winner;
-            const price = priceEl ? Number(priceEl.value || 0) : target.price;
-            const preferredType = holdSelectEl ? holdSelectEl.value : target.hold_state;
-            const holdState = computeHoldState(rawWinner, price, preferredType);
-            const canCheck = isDistributableHoldState(holdState);
-
-            if (!canCheck) {
-                alert('내판 또는 외판 상태일 때만 체크할 수 있습니다. (연합·이벤트·보유중은 체크 불가)');
-                if (chkEl) chkEl.checked = false;
-                return;
+        // 내판/외판 입력 검증 (내판=혈원 명단 아이디, 외판=명단에 없는 이름)
+        function validateSaleInput(alliance, saleType, winner) {
+            if (alliance === '피닉스' && (saleType === '내판' || saleType === '외판')) {
+                if (!winner) return `${saleType}은 수령자 이름을 입력해야 합니다.`;
+                const inRoster = clanCharSet.has(winner.toLowerCase());
+                if (saleType === '내판' && !inRoster) return `[${winner}] 은(는) 혈원 명단에 없는 이름입니다. 혈원이면 정확한 아이디를, 명단 밖이면 외판을 선택해 주세요.`;
+                if (saleType === '외판' && inRoster) return `[${winner}] 은(는) 혈원 명단에 있는 이름입니다. 혈원이면 내판을 선택해 주세요.`;
             }
+            return '';
+        }
 
-            const dist_checked = chkEl ? chkEl.checked : false;
-            const dist_date = dist_checked ? (target.dist_date || '') : '';
-
-            const updatedDetails = target.full_details_ref.map((it, idx) => {
-                if (idx === target.item_idx) {
-                    return {
-                        name: target.name,
-                        sale_type: holdState,
-                        price,
-                        winner: rawWinner,
-                        taken_date: takenEl ? takenEl.value : (target.taken_date || ClanApp.formatYMD(new Date())),
-                        dist_date,
-                        dist_checked
-                    };
-                }
-                return {
-                    name: it.name,
-                    sale_type: it.sale_type || '보유중',
-                    price: Number(it.price || 0),
-                    winner: it.winner || '',
-                    taken_date: it.taken_date || '',
-                    dist_date: it.dist_date || '',
-                    dist_checked: Boolean(it.dist_checked)
-                };
-            });
-
+        async function postItemDetails(target, updatedDetails, errMsg) {
             const res = await fetch('/api/raids/item-details', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -810,14 +911,53 @@
                     requester_role: ClanApp.role
                 })
             });
-
             if (res.ok) {
                 editingItemKeys.delete(target.key);
                 await loadItemStatusData();
             } else {
                 const err = await res.json().catch(() => ({}));
-                alert(err.detail || '체크 저장 실패');
+                alert(err.detail || errMsg);
             }
+        }
+
+        function buildUpdatedDetails(target, mine) {
+            return target.full_details_ref.map((it, idx) => idx === target.item_idx ? mine : toDetailPayload(it));
+        }
+
+        async function onDistCheckToggle(i) {
+            if (!ClanApp.isAdminModeOn) return;
+            const target = getFilteredItems()[i];
+            if (!target) return;
+
+            const chkEl = document.getElementById(`stDistChk_${i}`);
+            const takenEl = document.getElementById(`stTaken_${i}`);
+            const cur = readRowEdit(i, target);
+            const canCheck = (cur.saleType === '내판' || cur.saleType === '외판') && Boolean(cur.winner);
+
+            if (!canCheck) {
+                alert('수령자가 입력된 내판 또는 외판 상태일 때만 체크할 수 있습니다. (연합·이벤트·연합분배대기는 체크 불가)');
+                if (chkEl) chkEl.checked = false;
+                return;
+            }
+            const msg = validateSaleInput(cur.alliance, cur.saleType, cur.winner);
+            if (msg) {
+                alert(msg);
+                if (chkEl) chkEl.checked = false;
+                return;
+            }
+
+            const dist_checked = chkEl ? chkEl.checked : false;
+            const mine = {
+                name: target.name,
+                sale_type: cur.saleType,
+                alliance: cur.alliance,
+                price: cur.price,
+                winner: cur.winner,
+                taken_date: takenEl ? takenEl.value : (target.taken_date || ClanApp.formatYMD(new Date())),
+                dist_date: dist_checked ? (target.dist_date || '') : '',
+                dist_checked
+            };
+            await postItemDetails(target, buildUpdatedDetails(target, mine), '체크 저장 실패');
         }
 
         async function saveItemRow(i, forcedWinner = null) {
@@ -825,71 +965,32 @@
             const target = getFilteredItems()[i];
             if (!target) return;
 
-            const priceInputEl = document.getElementById(`stPrice_${i}`);
-            const winnerInputEl = document.getElementById(`stWinner_${i}`);
             const takenInputEl = document.getElementById(`stTaken_${i}`);
             const chkEl = document.getElementById(`stDistChk_${i}`);
-            const holdSelectEl = document.getElementById(`stHoldSelect_${i}`);
+            const cur = readRowEdit(i, target);
+            const winner = forcedWinner !== null ? forcedWinner.trim() : cur.winner;
 
-            const rawWinner = forcedWinner !== null
-                ? forcedWinner.trim()
-                : (winnerInputEl ? winnerInputEl.value.trim() : target.winner);
+            const msg = validateSaleInput(cur.alliance, cur.saleType, winner);
+            if (msg) return alert(msg);
 
-            const price = priceInputEl ? Number(priceInputEl.value || 0) : target.price;
-            const selectedHold = holdSelectEl ? holdSelectEl.value : target.hold_state;
-            const holdState = (rawWinner && selectedHold && selectedHold !== '보유중')
-                ? (price === 0 ? '이벤트' : selectedHold)
-                : computeHoldState(rawWinner, price, selectedHold);
-
-            const canCheck = isDistributableHoldState(holdState);
-
-            const taken_date = rawWinner
+            const sellable = (cur.saleType === '내판' || cur.saleType === '외판');
+            const dist_checked = sellable && winner ? (chkEl ? chkEl.checked : Boolean(target.dist_checked)) : false;
+            const hasWho = Boolean(winner);
+            const taken_date = hasWho
                 ? ((takenInputEl && takenInputEl.value) ? takenInputEl.value : (target.taken_date || ClanApp.formatYMD(new Date())))
                 : '';
 
-            const dist_checked = canCheck ? (chkEl ? chkEl.checked : Boolean(target.dist_checked)) : false;
-            const dist_date = canCheck ? (target.dist_date || '') : '';
-
-            const updatedDetails = target.full_details_ref.map((it, idx) => {
-                if (idx === target.item_idx) {
-                    return {
-                        name: target.name,
-                        sale_type: holdState,
-                        price: holdState === '이벤트' ? 0 : price,
-                        winner: rawWinner,
-                        taken_date,
-                        dist_date,
-                        dist_checked
-                    };
-                }
-                return {
-                    name: it.name,
-                    sale_type: it.sale_type || '보유중',
-                    price: Number(it.price || 0),
-                    winner: it.winner || '',
-                    taken_date: it.taken_date || '',
-                    dist_date: it.dist_date || '',
-                    dist_checked: Boolean(it.dist_checked)
-                };
-            });
-
-            const res = await fetch('/api/raids/item-details', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    raid_id: target.raid_id,
-                    item_details: updatedDetails,
-                    requester_role: ClanApp.role
-                })
-            });
-
-            if (res.ok) {
-                editingItemKeys.delete(target.key);
-                await loadItemStatusData();
-            } else {
-                const err = await res.json().catch(() => ({}));
-                alert(err.detail || '저장 실패');
-            }
+            const mine = {
+                name: target.name,
+                sale_type: cur.saleType,
+                alliance: cur.alliance,
+                price: cur.saleType === '이벤트' ? 0 : cur.price,
+                winner: cur.alliance === '' && !(target.clan_owned || target.event_item) ? '' : winner,
+                taken_date,
+                dist_date: sellable ? (target.dist_date || '') : '',
+                dist_checked
+            };
+            await postItemDetails(target, buildUpdatedDetails(target, mine), '저장 실패');
         }
 
         function exportItemExcel(kind) {

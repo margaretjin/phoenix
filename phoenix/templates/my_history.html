@@ -347,14 +347,14 @@
             const dayRecords = allRaidsCache.filter(r => r.raid_date === dateVal);
             const gridEl = document.getElementById('myCommonTimeGrid');
 
-            gridEl.innerHTML = ClanApp.RAID_TIMES.map(t => {
+            gridEl.innerHTML = ClanApp.getRaidTimes(dateVal).map(t => {
                 const rec = dayRecords.find(r => r.raid_time === t);
                 const pIds = rec ? ClanApp.extractParticipants(rec).map(p => p.id) : [];
                 const participated = pIds.includes(targetId);
                 const subText = participated ? '참여완료' : '미참여';
 
                 return `
-                    <div class="common-time-btn my-slot-btn ${participated ? 'participated' : ''}">
+                    <div class="common-time-btn my-slot-btn ${participated ? 'participated' : ''}"${ClanApp.slotAttr(t)}>
                         <span>${t}</span>
                         <span class="common-time-sub">${subText}</span>
                     </div>
@@ -397,8 +397,10 @@
 
                     const sType = item.sale_type || '보유중';
                     const isNonDistType = (sType === '연합' || sType === '이벤트');
+                    // 연합분배대기(보유중): 연합/내판/외판/이벤트 결정 전이므로 분배금 0원
+                    const isAllianceWait = (sType === '보유중');
                     const clanDistDate = isNonDistType ? '' : (item.dist_date || '');
-                    const grossPrice = isNonDistType ? 0 : Number(item.price || 0);
+                    const grossPrice = (isNonDistType || isAllianceWait) ? 0 : Number(item.price || 0);
                     const netPrice = Math.floor(grossPrice * (1 - currentTaxRate / 100));
                     const myItemShare = (memberCount > 0 && netPrice > 0) ? Math.floor(netPrice / memberCount) : 0;
 
@@ -423,6 +425,8 @@
                             memberCount,
                             item_name: item.name,
                             sale_type: sType,
+                            alliance: item.alliance || '',
+                            winner: item.winner || '',
                             net_price: netPrice,
                             my_share: myItemShare,
                             clan_dist_date: clanDistDate,
@@ -442,7 +446,7 @@
                     }
 
                     // 2) 다른 참여자의 분배금이 혈귀속으로 targetId(예: 피닉스혈)에게 귀속된 경우 → targetId 내역에 추가
-                    if (!isNonDistType) {
+                    if (!isNonDistType && !isAllianceWait) {
                         pIds.forEach(ownerId => {
                             if (ownerId === targetId) return;
                             const info = getHistoryItemDistInfo(r, idx, clanDistDate, ownerId);
@@ -477,8 +481,17 @@
 
             const rowsHtml = targetRows.map(row => {
                 let statusHtml = '';
-                if (row.sale_type === '연합' || row.sale_type === '이벤트') {
-                    statusHtml = `<span class="badge-gray-done">${row.sale_type} (분배제외)</span>`;
+                if (row.sale_type === '연합') {
+                    // 반항/세븐 선택 → 연합 (내부 분배 없음)
+                    const where = (row.alliance && row.alliance !== '피닉스') ? row.alliance : row.winner;
+                    statusHtml = `<span class="badge-gray-done" style="color:#2dd4bf; background:rgba(20,184,166,0.18); border-color:#14b8a6;">${ClanApp.escapeHtml(where ? `연합(${where})` : '연합')} · 분배제외</span>`;
+                } else if (row.sale_type === '이벤트') {
+                    statusHtml = `<span class="badge-gray-done" style="color:#c084fc; background:rgba(168,85,247,0.18); border-color:#a855f7;">이벤트 · 분배제외</span>`;
+                } else if (row.sale_type === '보유중') {
+                    // 연합분배대기(주황) / 피닉스 선택 후 판매구분 대기(분홍)
+                    statusHtml = row.alliance === '피닉스'
+                        ? `<span class="badge-orange-wait" style="color:#f472b6; background:rgba(244,114,182,0.16); border-color:#ec4899;">피닉스 판매대기</span>`
+                        : `<span class="badge-orange-wait">연합분배대기</span>`;
                 } else if (row.is_done) {
                     let methodLabel = `본인수령 (${row.receiver_id})`;
                     if (row.method === '대리수령') {
@@ -496,7 +509,7 @@
                         </div>
                     `;
                 } else {
-                    statusHtml = `<span class="badge-orange-wait">분배 대기</span>`;
+                    statusHtml = `<span class="badge-orange-wait">${row.sale_type} · 분배대기</span>`;
                 }
 
                 return `

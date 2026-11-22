@@ -11,8 +11,8 @@ router = APIRouter(prefix="/api/raids", tags=["Raids"])
 
 RAID_TIMES = [
     "01시", "03시", "05시", "06시", "07시", "09시", "11시", "12시",
-    "13시", "15시", "17시", "18시", "19시", "21시", "23시(오만)", "24시", "용레이드"
-]
+    "13시", "15시", "17시", "18시", "19시", "21시", "23시(오만)", "24시", "용레이드", "공성"
+]  # 공성은 일요일에만 사용
 
 class PartyInfo(BaseModel):
     leader: str
@@ -29,7 +29,8 @@ class RaidSaveRequest(BaseModel):
 
 class ItemDetailEntry(BaseModel):
     name: str
-    sale_type: str = "보유중"       # "보유중" | "내판" | "연합" | "외판" | "이벤트"
+    sale_type: str = "보유중"       # "보유중"(=연합분배대기) | "연합" | "내판" | "외판" | "이벤트"
+    alliance: str = ""              # 획득 혈: "" (연합분배대기) | "피닉스" | "반항" | "세븐"
     price: int = 0
     winner: str = ""                # 수령자
     taken_date: str = ""            # 판매완료일
@@ -72,6 +73,15 @@ def get_item_master_price_map() -> Dict[str, int]:
     except Exception:
         return {}
 
+def get_clan_owned_item_set() -> set:
+    """분배금 제외 아이템(혈비귀속 + 이벤트템) 이름 집합. 컬럼이 없으면 빈 집합."""
+    try:
+        res = supabase.table("item_master").select("*").execute()
+        return {row["item_name"] for row in (res.data or [])
+                if (row.get("clan_owned") or row.get("event_item")) and row.get("item_name")}
+    except Exception:
+        return set()
+
 def resolve_effective_item_price(item_dict: dict, price_map: Dict[str, int]) -> int:
     it_name = item_dict.get("name", "")
     winner_str = (item_dict.get("winner") or "").strip()
@@ -84,6 +94,62 @@ def resolve_effective_item_price(item_dict: dict, price_map: Dict[str, int]) -> 
     if saved_price > 0:
         return saved_price
     return default_price
+
+ALLIANCE_CLANS = ["반항", "세븐"]
+OWN_CLAN = "피닉스"
+
+def normalize_detail(d: dict) -> dict:
+    """아이템 진행 단계 규칙을 한 곳에서 적용.
+    연합분배대기(alliance 없음) -> 피닉스 선택 시 내판/외판/이벤트 선택, 반항/세븐 선택 시 연합(분배 없음)
+    """
+    out = dict(d)
+    alliance = (out.get("alliance") or "").strip()
+    sale_type = out.get("sale_type") or "보유중"
+    winner = (out.get("winner") or "").strip()
+    price = max(0, int(out.get("price") or 0))
+
+    def clear_dist():
+        out["dist_checked"] = False
+        out["dist_date"] = ""
+
+    if alliance in ALLIANCE_CLANS:
+        # 반항 / 세븐: 자동 연합 처리, 내부 분배 없음 (수령자는 선택 메모)
+        out["alliance"] = alliance
+        out["sale_type"] = "연합"
+        clear_dist()
+    elif alliance == OWN_CLAN:
+        out["alliance"] = alliance
+        if sale_type == "이벤트":
+            out["sale_type"] = "이벤트"
+            price = 0
+            clear_dist()
+        elif sale_type in ("내판", "외판"):
+            out["sale_type"] = sale_type
+            if not winner:
+                out["dist_checked"] = False
+                out["dist_date"] = ""
+        else:
+            # 피닉스 선택 후 판매구분(내판/외판/이벤트) 대기
+            out["sale_type"] = "보유중"
+            clear_dist()
+    else:
+        # 레거시(alliance 필드 없는 기존 데이터) 호환
+        out["alliance"] = ""
+        if sale_type == "연합":
+            clear_dist()
+        elif not winner:
+            out["sale_type"] = "보유중"
+            out["taken_date"] = ""
+            clear_dist()
+        elif price == 0 or sale_type == "이벤트":
+            out["sale_type"] = "이벤트"
+            price = 0
+            clear_dist()
+
+    if out["sale_type"] == "보유중" and not winner:
+        out["taken_date"] = ""
+    out["price"] = price
+    return out
 
 def sync_item_details_from_text(dropped_text: str, existing_details: list) -> list:
     tokens = [t.strip() for t in re.split(r'[\s,，\n]+', (dropped_text or '').strip()) if t.strip()]
@@ -101,31 +167,24 @@ def sync_item_details_from_text(dropped_text: str, existing_details: list) -> li
         default_p = price_map.get(token, 0)
         if matched_item:
             winner_str = (matched_item.get("winner") or "").strip()
-            s_type = matched_item.get("sale_type") or "보유중"
             saved_p = int(matched_item.get("price") if matched_item.get("price") is not None else default_p)
-            if not winner_str:
-                s_type = "보유중"
-                if saved_p == 0:
-                    saved_p = default_p
-            elif s_type == "이벤트" or saved_p == 0:
-                s_type = "이벤트"
-                saved_p = 0
-
-            can_dist = bool(winner_str and s_type in ["내판", "외판"])
-            is_checked = bool(matched_item.get("dist_checked")) if can_dist else False
-            synced.append({
+            if (matched_item.get("sale_type") or "보유중") == "보유중" and saved_p == 0:
+                saved_p = default_p
+            synced.append(normalize_detail({
                 "name": token,
-                "sale_type": s_type,
+                "sale_type": matched_item.get("sale_type") or "보유중",
+                "alliance": matched_item.get("alliance") or "",
                 "price": saved_p,
                 "winner": winner_str,
-                "taken_date": (matched_item.get("taken_date") or "") if winner_str else "",
-                "dist_date": (matched_item.get("dist_date") or "") if is_checked else "",
-                "dist_checked": is_checked
-            })
+                "taken_date": matched_item.get("taken_date") or "",
+                "dist_date": matched_item.get("dist_date") or "",
+                "dist_checked": bool(matched_item.get("dist_checked"))
+            }))
         else:
             synced.append({
                 "name": token,
                 "sale_type": "보유중",
+                "alliance": "",
                 "price": default_p,
                 "winner": "",
                 "taken_date": "",
@@ -263,28 +322,7 @@ def update_item_details(req: ItemDetailsUpdateRequest):
     if req.requester_role not in ["슈퍼관리자", "관리자"]:
         raise HTTPException(status_code=403, detail="관리자 이상만 아이템 정산 정보를 수정할 수 있습니다.")
 
-    details_list = []
-    for d in req.item_details:
-        dump = d.model_dump()
-        winner_str = (dump.get("winner") or "").strip()
-        price_val = max(0, int(dump.get("price") or 0))
-        dump["price"] = price_val
-
-        if not winner_str:
-            dump["sale_type"] = "보유중"
-            dump["taken_date"] = ""
-            dump["dist_checked"] = False
-            dump["dist_date"] = ""
-        elif price_val == 0 or dump.get("sale_type") == "이벤트":
-            dump["sale_type"] = "이벤트"
-            dump["price"] = 0
-            dump["dist_checked"] = False
-            dump["dist_date"] = ""
-        elif dump.get("sale_type") == "연합":
-            dump["dist_checked"] = False
-            dump["dist_date"] = ""
-
-        details_list.append(dump)
+    details_list = [normalize_detail(d.model_dump()) for d in req.item_details]
 
     dropped_str = " ".join([d["name"] for d in details_list if d.get("name")])
 
@@ -412,6 +450,7 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
     rows = query.execute().data or []
     default_tax = get_global_tax_rate()
     price_map = get_item_master_price_map()
+    clan_owned_set = get_clan_owned_item_set()
 
     output = io.StringIO()
     output.write('\ufeff')
@@ -433,7 +472,8 @@ def export_raids_excel(date: Optional[str] = None, month: Optional[str] = None,
         details = r.get("item_details") or []
         tax_rate = float(r.get("clan_tax_rate") if r.get("clan_tax_rate") is not None else default_tax)
         gross_total = sum(
-            (0 if d.get("sale_type") in ["이벤트", "연합"] else resolve_effective_item_price(d, price_map))
+            (resolve_effective_item_price(d, price_map)
+             if (d.get("sale_type") in ["내판", "외판"] and d.get("name") not in clan_owned_set) else 0)  # 분배금은 내판/외판 판매대금에서만
             for d in details
         )
         net_pool = int(gross_total * (1 - tax_rate / 100.0))
