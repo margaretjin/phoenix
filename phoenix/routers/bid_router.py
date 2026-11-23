@@ -3,8 +3,9 @@
 규칙
  1. 우선권자 = 아이템이 드랍된 보스탐(날짜·시간) 참여자. 입찰 등록 시점의 명단을 저장해 둔다.
  2. 시작 시간 ~ (시작 + 우선권 시간) 동안은 우선권자만 입찰 가능.
- 3. 우선권 시간이 지났는데 우선권자 입찰이 0명이면 관리자의 '전체 혈원 입찰 열기' 체크가 가능해진다.
-    우선권자가 한 명이라도 신청했으면 체크박스는 열리지 않는다.
+ 3. 우선권 시간 안에 우선권자 입찰이 0명이면, 우선권 시간이 끝나는 순간 자동으로 전체 혈원 입찰로 넘어간다.
+    우선권 시간 안에 우선권자가 입찰했으면 자동으로 열리지 않는다 (우선권자끼리).
+    관리자는 언제든 '전체 혈원 입찰 열기'로 직접 열 수 있고, 등록할 때 처음부터 전체 혈원 입찰로 만들 수도 있다.
  4. 종료 시간이 지나면 입찰 마감 → 관리자가 입찰자 중 구매자를 확정하면
     해당 보스탐 기록의 아이템이 [피닉스 · 내판 · 수령자 · 가격]으로 반영된다.
     (수령완료일은 아이템을 건넨 사람이 템보유현황에서 직접 지정)
@@ -34,6 +35,7 @@ class BidCreateRequest(BaseModel):
     start_at: str                 # ISO 8601 (시간대 포함)
     end_at: str
     priority_hours: float = 12
+    open_to_all: bool = False     # True 면 처음부터 전체 혈원 입찰 (우선권 없음)
     memo: Optional[str] = ""
     requester_role: str
     requester_id: str
@@ -68,13 +70,19 @@ def _priority_end(bid: dict):
     return parse_ts(bid["start_at"]) + timedelta(hours=float(bid.get("priority_hours") or 0))
 
 
-def _can_open_all(bid: dict, entries: list) -> bool:
-    """우선권 시간이 지났고, 아직 마감 전이며, 우선권자 입찰이 없을 때만 전체 열기 가능"""
-    now = now_utc()
-    return (bid.get("status") == STATUS_OPEN
-            and now >= _priority_end(bid)
-            and now < parse_ts(bid["end_at"])
-            and not any(e.get("is_priority") for e in entries))
+def _priority_bid_in_window(bid: dict, entries: list) -> bool:
+    """우선권 시간 안에 우선권자가 입찰했는지"""
+    p_end = _priority_end(bid)
+    return any(e.get("is_priority") and (parse_ts(e.get("created_at")) or p_end) < p_end for e in entries)
+
+
+def _auto_open(bid: dict, entries: list) -> bool:
+    """우선권 시간이 끝났고 그 안에 우선권자 입찰이 없으면 자동으로 전체 혈원 입찰"""
+    return now_utc() >= _priority_end(bid) and not _priority_bid_in_window(bid, entries)
+
+
+def _is_open_to_all(bid: dict, entries: list) -> bool:
+    return bool(bid.get("open_to_all")) or _auto_open(bid, entries)
 
 
 def _raid_item_details(raid: dict) -> list:
@@ -112,9 +120,10 @@ def create_bid(req: BidCreateRequest):
     start_at, end_at = parse_ts(req.start_at), parse_ts(req.end_at)
     if not start_at or not end_at or end_at <= start_at:
         raise HTTPException(status_code=400, detail="종료 시간은 시작 시간보다 뒤여야 합니다.")
-    if req.priority_hours < 0:
+    priority_hours = 0 if req.open_to_all else req.priority_hours
+    if priority_hours < 0:
         raise HTTPException(status_code=400, detail="우선권 시간은 0 이상이어야 합니다.")
-    if start_at + timedelta(hours=req.priority_hours) > end_at:
+    if start_at + timedelta(hours=priority_hours) > end_at:
         raise HTTPException(status_code=400, detail="우선권 시간이 입찰 종료 시간을 넘어갑니다.")
 
     raid = first_or_404(supabase.table("raid_logs").select("*").eq("id", req.raid_id).execute(), "보스탐 기록을 찾을 수 없습니다.")
@@ -136,9 +145,9 @@ def create_bid(req: BidCreateRequest):
         "price": max(0, int(req.price or 0)),
         "start_at": start_at.isoformat(),
         "end_at": end_at.isoformat(),
-        "priority_hours": req.priority_hours,
+        "priority_hours": priority_hours,
         "priority_members": extract_unique_participants(raid.get("parties") or []),
-        "open_to_all": False,
+        "open_to_all": bool(req.open_to_all),
         "status": STATUS_OPEN,
         "memo": (req.memo or "").strip(),
         "created_by": req.requester_id
@@ -162,7 +171,7 @@ def apply_bid(bid_id: int, req: BidApplyRequest):
         raise HTTPException(status_code=400, detail="입찰이 마감되었습니다.")
 
     is_priority = member in (bid.get("priority_members") or [])
-    if not is_priority and not bid.get("open_to_all"):
+    if not is_priority and not _is_open_to_all(bid, _entries_of(bid_id)):
         raise HTTPException(status_code=403, detail="지금은 해당 보스탐 참여자(우선권자)만 입찰할 수 있습니다.")
 
     if supabase.table("item_bid_entries").select("id").eq("bid_id", bid_id).eq("member_id", member).execute().data:
@@ -191,10 +200,13 @@ def set_open_all(bid_id: int, req: BidOpenAllRequest):
     require_admin(req.requester_role)
     bid = _get_bid(bid_id)
     entries = _entries_of(bid_id)
-    if req.open and not _can_open_all(bid, entries):
-        raise HTTPException(status_code=400, detail="우선권 시간이 끝나고 우선권자 입찰이 없을 때만 전체 혈원에게 열 수 있습니다.")
-    if not req.open and any(not e.get("is_priority") for e in entries):
-        raise HTTPException(status_code=400, detail="이미 일반 혈원 입찰자가 있어 닫을 수 없습니다.")
+    if bid.get("status") != STATUS_OPEN or now_utc() >= parse_ts(bid["end_at"]):
+        raise HTTPException(status_code=400, detail="마감된 입찰입니다.")
+    if not req.open:
+        if _auto_open(bid, entries):
+            raise HTTPException(status_code=400, detail="우선권 시간이 지나 자동으로 열린 입찰은 닫을 수 없습니다.")
+        if any(not e.get("is_priority") for e in entries):
+            raise HTTPException(status_code=400, detail="이미 일반 혈원 입찰자가 있어 닫을 수 없습니다.")
     supabase.table("item_bids").update({"open_to_all": bool(req.open)}).eq("id", bid_id).execute()
     return {"status": "updated", "open_to_all": bool(req.open)}
 

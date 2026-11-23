@@ -18,7 +18,7 @@
 
         <div class="bid-rule-box">
             <b>입찰 방식</b> · 아이템이 나온 보스탐 참여자(우선권자)가 먼저 <b>[🙋 입찰]</b> 할 수 있습니다.
-            우선권 시간 안에 우선권자 입찰이 없으면 관리자가 <b>전체 혈원 입찰</b>을 열어 줍니다.
+            우선권 시간 안에 우선권자 입찰이 없으면 자동으로 <b>전체 혈원 입찰</b>로 넘어갑니다. (관리자가 직접 열 수도 있습니다)
             마감 후 관리자가 <b>디스코드에서 룰렛</b>을 돌립니다.
         </div>
 
@@ -33,6 +33,14 @@
             </div>
 
             <div class="bid-form-grid">
+                <div class="filter-field full-row">
+                    <label>입찰 방식</label>
+                    <div id="bidModeTabs" class="tab-bar bid-mode-tabs">
+                        <button type="button" data-tab="priority" class="tab-btn active" onclick="setCreateMode('priority')">🎯 우선권 입찰 (보스탐 참여자 먼저)</button>
+                        <button type="button" data-tab="all" class="tab-btn" onclick="setCreateMode('all')">👥 처음부터 전체 혈원 입찰</button>
+                    </div>
+                </div>
+
                 <div class="filter-field full-row">
                     <label>입찰할 아이템 (연합분배대기 · 피닉스 판매대기 아이템)</label>
                     <select id="bidItemSelect" class="input-common" onchange="onBidItemChange()">
@@ -50,7 +58,7 @@
                     <label>입찰 시작</label>
                     <input type="datetime-local" id="bidStartAt" class="input-common" onchange="updatePriorityPreview()">
                 </div>
-                <div class="filter-field">
+                <div id="priorityHoursField" class="filter-field">
                     <label>우선권 시간 (시작부터)</label>
                     <div class="input-suffix">
                         <input type="number" id="bidPriorityHours" class="input-common" min="0" step="1" value="12" oninput="updatePriorityPreview()">

@@ -38,6 +38,15 @@
     grid-column: 1 / -1;
 }
 
+.bid-mode-tabs .tab-btn {
+    padding: 7px 12px;
+    font-size: 12.5px;
+}
+
+#priorityHoursField.is-off {
+    opacity: 0.4;
+}
+
 .input-suffix {
     display: flex;
     align-items: center;
@@ -98,8 +107,7 @@
 
 .bid-card.phase-priority { border-left-color: #3b82f6; }
 .bid-card.phase-all { border-left-color: var(--accent-green); }
-.bid-card.phase-priorityDone { border-left-color: #0ea5e9; }
-.bid-card.phase-waitOpen { border-left-color: var(--accent-gold); }
+.bid-card.phase-priorityOnly { border-left-color: #0ea5e9; }
 .bid-card.phase-closed { border-left-color: #ec4899; }
 .bid-card.phase-cancel { opacity: 0.6; }
 
@@ -111,9 +119,10 @@
 }
 
 .bid-item-name {
-    font-size: 14.5px;
-    font-weight: 800;
+    font-size: 18px;
+    font-weight: 900;
     color: var(--accent-yellow);
+    letter-spacing: -0.3px;
 }
 
 .bid-price {
@@ -240,6 +249,10 @@
     font-size: 11px;
 }
 
+.entry-list li .btn-xs {
+    margin-left: 4px;
+}
+
 .entry-empty {
     font-size: 12px;
 }
@@ -301,10 +314,6 @@
 .open-all-check.disabled {
     color: var(--text-dim);
     cursor: not-allowed;
-}
-
-.winner-select {
-    min-width: 130px;
 }
 
 @media (max-width: 768px) {

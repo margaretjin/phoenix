@@ -1,14 +1,16 @@
 // =========================================================
 // [bids.js] 아이템 입찰
 //  - 우선권자 = 아이템이 드랍된 보스탐 참여자
-//  - 우선권 시간 안에 우선권자 입찰 없음 → 관리자가 '전체 혈원 입찰 열기' 체크 가능
-//  - 우선권자가 신청하면 전체 열기 체크박스는 잠김
+//  - 우선권 시간 안에 우선권자 입찰 없음 → 우선권 시간이 끝나면 자동으로 전체 혈원 입찰
+//  - 우선권 시간 안에 우선권자가 입찰하면 우선권자끼리 진행 (자동으로 열리지 않음)
+//  - 관리자는 언제든 '전체 혈원 입찰 열기' 가능 / 등록 때 처음부터 전체 혈원 입찰 가능
 // =========================================================
 const HOUR = 60 * 60 * 1000;
 let bids = [];
 let pickerItems = [];       // 입찰 등록용 아이템 후보
 let bidTab = 'open';
 let clockOffset = 0;        // 서버 시각 - 내 PC 시각 (ms)
+let createMode = 'priority'; // 등록 방식: priority(우선권 입찰) | all(처음부터 전체 혈원)
 
 window.onload = async () => {
     const user = ClanApp.initPage('/bids', () => {
@@ -33,7 +35,7 @@ const esc = (v) => ClanApp.escapeHtml(v);
 function fmtDateTime(ts) {
     const d = new Date(ts);
     const p = (n) => String(n).padStart(2, '0');
-    return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    return `${d.getMonth() + 1}월 ${d.getDate()}일 ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 function fmtRemain(ms) {
@@ -52,14 +54,20 @@ function toLocalInput(d) {
 
 // ---------------------------------------------------------
 // 입찰 상태 계산 (서버 규칙과 동일)
+//  - 우선권 시간 안에 우선권자 입찰이 없으면 → 우선권 시간이 끝나는 순간 자동으로 전체 혈원
+//  - 관리자는 언제든 전체 혈원 입찰을 열 수 있음 (open_to_all)
 // ---------------------------------------------------------
 function bidState(b) {
     const t = now();
     const start = Date.parse(b.start_at);
     const end = Date.parse(b.end_at);
-    const priorityEnd = start + Number(b.priority_hours || 0) * HOUR;
+    const priorityHours = Number(b.priority_hours || 0);
+    const priorityEnd = start + priorityHours * HOUR;
     const entries = b.entries || [];
-    const hasPriorityEntry = entries.some(e => e.is_priority);
+    const priorityBidInWindow = entries.some(e => e.is_priority && Date.parse(e.created_at) < priorityEnd);
+    const autoOpen = t >= priorityEnd && !priorityBidInWindow;
+    const openAll = Boolean(b.open_to_all) || autoOpen;
+    const allFromStart = Boolean(b.open_to_all) && priorityHours === 0;
     const me = ClanApp.user.active_id;
     const isPriorityMember = (b.priority_members || []).includes(me);
     const myEntry = entries.find(e => e.member_id === me);
@@ -69,17 +77,15 @@ function bidState(b) {
     else if (b.status === '취소') phase = 'cancel';
     else if (t < start) phase = 'before';
     else if (t >= end) phase = 'closed';
+    else if (openAll) phase = 'all';
     else if (t < priorityEnd) phase = 'priority';
-    else if (b.open_to_all) phase = 'all';
-    else if (hasPriorityEntry) phase = 'priorityDone';
-    else phase = 'waitOpen';
+    else phase = 'priorityOnly';          // 우선권 시간 안에 우선권자가 입찰 → 우선권자끼리
 
     const live = b.status === '진행' && t >= start && t < end;
     return {
-        phase, start, end, priorityEnd, entries, hasPriorityEntry, isPriorityMember, myEntry,
-        canApply: live && !myEntry && (isPriorityMember || b.open_to_all),
-        canCancel: live && Boolean(myEntry),
-        canOpenAll: b.status === '진행' && t >= priorityEnd && t < end && !hasPriorityEntry
+        phase, start, end, priorityEnd, entries, openAll, autoOpen, allFromStart, isPriorityMember, myEntry,
+        canApply: live && !myEntry && (isPriorityMember || openAll),
+        canCancel: live && Boolean(myEntry)
     };
 }
 
@@ -87,8 +93,7 @@ const PHASE_BADGE = {
     before: ['시작 전', 'gray'],
     priority: ['우선권자 입찰 중', 'blue'],
     all: ['전체 혈원 입찰 중', 'green'],
-    priorityDone: ['우선권자 입찰 완료', 'sky'],
-    waitOpen: ['우선권 마감 · 전체 열기 대기', 'amber'],
+    priorityOnly: ['우선권자 입찰 (우선권자끼리)', 'sky'],
     closed: ['입찰 마감 · 확정 대기', 'pink'],
     done: ['구매 확정', 'gray'],
     cancel: ['취소됨', 'rose']
@@ -139,13 +144,13 @@ function timelineHtml(b, s) {
     let remain = '';
     if (s.phase === 'before') remain = `시작까지 ${fmtRemain(s.start - t)}`;
     else if (s.phase === 'priority') remain = `우선권 마감까지 ${fmtRemain(s.priorityEnd - t)}`;
-    else if (['all', 'priorityDone', 'waitOpen'].includes(s.phase)) remain = `종료까지 ${fmtRemain(s.end - t)}`;
+    else if (['all', 'priorityOnly'].includes(s.phase)) remain = `종료까지 ${fmtRemain(s.end - t)}`;
     const step = (label, ts, active) => `<span class="tl-step ${active ? 'active' : ''}"><em>${label}</em>${fmtDateTime(ts)}</span>`;
     return `
         <div class="bid-timeline">
             ${step('시작', s.start, s.phase === 'before')}
-            ${step('우선권 마감', s.priorityEnd, s.phase === 'priority')}
-            ${step('종료', s.end, ['all', 'priorityDone', 'waitOpen'].includes(s.phase))}
+            ${s.allFromStart ? '' : step('우선권 마감', s.priorityEnd, s.phase === 'priority')}
+            ${step('종료', s.end, ['all', 'priorityOnly'].includes(s.phase))}
             ${remain ? `<span class="tl-remain">⏱ ${remain}</span>` : ''}
         </div>`;
 }
@@ -157,50 +162,60 @@ function myActionHtml(b, s) {
     }
     if (s.canApply) {
         return `<button type="button" class="btn-sm btn-sm-green bid-apply-btn" onclick="applyBid(${b.id})">🙋 입찰</button>
-                <span class="my-note c-muted">${(s.isPriorityMember && !b.open_to_all) ? '우선권자로 입찰합니다' : '전체 혈원 입찰'}</span>`;
+                <span class="my-note c-muted">${(s.isPriorityMember && !s.openAll) ? '우선권자로 입찰합니다' : '전체 혈원 입찰'}</span>`;
     }
     let reason = '';
     if (s.phase === 'before') reason = '아직 시작 전입니다';
     else if (['closed', 'done', 'cancel'].includes(s.phase)) reason = s.myEntry ? '입찰했던 아이템입니다' : '';
-    else if (!s.isPriorityMember && !b.open_to_all) {
-        reason = s.phase === 'priority' ? '지금은 해당 보스탐 참여자만 입찰할 수 있습니다' : '전체 혈원 입찰이 열리면 입찰할 수 있습니다';
+    else if (!s.isPriorityMember && !s.openAll) {
+        reason = s.phase === 'priority'
+            ? `지금은 해당 보스탐 참여자만 입찰할 수 있습니다 (${fmtDateTime(s.priorityEnd)}까지)`
+            : '우선권자가 입찰해서 우선권자끼리 진행됩니다';
     }
     return reason ? `<span class="my-note c-muted">${reason}</span>` : '';
 }
 
 function adminActionHtml(b, s) {
-    if (!ClanApp.isAdminModeOn || b.status !== '진행') {
-        return (ClanApp.isAdminModeOn && b.status !== '진행')
-            ? `<div class="bid-admin"><button type="button" class="btn-row-del" onclick="deleteBid(${b.id})">기록 삭제</button></div>`
-            : '';
+    if (!ClanApp.isAdminModeOn) return '';
+    if (b.status !== '진행') {
+        return `<div class="bid-admin"><span></span><button type="button" class="btn-row-del" onclick="deleteBid(${b.id})">기록 삭제</button></div>`;
     }
-    let openHint = '';
-    if (b.open_to_all) openHint = '열림';
-    else if (s.hasPriorityEntry) openHint = '우선권자가 입찰해서 열 수 없음';
-    else if (now() < s.priorityEnd) openHint = `우선권 마감(${fmtDateTime(s.priorityEnd)}) 후 가능`;
-    else if (now() >= s.end) openHint = '입찰 종료됨';
-
-    const openDisabled = b.open_to_all
-        ? s.entries.some(e => !e.is_priority)          // 일반 입찰자가 있으면 닫기 불가
-        : !s.canOpenAll;
-    const winnerOptions = s.entries.map((e, i) =>
-        `<option value="${esc(e.member_id)}">${i + 1}. ${esc(e.member_id)}${e.is_priority ? ' (우선권)' : ''}</option>`).join('');
+    const ended = now() >= s.end;
+    let hint = '';
+    let disabled = ended;
+    if (s.allFromStart) { hint = '처음부터 전체 혈원'; disabled = true; }
+    else if (s.autoOpen) { hint = '우선권 시간 종료 · 자동으로 열림'; disabled = true; }
+    else if (b.open_to_all && s.entries.some(e => !e.is_priority)) { hint = '일반 혈원 입찰자가 있어 닫을 수 없음'; disabled = true; }
+    else if (ended) hint = '입찰 종료됨';
+    else if (!b.open_to_all) hint = s.phase === 'priority' ? `우선권 마감(${fmtDateTime(s.priorityEnd)}) 전에도 직접 열 수 있음` : '우선권자끼리 진행 중 · 직접 열 수 있음';
 
     return `
         <div class="bid-admin">
-            <label class="open-all-check ${openDisabled ? 'disabled' : ''}">
-                <input type="checkbox" ${b.open_to_all ? 'checked' : ''} ${openDisabled ? 'disabled' : ''}
+            <label class="open-all-check ${disabled ? 'disabled' : ''}">
+                <input type="checkbox" ${s.openAll ? 'checked' : ''} ${disabled ? 'disabled' : ''}
                        onchange="toggleOpenAll(${b.id}, this.checked)">
-                전체 혈원 입찰 열기 ${openHint ? `<small>(${openHint})</small>` : ''}
+                전체 혈원 입찰 열기 ${hint ? `<small>(${hint})</small>` : ''}
             </label>
-            <div class="row-actions">
-                <select id="winnerSel_${b.id}" class="tbl-select winner-select" ${s.entries.length ? '' : 'disabled'}>
-                    ${winnerOptions || '<option value="">입찰자 없음</option>'}
-                </select>
-                <button type="button" class="btn-sm btn-sm-blue btn-xs" ${s.entries.length ? '' : 'disabled'} onclick="confirmBid(${b.id})">구매자 확정</button>
-                <button type="button" class="btn-row-del" onclick="cancelBid(${b.id})">입찰 취소</button>
-            </div>
+            <button type="button" class="btn-row-del" onclick="cancelBid(${b.id})">입찰 취소</button>
         </div>`;
+}
+
+function entryRowHtml(b, s, e, i) {
+    const isWinner = b.winner === e.member_id;
+    // 전체 혈원 입찰이면 우선권 구분 없이 표시
+    const kindBadge = s.openAll ? '' : (e.is_priority ? ClanApp.badge('우선권', 'blue', 'badge-sm') : ClanApp.badge('일반', 'gray', 'badge-sm'));
+    const confirmBtn = (ClanApp.isAdminModeOn && b.status === '진행')
+        ? `<button type="button" class="btn-sm btn-sm-blue btn-xs" onclick="confirmBid(${b.id}, ${ClanApp.jsArg(e.member_id)})">구매자 확정</button>`
+        : '';
+    return `
+        <li class="${isWinner ? 'winner' : ''}">
+            <span class="entry-no">${i + 1}</span>
+            <span class="entry-name">${esc(e.member_id)}</span>
+            ${kindBadge}
+            ${isWinner ? ClanApp.badge('구매 확정', 'green', 'badge-sm') : ''}
+            <span class="entry-time">${fmtDateTime(Date.parse(e.created_at))}</span>
+            ${confirmBtn}
+        </li>`;
 }
 
 function bidCardHtml(b) {
@@ -210,14 +225,10 @@ function bidCardHtml(b) {
     const priorityChips = (b.priority_members || []).map(id =>
         `<span class="member-chip ${applied.has(id) ? 'applied' : ''}">${applied.has(id) ? '🙋 ' : ''}${esc(id)}</span>`).join('')
         || '<span class="c-dim">참여자 없음</span>';
-    const entryRows = s.entries.map((e, i) => `
-        <li class="${b.winner === e.member_id ? 'winner' : ''}">
-            <span class="entry-no">${i + 1}</span>
-            <span class="entry-name">${esc(e.member_id)}</span>
-            ${e.is_priority ? ClanApp.badge('우선권', 'blue', 'badge-sm') : ClanApp.badge('일반', 'gray', 'badge-sm')}
-            <span class="entry-time">${fmtDateTime(Date.parse(e.created_at))}</span>
-            ${b.winner === e.member_id ? ClanApp.badge('구매 확정', 'green', 'badge-sm') : ''}
-        </li>`).join('');
+    const entryRows = s.entries.map((e, i) => entryRowHtml(b, s, e, i)).join('');
+    const priorityLabel = s.allFromStart
+        ? `보스탐 참여자 ${(b.priority_members || []).length}명 (처음부터 전체 혈원 입찰 · 우선권 없음)`
+        : `우선권자 (보스탐 참여자 ${(b.priority_members || []).length}명)`;
 
     return `
         <article class="bid-card phase-${s.phase}">
@@ -227,13 +238,13 @@ function bidCardHtml(b) {
                 <span class="bid-price">${Number(b.price || 0).toLocaleString()}<small> 아데나</small></span>
             </div>
             <div class="bid-sub">
-                드랍 ${ClanApp.toShortDate(b.raid_date)} ${esc(b.raid_time)}
+                드랍 ${ClanApp.formatHeaderLabel(b.raid_date, b.raid_time)}
                 ${b.winner ? ` · 구매자 <b class="c-mint">${esc(b.winner)}</b>` : ''}
                 ${b.memo ? ` · ${esc(b.memo)}` : ''}
             </div>
             ${timelineHtml(b, s)}
             <div class="bid-section">
-                <div class="bid-section-label">우선권자 (보스탐 참여자 ${(b.priority_members || []).length}명)</div>
+                <div class="bid-section-label">${priorityLabel}</div>
                 <div class="member-chip-list">${priorityChips}</div>
             </div>
             <div class="bid-section">
@@ -266,15 +277,18 @@ async function cancelApply(id) {
 // 관리자
 // ---------------------------------------------------------
 async function toggleOpenAll(id, open) {
-    const msg = open ? '전체 혈원에게 입찰을 열겠습니까?' : '전체 혈원 입찰을 다시 닫겠습니까?';
+    const b = bids.find(x => x.id === id);
+    const hasPriority = b && (b.entries || []).some(e => e.is_priority);
+    const msg = open
+        ? (hasPriority ? '이미 우선권자 입찰이 있습니다. 그래도 전체 혈원에게 입찰을 열겠습니까?' : '전체 혈원에게 입찰을 열겠습니까?')
+        : '전체 혈원 입찰을 다시 닫겠습니까? (우선권자만 입찰)';
     if (!confirm(msg)) return renderBids();
     await ClanApp.send(`/api/bids/${id}/open-all`, { body: { open, requester_role: ClanApp.role }, failMsg: '변경 실패' });
     await loadBids();
 }
 
-async function confirmBid(id) {
+async function confirmBid(id, winner) {
     const b = bids.find(x => x.id === id);
-    const winner = ($id(`winnerSel_${id}`) || {}).value;
     if (!b || !winner) return;
     if (!confirm(`[${winner}] 님을 구매자로 확정하시겠습니까?\n템보유현황에 [피닉스 · 내판 · ${winner} · ${Number(b.price || 0).toLocaleString()}]으로 반영됩니다.\n(수령완료일은 아이템을 건넨 분이 템보유현황에서 지정)`)) return;
     if (await ClanApp.send(`/api/bids/${id}/confirm`, { body: { winner, requester_role: ClanApp.role }, failMsg: '확정 실패' })) {
@@ -307,6 +321,15 @@ function resetCreateForm() {
     $id('bidPriorityHours').value = 12;
     $id('bidPrice').value = '';
     $id('bidMemo').value = '';
+    setCreateMode('priority');
+}
+
+// 등록 방식 버튼: 우선권 입찰 / 처음부터 전체 혈원 입찰
+function setCreateMode(mode) {
+    createMode = mode;
+    ClanApp.setActiveTab('bidModeTabs', mode);
+    $id('bidPriorityHours').disabled = mode === 'all';
+    $id('priorityHoursField').classList.toggle('is-off', mode === 'all');
     updatePriorityPreview();
 }
 
@@ -343,14 +366,14 @@ function onBidItemChange() {
     box.innerHTML = `
         <div><b>${ClanApp.itemNameHtml(p.item.name)}</b> · 드랍 <b>${ClanApp.formatHeaderLabel(p.raid.raid_date, p.raid.raid_time)}</b></div>
         <div class="bid-section-label">우선권자 = 이 보스탐 참여자 ${members.length}명</div>
-        <div class="member-chip-list">${members.map(m => `<span class="member-chip">${esc(m)}</span>`).join('') || '<span class="c-dim">참여자 기록 없음 (바로 전체 열기 가능)</span>'}</div>`;
+        <div class="member-chip-list">${members.map(m => `<span class="member-chip">${esc(m)}</span>`).join('') || '<span class="c-dim">참여자 기록 없음 (처음부터 전체 혈원 입찰 추천)</span>'}</div>`;
     box.classList.remove('hidden');
 }
 
 function readFormTimes() {
     const start = new Date($id('bidStartAt').value);
     const end = new Date($id('bidEndAt').value);
-    const hours = Number($id('bidPriorityHours').value || 0);
+    const hours = createMode === 'all' ? 0 : Number($id('bidPriorityHours').value || 0);
     return { start, end, hours, priorityEnd: new Date(start.getTime() + hours * HOUR) };
 }
 
@@ -358,8 +381,12 @@ function updatePriorityPreview() {
     const { start, end, hours, priorityEnd } = readFormTimes();
     const el = $id('bidPriorityPreview');
     if (isNaN(start) || isNaN(end)) { el.textContent = ''; return; }
+    if (createMode === 'all') {
+        el.textContent = `처음부터 전체 혈원 입찰 · ${fmtDateTime(start)} ~ ${fmtDateTime(end)}`;
+        return;
+    }
     const warn = priorityEnd > end ? ' ⚠️ 우선권 시간이 종료 시간을 넘습니다' : '';
-    el.textContent = `우선권 마감: ${fmtDateTime(priorityEnd)} (${hours}시간) · 종료: ${fmtDateTime(end)}${warn}`;
+    el.textContent = `우선권 마감: ${fmtDateTime(priorityEnd)} (${hours}시간, 우선권자 입찰이 없으면 자동으로 전체 혈원) · 종료: ${fmtDateTime(end)}${warn}`;
 }
 
 async function createBid() {
@@ -379,6 +406,7 @@ async function createBid() {
             start_at: start.toISOString(),
             end_at: end.toISOString(),
             priority_hours: hours,
+            open_to_all: createMode === 'all',
             memo: $id('bidMemo').value.trim(),
             requester_role: ClanApp.role,
             requester_id: ClanApp.user.active_id
