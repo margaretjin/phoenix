@@ -90,6 +90,24 @@ function distBadgeHtml(state, label, id = '') {
     return ClanApp.badge(label, distToneOf(state, label), '', id);
 }
 
+// 수령자 배지: 혈원 명단(본캐·보조캐)에 있으면 민트 배지, 없으면 '외판' 배지
+function winnerMatch(name) {
+    const n = String(name || '').trim();
+    if (!n) return null;
+    const main = ClanApp.aliasMap[n.toLowerCase()] || null;
+    return { name: n, inRoster: Boolean(main), main };
+}
+
+function winnerBadgeHtml(name, emptyText = '-') {
+    const m = winnerMatch(name);
+    if (!m) return emptyText;
+    if (m.inRoster) {
+        const sub = m.main && m.main !== m.name ? ` <small>(본캐 ${ClanApp.escapeHtml(m.main)})</small>` : '';
+        return `<span class="badge badge-mint winner-badge" title="혈원 명단">✔ ${ClanApp.escapeHtml(m.name)}${sub}</span>`;
+    }
+    return `<span class="badge badge-green winner-badge" title="혈원 명단에 없는 이름">${ClanApp.escapeHtml(m.name)} · 외판</span>`;
+}
+
 function formatPriceWithPolicyHint(row) {
     if (row.hold_state === '이벤트') return '0 (이벤트)';
     const actual = Number(row.price || 0);
@@ -255,7 +273,7 @@ function viewRowHtml(row, i, isAdmin) {
         td('c-money', '판매가격', formatPriceWithPolicyHint(row)),
         td('', '보유상태', ClanApp.badge(holdLabelOf(row), holdToneOf(row))),
         td('', '분배상태', distBadgeHtml(row.dist_state, row.dist_label)),
-        td('c-mint', '수령자', ClanApp.escapeHtml(row.winner || '-')),
+        td('', '수령자', winnerBadgeHtml(row.winner)),
         td('', '수령완료일', row.taken_date ? ClanApp.toShortDate(row.taken_date) : '-')
     ];
     if (isAdmin) cells.push(td('', '', checkCellHtml(row, i)));
@@ -316,6 +334,7 @@ function editRowHtml(row, i) {
                            oninput="onWinnerTypeSearch(${i})" onkeydown="onWinnerKeydown(event, ${i})">
                     <div id="stWinnerSuggest_${i}" class="suggest-list hidden"></div>
                 </div>
+                <div id="stWinnerBadge_${i}" class="winner-live">${winnerBadgeHtml(row.winner, '')}</div>
             </td>
             <td>
                 <input type="date" id="stTaken_${i}" class="tbl-input tbl-date-input" value="${row.taken_date}" title="아이템을 건넨 날짜를 직접 지정" onchange="onLiveRowInput(${i})">
@@ -470,18 +489,36 @@ function onLiveRowInput(i, manualHoldChange = false) {
 // ---------------------------------------------------------
 // 수령자 자동완성 (내판일 때 혈원 검색)
 // ---------------------------------------------------------
+// 피닉스 + 판매구분(없음/내판/외판)일 때 수령자에 맞춰 내판/외판 자동 선택
+function applyWinnerAutoType(i) {
+    const winnerEl = $id(`stWinner_${i}`);
+    const alEl = $id(`stAlliance_${i}`);
+    const stEl = $id(`stSaleType_${i}`);
+    const m = winnerMatch(winnerEl ? winnerEl.value : '');
+    if (m && alEl && stEl && alEl.value === '피닉스' && ['', '내판', '외판'].includes(stEl.value)) {
+        const next = m.inRoster ? '내판' : '외판';
+        if (stEl.value !== next) {
+            stEl.value = next;
+            onLiveRowInput(i, true);
+        }
+    }
+    const badge = $id(`stWinnerBadge_${i}`);
+    if (badge) badge.innerHTML = winnerBadgeHtml(winnerEl ? winnerEl.value : '', '');
+}
+
 function onWinnerTypeSearch(i) {
     onLiveRowInput(i);
+    applyWinnerAutoType(i);
     const winnerEl = $id(`stWinner_${i}`);
     const box = $id(`stWinnerSuggest_${i}`);
     if (!winnerEl || !box) return;
 
-    const cur = readRowEdit(i, visibleRows[i]);
-    const q = cur.saleType === '내판' ? winnerEl.value : '';
-    ClanApp.suggest.open(box, ClanApp.searchChars(q), (charId) => {
+    // 명단 후보는 보여 주되, Enter 는 입력한 이름 그대로 저장 (↓ 키나 클릭으로 후보 선택)
+    ClanApp.suggest.open(box, ClanApp.searchChars(winnerEl.value), (charId) => {
         winnerEl.value = charId;
+        applyWinnerAutoType(i);
         saveItemRow(i, charId);
-    });
+    }, { autoActive: false });
 }
 
 function onWinnerKeydown(event, i) {

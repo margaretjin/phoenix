@@ -70,6 +70,20 @@ body.admin-mode .item-status-table td {
     color: var(--money-green);
 }
 
+.winner-live {
+    margin-top: 3px;
+    min-height: 0;
+}
+
+.winner-live:empty {
+    display: none;
+}
+
+.winner-badge small {
+    font-weight: 700;
+    opacity: 0.8;
+}
+
 .tbl-winner-input {
     width: 82px;
     text-align: center;

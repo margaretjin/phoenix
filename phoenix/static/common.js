@@ -794,16 +794,16 @@ window.ClanApp = {
     // 아이디 자동완성 드롭다운 (.suggest-wrap > input + .suggest-list)
     // =====================================================
     suggest: {
-        open(box, entries, onPick) {
+        open(box, entries, onPick, { autoActive = true } = {}) {
             if (!box) return;
             document.querySelectorAll('.suggest-list').forEach(el => { if (el !== box) ClanApp.suggest.close(el); });
             if (!entries || entries.length === 0) return ClanApp.suggest.close(box);
             box.innerHTML = entries.map((e, idx) => `
-                <div class="suggest-item ${idx === 0 ? 'active' : ''}" data-char-id="${ClanApp.escapeHtml(e.charId)}">
+                <div class="suggest-item ${autoActive && idx === 0 ? 'active' : ''}" data-char-id="${ClanApp.escapeHtml(e.charId)}">
                     <span class="suggest-main">${ClanApp.escapeHtml(e.charId)}</span>
                     <span class="suggest-sub">${ClanApp.escapeHtml(e.labelInfo)}</span>
                 </div>`).join('');
-            box.dataset.idx = '0';
+            box.dataset.idx = autoActive ? '0' : '-1';
             box._onPick = onPick;
             box.onmousedown = (ev) => {
                 const item = ev.target.closest('.suggest-item');
@@ -850,18 +850,19 @@ window.ClanApp = {
             if (event.isComposing || event.keyCode === 229) return false;
             const items = box ? [...box.querySelectorAll('.suggest-item')] : [];
             const open = ClanApp.suggest.isOpen(box);
-            let cur = Number(box && box.dataset.idx) || 0;
+            let cur = box ? Number(box.dataset.idx) : -1;
+            if (isNaN(cur)) cur = -1;
 
             if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && open) {
                 event.preventDefault();
-                cur = (cur + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+                const down = event.key === 'ArrowDown';
+                cur = cur < 0 ? (down ? 0 : items.length - 1) : (cur + (down ? 1 : -1) + items.length) % items.length;
                 box.dataset.idx = String(cur);
                 items.forEach((el, idx) => el.classList.toggle('active', idx === cur));
                 items[cur].scrollIntoView({ block: 'nearest' });
-            } else if (event.key === 'Enter' && open) {
+            } else if (event.key === 'Enter' && open && cur >= 0 && cur < items.length) {
                 event.preventDefault();
-                const target = items[cur >= 0 && cur < items.length ? cur : 0];
-                ClanApp.suggest.pick(box, target.getAttribute('data-char-id'));
+                ClanApp.suggest.pick(box, items[cur].getAttribute('data-char-id'));
                 return true;
             } else if (event.key === 'Escape' && box) {
                 ClanApp.suggest.close(box);
