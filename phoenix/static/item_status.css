@@ -1,165 +1,40 @@
 /* =========================================================
-   [item_status.css] 혈맹 아이템 현황 페이지 전용 스타일
+   [item_status.css] 혈맹 아이템 현황(템보유현황) 전용 스타일
+   (표 / 배지 / 입력창 / 자동완성 / 버튼은 common.css 공통 사용)
    ========================================================= */
 
-.excel-btn-group {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-}
-
-.btn-excel-sm {
-    background-color: #15803d;
-    color: #ffffff;
-    border: 1px solid #16a34a;
-    border-radius: 5px;
-    padding: 3px 7px;
-    font-size: 11px;
-    font-weight: bold;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-/* 1. 상단 조회 필터 그리드 */
-.filter-grid-box {
-    display: grid;
+.status-filter-grid {
     grid-template-columns: 120px 140px 135px 145px 1fr;
-    gap: 8px;
-    align-items: end;
-}
-
-.filter-field label {
-    display: block;
-    font-size: 11px;
-    color: #9ca3af;
-    font-weight: bold;
-    margin-bottom: 3px;
-}
-
-/* 2. 아이템 목록 테이블 */
-.status-table-wrap {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 120px;
 }
 
 .item-status-table {
-    width: 100%;
-    border-collapse: collapse;
     font-size: 12px;
 }
 
 .item-status-table th,
 .item-status-table td {
     padding: 8px 5px;
-    border-bottom: 1px solid #2e2e32;
-    text-align: center;
-    vertical-align: middle;
-    white-space: nowrap;
 }
 
-.item-status-table th {
-    background-color: #27272a;
-    color: #fbbf24;
-    font-weight: 800;
-    font-size: 11.5px;
-    line-height: 1.25;
+/* 관리자 모드: 칸 간격을 줄여 960px 안에 최대한 들어가게, 넘치면 표 아래 가로 스크롤 */
+body.admin-mode .item-status-table th,
+body.admin-mode .item-status-table td {
+    padding: 7px 3px;
 }
+
 
 /* 획득일시 */
 .raid-datetime-unified {
     font-weight: 800;
-    color: #d4d4d8;
+    color: var(--text-soft);
     font-size: 11.5px;
 }
 
 .dawn-sub-tag {
-    color: #60a5fa;
+    color: var(--accent-sky);
     font-size: 10px;
     font-weight: 700;
     margin-left: 2px;
-}
-
-/* 보유상태 배지 */
-.sale-badge {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 800;
-    white-space: nowrap;
-}
-
-.sale-badge.type-보유중 {
-    color: #fbbf24;
-    background-color: rgba(245, 158, 11, 0.16);
-    border: 1px solid #f59e0b;
-}
-
-.sale-badge.type-내판 {
-    color: #60a5fa;
-    background-color: rgba(59, 130, 246, 0.18);
-    border: 1px solid #3b82f6;
-}
-
-.sale-badge.type-외판 {
-    color: #4ade80;
-    background-color: rgba(34, 197, 94, 0.18);
-    border: 1px solid #22c55e;
-}
-
-.sale-badge.type-연합 {
-    color: #2dd4bf;
-    background-color: rgba(20, 184, 166, 0.18);
-    border: 1px solid #14b8a6;
-}
-
-.sale-badge.type-이벤트 {
-    color: #c084fc;
-    background-color: rgba(168, 85, 247, 0.18);
-    border: 1px solid #a855f7;
-}
-
-/* 분배상태 배지 */
-.dist-state-badge {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 800;
-    white-space: nowrap;
-}
-
-.dist-state-badge.state-분배대기 {
-    color: #fbbf24;
-    background-color: rgba(245, 158, 11, 0.16);
-    border: 1px solid #f59e0b;
-}
-
-.dist-state-badge.state-분배시작 {
-    color: #38bdf8;
-    background-color: rgba(56, 189, 248, 0.18);
-    border: 1px solid #0ea5e9;
-}
-
-.dist-state-badge.state-분배중 {
-    color: #60a5fa;
-    background-color: rgba(59, 130, 246, 0.18);
-    border: 1px solid #3b82f6;
-}
-
-.dist-state-badge.state-분배완료 {
-    color: #9ca3af;
-    background-color: #27272a;
-    border: 1px solid #52525b;
-}
-
-/* 분배완료일 텍스트 */
-.dist-date-text {
-    color: #60a5fa;
-    font-weight: 800;
-    font-size: 11.5px;
 }
 
 /* 체크박스 셀 */
@@ -172,159 +47,56 @@
 .dist-target-checkbox {
     width: 16px;
     height: 16px;
-    accent-color: #f59e0b;
+    accent-color: var(--accent-gold);
     cursor: pointer;
 }
 
-/* 테이블 내 입력창 */
-.tbl-input {
-    background-color: #141414;
-    border: 1px solid #3f3f46;
-    border-radius: 5px;
-    padding: 4px 5px;
-    color: #ffffff;
-    font-size: 11.5px;
-}
-
-.tbl-input:focus {
-    border-color: #3b82f6;
-}
-
-.tbl-input:disabled {
-    background-color: #1a1a1d;
-    border-color: #27272a;
-    color: #71717a;
-    cursor: not-allowed;
+/* 수정 모드 입력창 */
+.hold-edit-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
 }
 
 .tbl-hold-select {
-    font-weight: 700;
+    width: 92px;
 }
 
 .tbl-price-input {
-    width: 82px;
+    width: 72px;
     text-align: right;
     font-weight: 700;
-    color: #4ade80;
+    color: var(--money-green);
 }
 
 .tbl-winner-input {
-    width: 96px;
+    width: 82px;
     text-align: center;
     font-weight: 700;
-    color: #a7f3d0;
+    color: var(--accent-mint);
 }
 
-.tbl-date-input {
-    width: 112px;
+.item-status-table .tbl-date-input {
+    width: 104px;
+    padding: 4px 3px;
 }
 
-/* 수령자 자동완성 드롭다운 */
-.winner-autocomplete-wrap {
-    position: relative;
-    display: inline-block;
+.item-status-table .row-actions {
+    gap: 3px;
 }
 
-.winner-suggest-list {
-    position: absolute;
-    top: calc(100% + 3px);
-    left: 0;
-    min-width: 155px;
-    max-height: 180px;
-    overflow-y: auto;
-    background-color: #18181b;
-    border: 1px solid #f59e0b;
-    border-radius: 6px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.78);
-    z-index: 999;
-    text-align: left;
+.item-status-table .row-actions .btn-xs,
+.item-status-table .row-actions .btn-row-del {
+    padding: 4px 6px;
 }
 
-.winner-suggest-item {
-    padding: 6px 9px;
-    font-size: 12px;
-    color: #ffffff;
-    cursor: pointer;
-    border-bottom: 1px solid #27272a;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 6px;
-}
-
-.winner-suggest-item:last-child {
-    border-bottom: none;
-}
-
-.winner-suggest-item:hover,
-.winner-suggest-item.active {
-    background-color: #2563eb;
-    color: #ffffff;
-}
-
-.suggest-main-id {
-    font-weight: 800;
-    color: #fbbf24;
-}
-
-.winner-suggest-item:hover .suggest-main-id,
-.winner-suggest-item.active .suggest-main-id {
-    color: #ffffff;
-}
-
-.suggest-sub-info {
-    font-size: 10.5px;
-    color: #9ca3af;
-}
-
-.winner-suggest-item:hover .suggest-sub-info,
-.winner-suggest-item.active .suggest-sub-info {
-    color: #e5e7eb;
-}
-
-/* 수정 / 삭제 버튼 */
-.btn-row-edit {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #2563eb;
-    color: #ffffff;
-    border: 1px solid #3b82f6;
-    border-radius: 5px;
-    padding: 4px 8px;
-    font-size: 11px;
-    font-weight: 800;
-    line-height: 1;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.btn-row-del-item {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background-color: rgba(239, 68, 68, 0.18);
-    color: #f87171;
-    border: 1px solid #ef4444;
-    border-radius: 5px;
-    padding: 4px 7px;
-    font-size: 11px;
-    font-weight: 800;
-    line-height: 1;
-    cursor: pointer;
-    white-space: nowrap;
-    margin-left: 3px;
+/* 수정 중인 행 강조 */
+.item-status-table tr.is-editing td {
+    background-color: rgba(37, 99, 235, 0.08);
 }
 
 @media (max-width: 768px) {
-    .filter-grid-box {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .filter-field.search-full-mobile {
-        grid-column: 1 / -1;
-    }
-
     .item-status-table {
         font-size: 11px;
     }

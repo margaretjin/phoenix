@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>혈맹원관리 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/common.css?v=62">
-    <link rel="stylesheet" href="/static/admin.css?v=62">
+    <link rel="stylesheet" href="{{ asset('common.css') }}">
+    <link rel="stylesheet" href="{{ asset('admin.css') }}">
 </head>
 <body>
     <nav class="navbar" id="appNavbar"></nav>
@@ -16,17 +16,16 @@
             <a href="/member-list" class="btn-sm btn-sm-blue">📋 등록된 혈원 명단 보기 →</a>
         </div>
 
-        <div id="adminOffWarning" class="admin-warning-banner hidden">
+        <div class="admin-warning-banner user-block">
             🔒 현재 [관리자 모드: OFF] 상태입니다. 회원 추가·수정 및 스킬 관리를 하려면 우측 상단의 [👑 관리자 ON] 버튼을 켜주세요.
         </div>
 
         <!-- 1. 혈맹원 계정 및 권한 관리 폼 -->
-        <section id="memberFormCard" class="card-box hidden">
+        <section class="card-box admin-block">
             <span class="section-label" id="formTitle">➕ 혈맹원 계정 및 권한 관리 (추가 / 수정)</span>
             <input type="hidden" id="editMemberId">
 
             <div class="admin-form-stack">
-                <!-- 첫째 줄: 고유아이디 | 사용중인아이디 (2칸) -->
                 <div class="form-row-2col">
                     <div class="form-field-box">
                         <label>고유 아이디 (UID)</label>
@@ -38,17 +37,10 @@
                     </div>
                 </div>
 
-                <!-- 둘째 줄: 클래스 | 혈맹 | 권한 (3칸) -->
                 <div class="form-row-3col">
                     <div class="form-field-box">
                         <label>클래스</label>
-                        <select id="memClass" class="input-common" onchange="onMemberClassChange()">
-                            <option value="기사">기사</option>
-                            <option value="요정">요정</option>
-                            <option value="법사">법사</option>
-                            <option value="군주">군주</option>
-                            <option value="다크엘프">다크엘프</option>
-                        </select>
+                        <select id="memClass" class="input-common" onchange="onMemberClassChange()"></select>
                     </div>
                     <div class="form-field-box">
                         <label>혈맹</label>
@@ -64,358 +56,51 @@
                     </div>
                 </div>
 
-                <!-- 셋째 줄: 이메일 주소 (비밀번호 대체) -->
                 <div class="form-field-box">
                     <label>이메일 주소 (비밀번호 대체 - 비워두면 회원이 첫 로그인 시 직접 등록)</label>
-                    <input type="email" id="memEmail" class="input-common" placeholder="미입력 시 회원 직접 등록 (등록된 회원은 ****로 보호됨)">
+                    <input type="email" id="memEmail" class="input-common">
                 </div>
 
-                <!-- 넷째 줄: 보조캐릭 아이디 (1줄에 3칸 입력) -->
                 <div class="form-field-box">
                     <label>보조캐릭 아이디 (최대 3개)</label>
-                    <div class="sub-char-row-3col">
+                    <div class="form-row-3col sub-char-row">
                         <input type="text" id="subChar1" class="input-common" placeholder="보조캐릭 1">
                         <input type="text" id="subChar2" class="input-common" placeholder="보조캐릭 2">
                         <input type="text" id="subChar3" class="input-common" placeholder="보조캐릭 3">
                     </div>
                 </div>
 
-                <!-- 다섯째 줄: 보유 중요 스킬 -->
                 <div class="form-field-box">
                     <label>보유 중요 스킬</label>
                     <div id="memSkills" class="skill-chips-box"></div>
                 </div>
 
-                <div class="form-btn-row">
-                    <button type="button" class="btn-sm btn-sm-green" style="padding: 8px 16px; font-size: 13px;" onclick="saveMember()">💾 저장하기</button>
-                    <button type="button" class="btn-sm btn-sm-dark" style="padding: 8px 14px; font-size: 13px;" onclick="resetMemberForm()">입력 초기화</button>
+                <div class="row-actions form-btn-row">
+                    <button type="button" class="btn-sm btn-sm-green btn-lg" onclick="saveMember()">💾 저장하기</button>
+                    <button type="button" class="btn-sm btn-sm-dark btn-lg" onclick="resetMemberForm()">입력 초기화</button>
                 </div>
             </div>
         </section>
 
-        <!-- 2. 스킬 관리 항목 (신규 스킬 추가 / 클래스별 스킬 관리) -->
-        <section id="skillManageCard" class="card-box hidden">
+        <!-- 2. 스킬 관리 (신규 스킬 추가 / 클래스별 스킬 관리) -->
+        <section class="card-box admin-block">
             <span class="section-label">✨ 스킬 관리 (신규 중요 스킬 추가)</span>
             <p class="skill-manage-guide">
                 클래스를 선택한 뒤 신규 스킬명(예: <b>요정</b> → <b>팟바람</b>)을 추가하면, 위 <b>보유 중요 스킬</b> 선택 목록에 즉시 추가됩니다.
             </p>
 
             <div class="skill-add-row">
-                <select id="skillTargetClass" class="input-common skill-class-select" onchange="renderSkillManageChips()">
-                    <option value="요정">요정</option>
-                    <option value="기사">기사</option>
-                    <option value="법사">법사</option>
-                    <option value="군주">군주</option>
-                    <option value="다크엘프">다크엘프</option>
-                </select>
+                <select id="skillTargetClass" class="input-common skill-class-select" onchange="renderSkillManageChips()"></select>
                 <input type="text" id="newSkillNameInput" class="input-common" placeholder="신규 스킬명 입력 (예: 팟바람)"
                        onkeydown="if(event.key==='Enter'){event.preventDefault();addNewClassSkill();}">
-                <button type="button" class="btn-sm btn-sm-blue" style="padding: 8px 14px; font-size: 12.5px;" onclick="addNewClassSkill()">+ 스킬 추가</button>
+                <button type="button" class="btn-sm btn-sm-blue skill-add-btn" onclick="addNewClassSkill()">+ 스킬 추가</button>
             </div>
 
             <div id="skillManageListBox" class="skill-manage-list-box"></div>
         </section>
     </main>
 
-    <script src="/static/common.js?v=62"></script>
-    <script>
-        let membersList = [];
-        let skillsByClass = {
-            기사: ['스턴', '리덕', '솔캐', '바운스', '카베', '투망'],
-            요정: ['소울', '트리플', '왕바람', '왕어스', '소프', '씽', '게일', '어바', '똥물', '캔슬', '투망'],
-            법사: ['뮨', '캔슬', '미티어', '라톰', '파톰', '블리자드', '인비지', '투망'],
-            군주: [],
-            다크엘프: []
-        };
-        let skillRowsDb = [];
-
-        window.onload = async () => {
-            const user = ClanApp.initPage('/admin', () => {
-                applyAdminUI();
-                renderSkillOptions(getCheckedSkills());
-                renderSkillManageChips();
-            });
-            if (!user) return;
-
-            if (!ClanApp.hasAdminPrivilege) {
-                alert('관리자 권한이 없습니다.');
-                window.location.href = '/raid-record';
-                return;
-            }
-
-            populateRoleOptions();
-            applyAdminUI();
-            await Promise.all([loadMembers(), loadClassSkills()]);
-            renderSkillOptions([]);
-            renderSkillManageChips();
-
-            // 명단 페이지에서 [수정] 클릭해 넘어온 경우 해당 회원 폼 자동 오픈
-            const params = new URLSearchParams(window.location.search);
-            const editIdParam = params.get('edit_id');
-            if (editIdParam) {
-                editMember(Number(editIdParam));
-            }
-        };
-
-        function populateRoleOptions(selectedRole = '일반회원') {
-            const roleSelect = document.getElementById('memRole');
-            roleSelect.innerHTML = '';
-            const roles = ClanApp.isSuperAdmin
-                ? ['일반회원', '관리자', '슈퍼관리자']
-                : ['일반회원', '관리자'];
-
-            roles.forEach(r => {
-                const opt = new Option(r, r);
-                if (r === selectedRole) opt.selected = true;
-                roleSelect.add(opt);
-            });
-        }
-
-        function applyAdminUI() {
-            const isOn = ClanApp.isAdminModeOn;
-            document.getElementById('adminOffWarning').classList.toggle('hidden', isOn);
-            document.getElementById('memberFormCard').classList.toggle('hidden', !isOn);
-            document.getElementById('skillManageCard').classList.toggle('hidden', !isOn);
-        }
-
-        async function loadMembers() {
-            const res = await fetch('/api/auth/search-members');
-            membersList = await res.json();
-        }
-
-        async function loadClassSkills() {
-            try {
-                const res = await fetch('/api/admin/skills');
-                if (!res.ok) return;
-                const data = await res.json();
-                if (data.skills_by_class) {
-                    skillsByClass = {
-                        기사: data.skills_by_class['기사'] || [],
-                        요정: data.skills_by_class['요정'] || [],
-                        법사: data.skills_by_class['법사'] || [],
-                        군주: data.skills_by_class['군주'] || [],
-                        다크엘프: data.skills_by_class['다크엘프'] || []
-                    };
-                }
-                skillRowsDb = data.rows || [];
-            } catch (e) {
-                // 기본 스킬 맵 유지
-            }
-        }
-
-        function getCheckedSkills() {
-            return [...document.querySelectorAll('#memSkills input[name="memberSkill"]:checked')].map(i => i.value);
-        }
-
-        function onMemberClassChange() {
-            const cls = document.getElementById('memClass').value;
-            const targetClassSel = document.getElementById('skillTargetClass');
-            if (targetClassSel && skillsByClass[cls] !== undefined) {
-                targetClassSel.value = cls;
-                renderSkillManageChips();
-            }
-            renderSkillOptions([]);
-        }
-
-        function renderSkillOptions(selectedSkills = []) {
-            const container = document.getElementById('memSkills');
-            container.innerHTML = '';
-            const cls = document.getElementById('memClass').value;
-            const skills = skillsByClass[cls] || [];
-
-            if (skills.length === 0) {
-                container.innerHTML = `<span style="color:#71717a; font-size:12px;">[${cls}] 클래스에 등록된 스킬이 없습니다. 아래 스킬 관리에서 추가해 주세요.</span>`;
-                return;
-            }
-
-            skills.forEach(skill => {
-                const label = document.createElement('label');
-                label.className = `skill-chip-label ${selectedSkills.includes(skill) ? 'selected' : ''}`;
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.name = 'memberSkill';
-                checkbox.value = skill;
-                checkbox.checked = selectedSkills.includes(skill);
-                checkbox.onchange = () => label.classList.toggle('selected', checkbox.checked);
-                label.append(checkbox, document.createTextNode(skill));
-                container.appendChild(label);
-            });
-        }
-
-        function renderSkillManageChips() {
-            const cls = document.getElementById('skillTargetClass').value;
-            const box = document.getElementById('skillManageListBox');
-            const list = skillsByClass[cls] || [];
-
-            if (list.length === 0) {
-                box.innerHTML = `<span style="color:#71717a; font-size:12px;">[${cls}] 클래스에 등록된 스킬이 없습니다.</span>`;
-                return;
-            }
-
-            box.innerHTML = list.map(sk => {
-                const dbRow = skillRowsDb.find(r => r.char_class === cls && r.skill_name === sk);
-                const delBtn = dbRow
-                    ? `<button type="button" class="skill-del-x" title="스킬 삭제" onclick="deleteClassSkill(${dbRow.id}, '${sk}')">✕</button>`
-                    : '';
-                return `<span class="skill-manage-badge">${sk}${delBtn}</span>`;
-            }).join('');
-        }
-
-        async function addNewClassSkill() {
-            if (!ClanApp.isAdminModeOn) return;
-            const cls = document.getElementById('skillTargetClass').value;
-            const inputEl = document.getElementById('newSkillNameInput');
-            const skillName = (inputEl.value || '').trim();
-
-            if (!skillName) {
-                return alert('추가할 스킬명을 입력해 주세요.');
-            }
-
-            const prevChecked = getCheckedSkills();
-
-            const res = await fetch('/api/admin/skills', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    char_class: cls,
-                    skill_name: skillName,
-                    requester_role: ClanApp.role
-                })
-            });
-
-            if (res.ok) {
-                inputEl.value = '';
-                await loadClassSkills();
-                renderSkillManageChips();
-                if (document.getElementById('memClass').value === cls) {
-                    renderSkillOptions([...prevChecked, skillName]);
-                }
-                alert(`[${cls}] 클래스에 [${skillName}] 스킬이 추가되었습니다.`);
-            } else {
-                const err = await res.json().catch(() => ({}));
-                alert(err.detail || '스킬 추가 중 오류가 발생했습니다.');
-            }
-        }
-
-        async function deleteClassSkill(skillId, skillName) {
-            if (!ClanApp.isAdminModeOn) return;
-            if (!confirm(`[${skillName}] 스킬을 목록에서 삭제하시겠습니까?`)) return;
-
-            const prevChecked = getCheckedSkills();
-            const res = await fetch(`/api/admin/skills/${skillId}?requester_role=${encodeURIComponent(ClanApp.role)}`, {
-                method: 'DELETE'
-            });
-
-            if (res.ok) {
-                await loadClassSkills();
-                renderSkillManageChips();
-                renderSkillOptions(prevChecked.filter(s => s !== skillName));
-            } else {
-                const err = await res.json().catch(() => ({}));
-                alert(err.detail || '스킬 삭제 중 오류가 발생했습니다.');
-            }
-        }
-
-        function editMember(id) {
-            if (!ClanApp.isAdminModeOn) return;
-            const m = membersList.find(x => x.id === id);
-            if (!m) return;
-
-            if (m.role === '슈퍼관리자' && !ClanApp.isSuperAdmin) {
-                return alert('슈퍼관리자 정보는 슈퍼관리자만 수정할 수 있습니다.');
-            }
-
-            document.getElementById('editMemberId').value = m.id;
-            document.getElementById('memUniqueId').value = m.unique_id || '';
-            document.getElementById('memActiveId').value = m.active_id || '';
-            document.getElementById('memEmail').value = '';
-            document.getElementById('memEmail').placeholder = (m.has_email || m.google_email)
-                ? '현재 등록됨 (****) - 변경할 때만 새 이메일 입력'
-                : '미입력 시 회원 직접 등록';
-
-            document.getElementById('memClass').value = m.char_class || '기사';
-            document.getElementById('memClan').value = m.clan || '피닉스';
-            populateRoleOptions(m.role);
-
-            const subs = (m.sub_chars || '').split(',').map(s => s.trim()).filter(Boolean);
-            document.getElementById('subChar1').value = subs[0] || '';
-            document.getElementById('subChar2').value = subs[1] || '';
-            document.getElementById('subChar3').value = subs[2] || '';
-
-            const skills = Array.isArray(m.skills) ? m.skills : String(m.skills || '').split(',').map(s => s.trim()).filter(Boolean);
-            renderSkillOptions(skills);
-            document.getElementById('formTitle').textContent = `✏️ [${m.active_id}] 회원 정보 수정`;
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function resetMemberForm() {
-            document.getElementById('editMemberId').value = '';
-            document.getElementById('memUniqueId').value = '';
-            document.getElementById('memActiveId').value = '';
-            document.getElementById('memEmail').value = '';
-            document.getElementById('memEmail').placeholder = '미입력 시 회원 직접 등록 (등록된 회원은 ****로 보호됨)';
-            document.getElementById('subChar1').value = '';
-            document.getElementById('subChar2').value = '';
-            document.getElementById('subChar3').value = '';
-            populateRoleOptions('일반회원');
-            renderSkillOptions([]);
-            document.getElementById('formTitle').textContent = '➕ 혈맹원 계정 및 권한 관리 (추가 / 수정)';
-        }
-
-        async function saveMember() {
-            if (!ClanApp.isAdminModeOn) return;
-            const editId = document.getElementById('editMemberId').value;
-
-            const subList = [
-                document.getElementById('subChar1').value.trim(),
-                document.getElementById('subChar2').value.trim(),
-                document.getElementById('subChar3').value.trim()
-            ].filter(Boolean);
-
-            const typedEmail = document.getElementById('memEmail').value.trim();
-            let finalEmail = typedEmail || null;
-
-            if (editId && !typedEmail) {
-                const existingMem = membersList.find(x => String(x.id) === String(editId));
-                if (existingMem && existingMem.google_email) {
-                    finalEmail = existingMem.google_email;
-                }
-            }
-
-            const payload = {
-                unique_id: document.getElementById('memUniqueId').value.trim(),
-                active_id: document.getElementById('memActiveId').value.trim(),
-                google_email: finalEmail,
-                char_class: document.getElementById('memClass').value,
-                clan: document.getElementById('memClan').value,
-                role: document.getElementById('memRole').value,
-                sub_chars: subList.join(', '),
-                skills: getCheckedSkills(),
-                requester_role: ClanApp.role
-            };
-
-            if (!payload.unique_id || !payload.active_id) {
-                return alert('고유 아이디(UID)와 본캐릭명을 입력해 주세요.');
-            }
-
-            const url = editId ? `/api/admin/members/${editId}` : '/api/admin/members';
-            const method = editId ? 'PUT' : 'POST';
-
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (res.ok) {
-                alert('회원 정보가 저장되었습니다.');
-                resetMemberForm();
-                await loadMembers();
-            } else {
-                const err = await res.json();
-                alert(err.detail || '저장 중 오류가 발생했습니다.');
-            }
-        }
-    </script>
+    <script src="{{ asset('common.js') }}"></script>
+    <script src="{{ asset('admin.js') }}"></script>
 </body>
 </html>

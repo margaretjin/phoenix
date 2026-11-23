@@ -1,0 +1,106 @@
+/* =========================================================
+   [login.css] 로그인 페이지 전용 스타일 (기존 style.css 대체)
+   ========================================================= */
+
+.login-brand {
+    color: var(--accent-gold);
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.login-container {
+    max-width: 460px;
+    margin-top: 28px;
+}
+
+.login-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #ffffff;
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.login-guide {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.login-field {
+    margin-bottom: 14px;
+}
+
+.login-field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    font-weight: 700;
+}
+
+.login-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-height: 190px;
+    overflow-y: auto;
+    margin-top: 8px;
+    padding: 8px;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.login-chip {
+    background-color: var(--bg-chip);
+    color: #ffffff;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.login-chip:hover,
+.login-chip.selected {
+    background-color: var(--accent-gold);
+    color: #000000;
+}
+
+.selected-id-input {
+    color: var(--accent-gold);
+    font-weight: 800;
+    background-color: #131c2e;
+}
+
+.selected-id-status {
+    font-size: 11px;
+    margin-top: 4px;
+    color: var(--text-muted);
+}
+
+.login-message {
+    min-height: 18px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.login-message.error {
+    color: var(--accent-red);
+}
+
+.btn-login {
+    background-color: #16a34a;
+}
+
+.btn-login:active {
+    background-color: #15803d;
+}

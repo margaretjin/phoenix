@@ -4,167 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>로그인 - 혈맹 보스탐 체크기</title>
-    <link rel="stylesheet" href="/static/style.css?v=7">
+    <link rel="stylesheet" href="{{ asset('common.css') }}">
+    <link rel="stylesheet" href="{{ asset('login.css') }}">
 </head>
 <body>
     <nav class="navbar">
-        <div class="nav-left">
-            <span style="color: var(--accent-gold); font-weight: 800; font-size: 1rem;">⚔️ 피닉스 혈맹 보스탐 시스템</span>
+        <div class="nav-inner-container">
+            <span class="login-brand">⚔️ 피닉스 혈맹 보스탐 시스템</span>
         </div>
     </nav>
 
-    <main class="container" style="max-width: 460px; margin-top: 2rem;">
-        <div class="card">
-            <h2 class="section-title" style="text-align: center;">🔐 혈맹원 로그인 / 이메일 등록</h2>
-            <p style="font-size: 0.84rem; color: var(--text-muted); text-align: center; margin-bottom: 1.2rem; line-height: 1.5;">
+    <main class="main-container login-container">
+        <div class="card-box">
+            <h2 class="login-title">🔐 혈맹원 로그인 / 이메일 등록</h2>
+            <p class="login-guide">
                 1. 본인의 캐릭터 아이디를 검색하여 클릭하세요.<br>
-                2. <span style="color: var(--accent-gold); font-weight: 700;">이메일 주소(비밀번호 대체)</span>를 입력하면 로그인됩니다.<br>
-                <small style="color: #6ee7b7;">(로그아웃을 누르기 전까지 로그인 상태가 계속 유지됩니다)</small>
+                2. <span class="c-gold">이메일 주소(비밀번호 대체)</span>를 입력하면 로그인됩니다.<br>
+                <small class="c-mint">(로그아웃을 누르기 전까지 로그인 상태가 계속 유지됩니다)</small>
             </p>
 
             <!-- 1단계: 회원 아이디 검색 및 클릭 선택 -->
-            <div style="margin-bottom: 1rem;">
+            <div class="login-field">
                 <label for="memberSearchBox">1️⃣ 회원 아이디 검색 (본인 아이디 클릭)</label>
-                <input type="search" id="memberSearchBox" placeholder="캐릭터명 또는 보조캐릭 검색 (예: 월은)" oninput="renderSearchChips()" autocomplete="off">
-                <div id="memberChipList" class="winner-search-chips" style="max-height: 190px; overflow-y: auto; margin-top: 0.5rem; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px;">
-                    불러오는 중...
-                </div>
+                <input type="search" id="memberSearchBox" class="input-common" placeholder="캐릭터명 또는 보조캐릭 검색 (예: 월은)" oninput="renderSearchChips()" autocomplete="off">
+                <div id="memberChipList" class="login-chip-list">불러오는 중...</div>
             </div>
 
-            <!-- 선택된 아이디 표시 -->
             <form onsubmit="handleEmailLogin(event)">
-                <div style="margin-bottom: 1rem;">
-                    <label>선택된 캐릭터 아이디</label>
-                    <input type="text" id="selectedActiveId" readonly placeholder="위 목록에서 본인 아이디를 클릭하세요" style="color: var(--accent-gold); font-weight: 800; background: #131c2e;" required>
-                    <div id="selectedIdStatus" style="font-size: 0.78rem; margin-top: 0.3rem; color: var(--text-muted);"></div>
+                <div class="login-field">
+                    <label for="selectedActiveId">선택된 캐릭터 아이디</label>
+                    <input type="text" id="selectedActiveId" class="input-common selected-id-input" readonly placeholder="위 목록에서 본인 아이디를 클릭하세요" required>
+                    <div id="selectedIdStatus" class="selected-id-status"></div>
                 </div>
 
                 <!-- 2단계: 이메일 주소 입력 (비밀번호 대체) -->
-                <div style="margin-bottom: 1rem;">
-                    <label for="loginEmail" id="emailLabel">2️⃣ 이메일 주소 입력 (비밀번호 대체)</label>
-                    <input type="email" id="loginEmail" placeholder="example@gmail.com" autocomplete="email" required>
+                <div class="login-field">
+                    <label for="loginEmail">2️⃣ 이메일 주소 입력 (비밀번호 대체)</label>
+                    <input type="email" id="loginEmail" class="input-common" placeholder="example@gmail.com" autocomplete="email" required>
                 </div>
 
-                <p id="loginMessage" style="min-height: 1.3rem; margin-bottom: 0.75rem; font-size: 0.84rem; text-align: center;"></p>
-                <button id="loginBtn" type="submit" class="btn btn-green" style="width: 100%; font-size: 1rem; padding: 0.75rem;" disabled>
-                    아이디를 먼저 선택해 주세요
-                </button>
+                <p id="loginMessage" class="login-message"></p>
+                <button id="loginBtn" type="submit" class="btn-primary btn-login" disabled>아이디를 먼저 선택해 주세요</button>
             </form>
         </div>
     </main>
 
-    <script>
-        let allMembers = [];
-        let selectedMember = null;
-
-        window.onload = async () => {
-            // 로그아웃 전까지 자동 로그인 유지
-            const saved = localStorage.getItem('clan_user');
-            if (saved) {
-                window.location.href = '/raid-record';
-                return;
-            }
-            await fetchMembers();
-        };
-
-        async function fetchMembers() {
-            const chipBox = document.getElementById('memberChipList');
-            try {
-                const res = await fetch('/api/auth/search-members');
-                allMembers = await res.json();
-                renderSearchChips();
-            } catch (e) {
-                chipBox.innerHTML = `<span style="color: var(--accent-red); font-size: 0.82rem;">회원 명단을 불러오지 못했습니다.</span>`;
-            }
-        }
-
-        function renderSearchChips() {
-            const keyword = document.getElementById('memberSearchBox').value.trim().toLowerCase();
-            const chipBox = document.getElementById('memberChipList');
-            chipBox.innerHTML = '';
-
-            const filtered = allMembers.filter(m => {
-                if (!keyword) return true;
-                return (m.active_id || '').toLowerCase().includes(keyword) ||
-                       (m.unique_id || '').toLowerCase().includes(keyword) ||
-                       (m.sub_chars || '').toLowerCase().includes(keyword);
-            });
-
-            if (filtered.length === 0) {
-                chipBox.innerHTML = `<span style="color: var(--text-muted); font-size: 0.82rem;">검색 결과가 없습니다.</span>`;
-                return;
-            }
-
-            filtered.forEach(m => {
-                const chip = document.createElement('span');
-                chip.className = 'winner-chip';
-                const isSelected = selectedMember && selectedMember.active_id === m.active_id;
-                if (isSelected) {
-                    chip.style.background = 'var(--accent-gold)';
-                    chip.style.color = '#000';
-                }
-                chip.textContent = m.has_email ? `🔒 ${m.active_id}` : `🆕 ${m.active_id}`;
-                chip.onclick = () => selectMemberForLogin(m);
-                chipBox.appendChild(chip);
-            });
-        }
-
-        function selectMemberForLogin(member) {
-            selectedMember = member;
-            document.getElementById('selectedActiveId').value = member.active_id;
-            const statusEl = document.getElementById('selectedIdStatus');
-            const btn = document.getElementById('loginBtn');
-
-            if (member.has_email) {
-                statusEl.innerHTML = `🔒 <b style="color:#6ee7b7;">가입 완료 회원</b>: 등록하신 이메일 주소를 입력하면 로그인됩니다.`;
-                btn.textContent = `[${member.active_id}] 로그인`;
-            } else {
-                statusEl.innerHTML = `🆕 <b style="color:var(--accent-gold);">최초 가입 회원</b>: 본인이 사용할 이메일 주소를 입력하면 즉시 등록 및 로그인됩니다.`;
-                btn.textContent = `[${member.active_id}] 이메일 등록 및 로그인`;
-            }
-
-            btn.disabled = false;
-            renderSearchChips();
-            document.getElementById('loginEmail').focus();
-        }
-
-        async function handleEmailLogin(e) {
-            e.preventDefault();
-            if (!selectedMember) return;
-
-            const email = document.getElementById('loginEmail').value.trim();
-            const msgEl = document.getElementById('loginMessage');
-            const btn = document.getElementById('loginBtn');
-
-            btn.disabled = true;
-            msgEl.style.color = 'var(--text-muted)';
-            msgEl.textContent = '인증 확인 중...';
-
-            try {
-                const res = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ active_id: selectedMember.active_id, email })
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                    msgEl.style.color = 'var(--accent-red)';
-                    msgEl.textContent = data.detail || '로그인에 실패했습니다.';
-                    btn.disabled = false;
-                    return;
-                }
-
-                if (data.status === 'email_registered') {
-                    alert(`[${data.user.active_id}] 아이디에 이메일(${email})이 등록되었습니다!`);
-                }
-                localStorage.setItem('clan_user', JSON.stringify(data.user));
-                window.location.href = '/raid-record';
-            } catch (err) {
-                msgEl.style.color = 'var(--accent-red)';
-                msgEl.textContent = '서버 통신 오류가 발생했습니다.';
-                btn.disabled = false;
-            }
-        }
-    </script>
+    <script src="{{ asset('login.js') }}"></script>
 </body>
 </html>

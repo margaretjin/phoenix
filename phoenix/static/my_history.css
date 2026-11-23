@@ -1,23 +1,29 @@
 /* =========================================================
    [my_history.css] 참여내역 페이지 전용 스타일
+   (표 / 배지 / 탭 / KPI / 필터는 common.css 공통 사용)
    ========================================================= */
 
-.excel-btn-group {
+.top-tools {
     display: flex;
-    gap: 4px;
+    align-items: center;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
-.btn-excel-sm {
-    background-color: #15803d;
-    color: #ffffff;
-    border: 1px solid #16a34a;
-    border-radius: 5px;
-    padding: 3px 7px;
-    font-size: 11px;
-    font-weight: bold;
-    cursor: pointer;
-    white-space: nowrap;
+.admin-target-search {
+    gap: 6px;
+}
+
+.admin-target-label {
+    color: var(--accent-yellow);
+    font-size: 11.5px;
+    font-weight: 800;
+}
+
+.admin-target-input {
+    width: 100px;
+    padding: 4px 7px;
+    font-size: 12px;
 }
 
 /* 1. 상단 프로필 4칸 요약 */
@@ -25,8 +31,8 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 8px;
-    background-color: #141414;
-    border: 1px solid #2e2e32;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-soft);
     border-radius: 8px;
     padding: 10px 12px;
     margin-bottom: 12px;
@@ -34,7 +40,7 @@
 
 .prof-box-label {
     font-size: 11px;
-    color: #9ca3af;
+    color: var(--text-muted);
     font-weight: bold;
 }
 
@@ -46,20 +52,9 @@
     word-break: break-all;
 }
 
-/* 2. 검색 기준 + 기간(월별/일별/전체) + 아이템 검색 + 참여 횟수 */
+/* 2. 검색 기준 + 기간 + 아이템 검색 + 참여 횟수 */
 .history-filter-grid {
-    display: grid;
     grid-template-columns: 150px 115px 155px 1fr auto;
-    gap: 8px;
-    align-items: end;
-}
-
-.history-filter-field label {
-    display: block;
-    font-size: 11px;
-    color: #9ca3af;
-    font-weight: bold;
-    margin-bottom: 3px;
 }
 
 .participation-kpi-group {
@@ -69,39 +64,17 @@
 }
 
 .part-kpi-badge {
-    background-color: #141414;
-    border: 1px solid #2e2e32;
-    border-radius: 8px;
     padding: 6px 10px;
-    text-align: center;
     min-width: 108px;
 }
 
-.part-kpi-label {
+.part-kpi-badge .kpi-label {
     font-size: 10.5px;
-    color: #9ca3af;
-    font-weight: bold;
+    margin-bottom: 1px;
 }
 
-.part-kpi-val {
-    font-size: 14px;
-    font-weight: 900;
-    color: #fbbf24;
-    margin-top: 1px;
-}
-
-.part-kpi-val.day-val {
-    color: #4ade80;
-}
-
-/* 3. 보스탐 기록과 동일한 8x2 참여 타임 그리드 */
-.history-time-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    gap: 8px;
-    flex-wrap: wrap;
+.kpi-val.day-val {
+    color: var(--money-green);
 }
 
 .history-selected-date {
@@ -110,98 +83,25 @@
     font-weight: 800;
 }
 
-.my-slot-btn.participated {
-    background-color: rgba(34, 197, 94, 0.16);
-    border-color: #22c55e;
-    color: #ffffff;
-}
-
-.my-slot-btn.participated .common-time-sub {
-    color: #4ade80;
-}
-
-/* 4. 분배대기중인 아이템 / 분배완료 아이템 테이블 */
-.history-items-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.status-tab-bar {
-    display: flex;
-    gap: 6px;
-}
-
-.status-tab-btn {
-    padding: 5px 10px;
-    border-radius: 6px;
-    border: 1px solid #3f3f46;
-    background-color: #27272a;
-    color: #d4d4d8;
-    font-size: 11.5px;
-    font-weight: 800;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.status-tab-btn.active {
-    background-color: #2563eb;
-    border-color: #3b82f6;
-    color: #ffffff;
-}
-
-.history-table-wrap {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-.history-item-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12.5px;
-}
-
-.history-item-table th,
+/* 3. 아이템 / 분배금 표 */
 .history-item-table td {
     padding: 9px 6px;
-    border-bottom: 1px solid #2e2e32;
-    text-align: center;
-    vertical-align: middle;
-    white-space: nowrap;
 }
 
 .history-item-table th {
-    background-color: #27272a;
-    color: #fbbf24;
-    font-weight: 800;
     font-size: 12px;
 }
 
-/* 보스탐 / 혈비제외가 / 참여인원 3개 컬럼 모두 참여인원과 동일한 연한 회색(#d4d4d8)으로 통일 */
-.same-member-color {
-    color: #d4d4d8;
-    font-weight: 700;
-    font-size: 12.5px;
-}
-
-/* 아이템 컬럼: 노란색 그대로 유지 */
 .drop-item-name {
     font-weight: 800;
-    color: #fbbf24;
+    color: var(--accent-yellow);
     font-size: 13px;
 }
 
-.clan-dist-date-cell {
-    color: #60a5fa;
-    font-weight: 800;
-    font-size: 12px;
+.my-share-cell {
+    font-weight: 900;
 }
 
-/* 본인수령 (본인/쫄아이디) / 대리수령 (대리인아이디) 회색 배지 + 옆에 받은날짜 표시 */
 .history-status-cell {
     display: inline-flex;
     align-items: center;
@@ -209,63 +109,31 @@
     gap: 8px;
 }
 
-.badge-gray-done {
-    display: inline-block;
-    padding: 3px 9px;
-    border-radius: 4px;
-    background-color: #27272a;
-    border: 1px solid #52525b;
-    color: #9ca3af;
-    font-weight: 800;
-    font-size: 11.5px;
-}
-
 .done-paid-date {
-    color: #9ca3af;
+    color: var(--text-muted);
     font-size: 12px;
     font-weight: 700;
 }
 
-.badge-orange-wait {
-    display: inline-block;
-    padding: 3px 9px;
-    border-radius: 4px;
-    background-color: rgba(245, 158, 11, 0.16);
-    border: 1px solid #f59e0b;
-    color: #fbbf24;
-    font-weight: 800;
-    font-size: 11.5px;
-}
-
-/* 맨 아래 조회기간 내 분배금 합계 맨 오른쪽 배치 */
+/* 맨 아래 조회기간 내 분배금 합계 (오른쪽) */
 .history-sum-row td {
     background-color: rgba(245, 158, 11, 0.1);
     text-align: right !important;
     padding: 10px 12px !important;
     font-size: 13px;
     font-weight: 800;
-    color: #e5e7eb;
+    color: var(--text-light);
 }
 
 .history-sum-amount {
-    color: #4ade80;
+    color: var(--money-green);
     font-weight: 900;
     font-size: 14px;
     margin-left: 8px;
 }
 
-.admin-target-search {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
 @media (max-width: 768px) {
     .history-profile-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .history-filter-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 

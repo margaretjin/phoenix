@@ -2,12 +2,17 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from database import supabase
+from utils import require_admin
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
+
+MEMBER_PUBLIC_COLUMNS = "id, unique_id, active_id, char_class, skills, clan, sub_chars, role, google_email"
+
 
 class EmailLoginRequest(BaseModel):
     active_id: str
     email: str
+
 
 @router.post("/login")
 def email_only_login(req: EmailLoginRequest):
@@ -32,30 +37,27 @@ def email_only_login(req: EmailLoginRequest):
             raise HTTPException(status_code=401, detail="등록된 이메일 주소와 일치하지 않습니다. 관리자에게 문의하세요.")
         return {"status": "login_success", "user": user}
 
-    # 2. 이메일이 아직 등록되지 않은 회원 -> 타 회원 중복 체크 후 즉시 등록(가입 완료)
-    dup_check = supabase.table("members").select("id, active_id").eq("google_email", email).execute()
+    # 2. 이메일 미등록 회원 -> 타 회원 중복 체크 후 즉시 등록(가입 완료)
+    dup_check = supabase.table("members").select("id").eq("google_email", email).execute()
     if any(m.get("id") != user["id"] for m in (dup_check.data or [])):
         raise HTTPException(status_code=409, detail="이미 다른 캐릭터에 등록된 이메일 주소입니다.")
 
     updated = supabase.table("members").update({"google_email": email}).eq("id", user["id"]).execute()
     if not updated.data:
         raise HTTPException(status_code=500, detail="이메일 등록 중 오류가 발생했습니다.")
-
     return {"status": "email_registered", "user": updated.data[0]}
+
 
 @router.post("/reset-email/{member_id}")
 def reset_member_email(member_id: int, requester_role: str):
-    if requester_role not in ["슈퍼관리자", "관리자"]:
-        raise HTTPException(status_code=403, detail="관리자 이상만 이메일을 초기화할 수 있습니다.")
-
+    require_admin(requester_role, "관리자 이상만 이메일을 초기화할 수 있습니다.")
     supabase.table("members").update({"google_email": None}).eq("id", member_id).execute()
     return {"status": "email_cleared"}
 
+
 @router.get("/search-members")
 def search_members(q: Optional[str] = ""):
-    query = supabase.table("members").select(
-        "id, unique_id, active_id, char_class, skills, clan, sub_chars, role, google_email"
-    ).order("active_id")
+    query = supabase.table("members").select(MEMBER_PUBLIC_COLUMNS).order("active_id")
     if q:
         query = query.or_(f"active_id.ilike.%{q}%,unique_id.ilike.%{q}%,sub_chars.ilike.%{q}%")
     rows = query.execute().data or []

@@ -1,5 +1,6 @@
 /* =========================================================
    [raid_status.css] 일별 기록 현황 페이지 전용 스타일
+   (KPI / 배지 / 시간 그리드 / 파티 행은 common.css 공통 사용)
    ========================================================= */
 
 .status-date-row {
@@ -12,7 +13,7 @@
 }
 
 .status-selected-date {
-    color: #ff5722;
+    color: var(--accent-orange);
     font-size: 16px;
     font-weight: 800;
     letter-spacing: -0.3px;
@@ -26,8 +27,8 @@
 }
 
 .date-picker-input {
-    background-color: #141414;
-    border: 1px solid #3f3f46;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-strong);
     border-radius: 6px;
     padding: 5px 6px;
     color: #ffffff;
@@ -37,9 +38,9 @@
 }
 
 .btn-day-move {
-    background-color: #27272a;
-    border: 1px solid #3f3f46;
-    color: #d4d4d8;
+    background-color: var(--bg-chip);
+    border: 1px solid var(--border-strong);
+    color: var(--text-soft);
     border-radius: 6px;
     padding: 6px 8px;
     font-size: 11.5px;
@@ -49,46 +50,74 @@
 }
 
 .btn-day-move.today {
-    background-color: #2563eb;
-    border-color: #2563eb;
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
     color: #ffffff;
 }
 
+.btn-tiny {
+    padding: 2px 6px;
+    font-size: 10px;
+}
+
+/* 일별 요약: 드랍 수(1) : 아이템 목록(4) */
 .day-summary-strip {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 4fr);
     gap: 6px;
     margin-bottom: 12px;
 }
 
 .summary-mini-box {
-    background-color: #141414;
-    border: 1px solid #2e2e32;
-    border-radius: 8px;
-    padding: 8px 6px;
-    text-align: center;
+    padding: 6px 8px;
 }
 
-.summary-mini-label {
-    font-size: 11px;
-    color: #9ca3af;
-    font-weight: bold;
-}
-
-.summary-mini-val {
-    font-size: 14px;
+.summary-mini-box .kpi-val {
     font-weight: 800;
-    color: #f59e0b;
+    color: var(--accent-gold);
     margin-top: 2px;
 }
 
-.status-time-btn.has-record {
-    background-color: rgba(34, 197, 94, 0.12);
-    border-color: #22c55e;
-    color: #ffffff;
+.summary-items-box,
+.summary-items-box .kpi-label {
+    text-align: left;
 }
-.status-time-btn.has-record .common-time-sub {
-    color: #4ade80;
+
+.summary-drop-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+}
+
+.summary-drop-chip {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background-color: rgba(245, 158, 11, 0.14);
+    border: 1px solid var(--accent-gold);
+    color: var(--accent-yellow);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.summary-none {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dim);
+}
+
+/* 선택 보스탐 상세 2단 */
+.raid-detail-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.raid-detail-columns > .card-box {
+    min-width: 0;
+    height: 100%;
 }
 
 .item-section-header {
@@ -107,36 +136,39 @@
     margin-left: auto;
 }
 
-/* 드랍아이템 총 금액 (단위:아데나) 표시 */
 .slot-green-meta {
     font-size: 12px;
     font-weight: 800;
-    color: #4ade80;
+    color: var(--money-green);
     white-space: nowrap;
 }
 
-/* 혈비 20% 제외 분배: 두껍지 않은 약간 회색 */
 .slot-gray-note {
     font-size: 11.5px;
     font-weight: 400;
-    color: #9ca3af;
+    color: var(--text-muted);
     white-space: nowrap;
+    margin-left: 4px;
+}
+
+/* 드랍 아이템 목록 */
+.raid-detail-items {
+    display: flex;
+    flex-direction: column;
 }
 
 .item-list-wrap {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    margin-bottom: 10px;
 }
 
 .item-row-card {
-    background-color: #141414;
-    border: 1px solid #2e2e32;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-soft);
     border-radius: 8px;
     padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
 }
 
 .item-view-line {
@@ -150,108 +182,42 @@
 .item-badge-name {
     font-size: 13px;
     font-weight: 800;
-    color: #fbbf24;
+    color: var(--accent-yellow);
+}
+
+.item-status-tag {
+    margin-left: auto;
 }
 
 .item-matched-price {
     font-size: 12px;
     font-weight: 800;
-    color: #4ade80;
-    margin-left: auto;
+    color: var(--money-green);
+}
+
+.included-from {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 600;
 }
 
 .admin-item-add-row {
-    display: none;
+    display: flex;
     gap: 6px;
-    margin-top: 10px;
-}
-body.admin-mode .admin-item-add-row {
-    display: flex;
+    margin-top: auto;
+    padding-top: 10px;
 }
 
-.day-summary-split {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 4fr);
-}
-
-.day-summary-split .summary-mini-box {
-    padding: 6px 8px;
-}
-
-.summary-items-box {
-    text-align: left;
-}
-
-.summary-items-box .summary-mini-label {
-    text-align: left;
-}
-
-.summary-drop-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 3px;
-}
-
-.summary-drop-chip {
-    padding: 2px 7px;
-    border-radius: 5px;
-    background-color: rgba(245, 158, 11, 0.14);
-    border: 1px solid #f59e0b;
-    color: #fbbf24;
-    font-size: 11px;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.summary-none {
-    font-size: 12px;
-    font-weight: 700;
-    color: #71717a;
-}
-
-.excel-btn-group {
-    gap: 4px;
-}
-
-.btn-excel-sm {
-    background-color: #15803d;
-    color: #ffffff;
-    border: 1px solid #16a34a;
-    border-radius: 5px;
-    padding: 3px 7px;
-    font-size: 11px;
-    font-weight: bold;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.raid-detail-columns {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 12px;
-    align-items: start;
-}
-
-.raid-detail-columns > .card-box {
-    min-width: 0;
-    height: 100%;
-}
-
+/* 파티원 명단 */
 .party-list-stack {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-.party-row-item {
-    display: flex;
+.raid-detail-parties .party-row-item {
     align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
     padding: 8px 10px;
-    background: #141414;
-    border: 1px solid #2e2e32;
-    border-radius: 8px;
 }
 
 .party-member-stack {
@@ -272,31 +238,17 @@ body.admin-mode .admin-item-add-row {
 
 .party-person-row .party-leader-name,
 .party-person-row .party-member-name {
-    width: auto;
     flex: 1;
     min-width: 0;
-    padding: 0;
-    border: none;
-    background: none;
     overflow-wrap: anywhere;
     font-size: 13px;
     line-height: 1.4;
 }
 
-.party-leader-name {
-    color: #a7f3d0;
-    font-weight: 800;
-}
-
-.party-member-name {
-    color: #ffffff;
-    font-weight: 600;
-}
-
 .party-person-share {
     font-size: 11.5px;
     font-weight: 800;
-    color: #fbbf24;
+    color: var(--accent-yellow);
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -311,7 +263,7 @@ body.admin-mode .admin-item-add-row {
     justify-content: center;
     background-color: rgba(239, 68, 68, 0.15);
     color: #f87171;
-    border: 1px solid #ef4444;
+    border: 1px solid var(--accent-red);
     border-radius: 4px;
     font-size: 10px;
     font-weight: bold;
@@ -320,32 +272,14 @@ body.admin-mode .admin-item-add-row {
 }
 
 .admin-party-add {
-    display: none;
+    display: flex;
     flex-direction: column;
     gap: 6px;
     margin-top: 10px;
 }
-body.admin-mode .admin-party-add {
-    display: flex;
-}
-
-.raid-detail-items {
-    display: flex;
-    flex-direction: column;
-}
-
-.raid-detail-items .admin-item-add-row {
-    margin-top: auto;
-    padding-top: 10px;
-}
-
-.raid-detail-items .item-list-wrap {
-    margin-bottom: 10px;
-}
 
 @media (max-width: 640px) {
     .raid-detail-columns {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 6px;
     }
 
@@ -362,7 +296,7 @@ body.admin-mode .admin-party-add {
         font-size: 10.5px;
     }
 
-    .party-row-item {
+    .raid-detail-parties .party-row-item {
         padding: 6px 7px;
     }
 
