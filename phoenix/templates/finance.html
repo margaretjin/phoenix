@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>혈비 재정 관리 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="{{ asset('common.css') }}">
+    <link rel="stylesheet" href="{{ asset('finance.css') }}">
+</head>
+<body>
+    <nav class="navbar" id="appNavbar"></nav>
+
+    <main class="main-container">
+        <div class="top-bar">
+            <h1 class="page-title">🏦 혈비 재정 관리</h1>
+            <span id="autoStartLabel" class="count-label"></span>
+        </div>
+
+        <!-- 1. 요약 -->
+        <section class="card-box">
+            <div class="fin-kpi-grid">
+                <div class="kpi-box fin-kpi-main">
+                    <div class="kpi-label">혈비 잔액 (총금액)</div>
+                    <div id="kpiBalance" class="kpi-val">0</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-label">누적 수입</div>
+                    <div id="kpiIncome" class="kpi-val c-money">0</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-label">누적 지출</div>
+                    <div id="kpiExpense" class="kpi-val c-expense">0</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-label" id="kpiPeriodLabel">조회 기간 수입 / 지출</div>
+                    <div class="kpi-val fin-kpi-period"><span id="kpiPeriodIncome" class="c-money">0</span> / <span id="kpiPeriodExpense" class="c-expense">0</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 혈비 관리내역 (엑셀과 같은 형식: 연번 · 날짜 · 항목 · 수입 · 지출 · 비고) -->
+        <section class="card-box">
+            <div class="section-head">
+                <span class="section-label">📒 혈비 관리내역</span>
+            </div>
+
+            <div class="filter-grid fin-filter-grid">
+                <div class="filter-field">
+                    <label>기간</label>
+                    <select id="periodMode" class="input-common" onchange="onPeriodChange()">
+                        <option value="all">전체</option>
+                        <option value="month">월별</option>
+                    </select>
+                </div>
+                <div id="monthBox" class="filter-field hidden">
+                    <label>월 선택</label>
+                    <input type="month" id="periodMonth" class="input-common" onchange="renderLedger()">
+                </div>
+                <div class="filter-field">
+                    <label>항목</label>
+                    <select id="categoryFilter" class="input-common" onchange="renderLedger()"></select>
+                </div>
+                <div class="filter-field full-mobile">
+                    <label>검색 (항목 / 비고)</label>
+                    <input type="search" id="ledgerSearch" class="input-common" placeholder="예: 마돌, 맘보코트" oninput="renderLedger()">
+                </div>
+            </div>
+
+            <div class="fin-toolbar">
+                <button type="button" class="btn-sm btn-sm-blue admin-only" onclick="openAddModal()">+ 추가</button>
+                <label class="fin-check">
+                    <input type="checkbox" id="showAuto" checked onchange="renderLedger()"> 자동 기록 보기
+                </label>
+                <button type="button" id="sortToggleBtn" class="btn-sm btn-sm-dark btn-xs" onclick="toggleSort()">오래된순 ▲</button>
+            </div>
+
+            <div class="tbl-wrap">
+                <table class="tbl tbl-mcard fin-table">
+                    <thead>
+                        <tr>
+                            <th>연번</th>
+                            <th>날짜</th>
+                            <th>항목</th>
+                            <th>수입</th>
+                            <th>지출</th>
+                            <th>비고</th>
+                            <th class="admin-cell">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ledgerBody">
+                        <tr><td colspan="7" class="empty-party-msg">불러오는 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="fin-note">
+                🔄 <b>자동</b> 표시는 분배 기록에서 계산된 줄입니다:
+                <b>혈비</b> = 분배완료 아이템 판매가의 혈비율(혈분배일 기준),
+                <b>혈귀속</b> = 혈귀속으로 받은 분배금 · 분배금혈귀 아이템,
+                <b>분배금지급</b> = 지급일별 분배금 (판매대금에서 지급되므로 총금액에는 넣지 않음).
+            </p>
+        </section>
+
+        <!-- 3. 비품 재고 -->
+        <section class="card-box">
+            <div class="section-head">
+                <span class="section-label">📦 비품 재고</span>
+                <span class="c-muted fin-form-hint">계(재고) = 구입 + 입고 − 사용 · [내역]을 누르면 입출 내역이 열립니다</span>
+            </div>
+
+            <!-- 비품 기록 버튼 (관리자) -->
+            <div class="supply-toolbar admin-block">
+                <button type="button" class="btn-sm btn-sm-blue" onclick="openSupplyBuy()">🛒 비품 구입 (지출)</button>
+                <button type="button" class="btn-sm btn-sm-red" onclick="openSupplyMove('out')">📤 비품 사용 (출)</button>
+                <button type="button" class="btn-sm btn-sm-dark" onclick="openSupplyMove('in')">📥 입고 · 재고조정</button>
+                <span class="c-muted fin-form-hint">구입 = 혈비 지출 + 재고 증가 · 사용 = 재고만 감소</span>
+            </div>
+
+            <div class="tbl-wrap">
+                <table class="tbl supply-table">
+                    <thead>
+                        <tr>
+                            <th>비품</th>
+                            <th>입</th>
+                            <th>출</th>
+                            <th>계 (재고)</th>
+                            <th>최근 구입 단가</th>
+                            <th>최근 구입일</th>
+                            <th>내역</th>
+                        </tr>
+                    </thead>
+                    <tbody id="supplyBody"></tbody>
+                </table>
+            </div>
+
+            <div class="admin-block">
+                <div class="fin-sub-title">비품 추가</div>
+                <div class="inline-form">
+                    <input type="text" id="newSupplyName" class="input-common" placeholder="비품명 (예: 미스릴화살)">
+                    <input type="text" id="newSupplyUnit" class="input-common unit-input" placeholder="단위" value="개">
+                    <button type="button" class="btn-sm btn-sm-green" onclick="addSupply()">+ 비품 추가</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 항목 / 설정 (관리자) -->
+        <section class="card-box admin-block">
+            <span class="section-label">⚙️ 항목 · 자동 기록 설정</span>
+            <div class="fin-sub-title">항목 목록 <small class="c-muted">(✕ 로 삭제 · 기존 기록은 그대로)</small></div>
+            <div id="categoryChips" class="category-chips"></div>
+            <div class="inline-form">
+                <input type="text" id="newCatName" class="input-common" placeholder="새 항목명 (예: 미스릴화살구입)">
+                <select id="newCatKind" class="input-common">
+                    <option value="expense">지출</option>
+                    <option value="income">수입</option>
+                    <option value="none">기록만</option>
+                </select>
+                <select id="newCatSupply" class="input-common"></select>
+                <button type="button" class="btn-sm btn-sm-green" onclick="addCategory()">+ 항목 추가</button>
+            </div>
+
+            <div class="fin-sub-title">자동 기록 시작일 <small class="c-muted">(이 날짜부터 분배 기록을 장부에 자동 반영 · 구글 시트에서 옮긴 내역과 겹치지 않게)</small></div>
+            <div class="inline-form">
+                <input type="date" id="autoStartInput" class="input-common date-only">
+                <button type="button" class="btn-sm btn-sm-blue" onclick="saveAutoStart()">저장</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 팝업: 재정 기록 추가 -->
+    <div id="ledgerModal" class="modal hidden">
+        <div class="modal-box">
+            <div class="modal-head">
+                <span class="modal-title" id="ledgerModalTitle">✍️ 재정 기록 추가</span>
+                <button type="button" class="modal-close" data-close-modal>✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="fin-form-grid">
+                    <div class="filter-field">
+                        <label>날짜</label>
+                        <input type="date" id="fDate" class="input-common">
+                    </div>
+                    <div class="filter-field">
+                        <label>항목</label>
+                        <select id="fCategory" class="input-common" onchange="onFormCategoryChange()"></select>
+                    </div>
+                    <div class="filter-field">
+                        <label>구분</label>
+                        <select id="fKind" class="input-common">
+                            <option value="income">수입</option>
+                            <option value="expense">지출</option>
+                            <option value="none">기록만 (금액 없음)</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label>비품 (구입 시 재고 +)</label>
+                        <select id="fSupply" class="input-common"></select>
+                    </div>
+                    <div class="filter-field">
+                        <label>개당 가격</label>
+                        <input type="number" id="fUnitPrice" class="input-common" min="0" placeholder="예: 200" oninput="calcFormAmount()">
+                    </div>
+                    <div class="filter-field">
+                        <label>수량</label>
+                        <input type="number" id="fQty" class="input-common" min="0" placeholder="예: 5400" oninput="calcFormAmount()">
+                    </div>
+                    <div class="filter-field full-span">
+                        <label>금액 <small class="c-muted">(개당 가격 × 수량 자동 계산)</small></label>
+                        <input type="number" id="fAmount" class="input-common fin-amount-input" min="0" placeholder="0">
+                    </div>
+                    <div class="filter-field full-span">
+                        <label>비고</label>
+                        <input type="text" id="fMemo" class="input-common" placeholder="예: 트렌드한테 전달 받음"
+                               onkeydown="if(event.key==='Enter'){event.preventDefault();saveNewLedger();}">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="btn-sm btn-sm-dark btn-lg" data-close-modal>취소</button>
+                <button type="button" class="btn-sm btn-sm-blue btn-lg" onclick="saveNewLedger()">+ 추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 팝업: 비품 입출 내역 -->
+    <div id="supplyModal" class="modal hidden">
+        <div class="modal-box wide">
+            <div class="modal-head">
+                <span class="modal-title" id="supplyModalTitle">📦 비품 입출 내역</span>
+                <button type="button" class="modal-close" data-close-modal>✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="supplyModalSummary" class="supply-summary"></div>
+
+                <div class="admin-block supply-move-box">
+                    <div class="fin-sub-title">사용 · 입고 · 재고조정 기록</div>
+                    <div class="move-form-grid">
+                        <select id="mSupply" class="input-common" onchange="onMoveSupplyChange()"></select>
+                        <input type="date" id="mDate" class="input-common">
+                        <select id="mType" class="input-common" onchange="onMoveTypeChange()">
+                            <option value="out">사용 (출)</option>
+                            <option value="in">입고 (기부 등)</option>
+                            <option value="adjust">재고조정 (실제 수량)</option>
+                        </select>
+                        <input type="number" id="mQty" class="input-common" min="0" placeholder="수량">
+                        <input type="text" id="mMemo" class="input-common" placeholder="비고 (예: 공성 사용)"
+                               onkeydown="if(event.key==='Enter'){event.preventDefault();saveMove();}">
+                        <button type="button" class="btn-sm btn-sm-blue" onclick="saveMove()">기록</button>
+                    </div>
+                </div>
+
+                <div class="tbl-wrap supply-history-wrap">
+                    <table class="tbl supply-table">
+                        <thead>
+                            <tr><th>날짜</th><th>입</th><th>출</th><th>계</th><th>비고</th><th class="admin-cell">관리</th></tr>
+                        </thead>
+                        <tbody id="supplyHistoryBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ asset('common.js') }}"></script>
+    <script src="{{ asset('finance.js') }}"></script>
+</body>
+</html>

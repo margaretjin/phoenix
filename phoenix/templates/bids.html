@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>아이템 입찰 - 혈맹 보스탐 체크기</title>
+    <link rel="stylesheet" href="{{ asset('common.css') }}">
+    <link rel="stylesheet" href="{{ asset('bids.css') }}">
+</head>
+<body>
+    <nav class="navbar" id="appNavbar"></nav>
+
+    <main class="main-container">
+        <div class="top-bar">
+            <h1 class="page-title">🙋 아이템 입찰</h1>
+            <span id="bidCountLabel" class="count-label">진행 0건</span>
+        </div>
+
+        <div class="bid-rule-box">
+            <b>입찰 방식</b> · 아이템이 나온 보스탐 참여자(우선권자)가 먼저 <b>[🙋 입찰]</b> 할 수 있습니다.
+            우선권 시간 안에 우선권자 입찰이 없으면 관리자가 <b>전체 혈원 입찰</b>을 열어 줍니다.
+            마감 후 관리자가 <b>디스코드에서 룰렛</b>을 돌립니다.
+        </div>
+
+        <!-- 1. 입찰 등록 (관리자) -->
+        <section class="card-box admin-block">
+            <div class="section-head">
+                <span class="section-label">➕ 입찰 등록 (관리자)</span>
+                <div class="row-actions">
+                    <label class="inline-label" for="bidRaidMonth">드랍 월</label>
+                    <input type="month" id="bidRaidMonth" class="input-common month-input" onchange="loadRaidsForPicker()">
+                </div>
+            </div>
+
+            <div class="bid-form-grid">
+                <div class="filter-field full-row">
+                    <label>입찰할 아이템 (연합분배대기 · 피닉스 판매대기 아이템)</label>
+                    <select id="bidItemSelect" class="input-common" onchange="onBidItemChange()">
+                        <option value="">아이템을 선택하세요</option>
+                    </select>
+                </div>
+
+                <div id="bidItemInfo" class="bid-item-info full-row hidden"></div>
+
+                <div class="filter-field">
+                    <label>판매 가격</label>
+                    <input type="number" id="bidPrice" class="input-common" min="0" placeholder="내판가">
+                </div>
+                <div class="filter-field">
+                    <label>입찰 시작</label>
+                    <input type="datetime-local" id="bidStartAt" class="input-common" onchange="updatePriorityPreview()">
+                </div>
+                <div class="filter-field">
+                    <label>우선권 시간 (시작부터)</label>
+                    <div class="input-suffix">
+                        <input type="number" id="bidPriorityHours" class="input-common" min="0" step="1" value="12" oninput="updatePriorityPreview()">
+                        <span>시간</span>
+                    </div>
+                </div>
+                <div class="filter-field">
+                    <label>입찰 종료</label>
+                    <input type="datetime-local" id="bidEndAt" class="input-common" onchange="updatePriorityPreview()">
+                </div>
+                <div class="filter-field full-row">
+                    <label>비고</label>
+                    <input type="text" id="bidMemo" class="input-common" placeholder="(선택) 안내 문구">
+                </div>
+            </div>
+
+            <div class="bid-form-foot">
+                <span id="bidPriorityPreview" class="c-muted"></span>
+                <button type="button" class="btn-sm btn-sm-blue btn-lg" onclick="createBid()">입찰 등록</button>
+            </div>
+        </section>
+
+        <!-- 2. 입찰 목록 -->
+        <section class="card-box">
+            <div class="section-head">
+                <span class="section-label">📋 입찰 목록</span>
+                <div id="bidTabs" class="tab-bar">
+                    <button type="button" data-tab="open" class="tab-btn active" onclick="setBidTab('open')">진행중 (<span id="cntOpen">0</span>)</button>
+                    <button type="button" data-tab="closed" class="tab-btn" onclick="setBidTab('closed')">마감·확정대기 (<span id="cntClosed">0</span>)</button>
+                    <button type="button" data-tab="done" class="tab-btn" onclick="setBidTab('done')">구매확정 (<span id="cntDone">0</span>)</button>
+                    <button type="button" data-tab="all" class="tab-btn" onclick="setBidTab('all')">전체</button>
+                </div>
+            </div>
+
+            <div id="bidList" class="bid-list">
+                <div class="empty-party-msg">불러오는 중...</div>
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ asset('common.js') }}"></script>
+    <script src="{{ asset('bids.js') }}"></script>
+</body>
+</html>

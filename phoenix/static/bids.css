@@ -1,0 +1,318 @@
+/* =========================================================
+   [bids.css] 아이템 입찰(구매 신청) 페이지 전용 스타일
+   ========================================================= */
+
+.bid-rule-box {
+    background-color: rgba(37, 99, 235, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.45);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--text-soft);
+    line-height: 1.55;
+}
+
+.bid-rule-box b { color: #ffffff; }
+
+/* 등록 폼 */
+.inline-label {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.month-input {
+    width: 150px;
+    padding: 5px 8px;
+}
+
+.bid-form-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    align-items: end;
+}
+
+.bid-form-grid .full-row {
+    grid-column: 1 / -1;
+}
+
+.input-suffix {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.input-suffix .input-common {
+    flex: 1;
+    min-width: 0;
+}
+
+.input-suffix span {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.bid-item-info {
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 12.5px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bid-form-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    font-size: 12px;
+}
+
+/* 입찰 카드 */
+.bid-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bid-card {
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-soft);
+    border-left: 4px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 11px 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.bid-card.phase-priority { border-left-color: #3b82f6; }
+.bid-card.phase-all { border-left-color: var(--accent-green); }
+.bid-card.phase-priorityDone { border-left-color: #0ea5e9; }
+.bid-card.phase-waitOpen { border-left-color: var(--accent-gold); }
+.bid-card.phase-closed { border-left-color: #ec4899; }
+.bid-card.phase-cancel { opacity: 0.6; }
+
+.bid-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.bid-item-name {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: var(--accent-yellow);
+}
+
+.bid-price {
+    margin-left: auto;
+    font-size: 15px;
+    font-weight: 900;
+    color: var(--money-green);
+}
+
+.bid-price small {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.bid-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* 시작 → 우선권 마감 → 종료 */
+.bid-timeline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 11.5px;
+}
+
+.tl-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    background-color: var(--bg-chip);
+    border: 1px solid var(--border-strong);
+    color: var(--text-soft);
+    font-weight: 700;
+}
+
+.tl-step em {
+    font-style: normal;
+    color: var(--text-muted);
+    font-size: 10.5px;
+}
+
+.tl-step.active {
+    border-color: #3b82f6;
+    background-color: rgba(59, 130, 246, 0.18);
+    color: #ffffff;
+}
+
+.tl-remain {
+    color: var(--accent-yellow);
+    font-weight: 800;
+}
+
+.bid-section-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.member-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.member-chip {
+    padding: 2px 8px;
+    border-radius: 5px;
+    background-color: var(--bg-chip);
+    border: 1px solid var(--border-strong);
+    color: var(--text-soft);
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.member-chip.applied {
+    background-color: rgba(34, 197, 94, 0.18);
+    border-color: var(--accent-green);
+    color: var(--money-green);
+}
+
+.entry-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.entry-list li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    background-color: #18181b;
+}
+
+.entry-list li.winner {
+    background-color: rgba(34, 197, 94, 0.14);
+    border: 1px solid var(--accent-green);
+}
+
+.entry-no {
+    min-width: 18px;
+    color: var(--text-dim);
+    font-weight: 800;
+}
+
+.entry-name {
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.entry-time {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.entry-empty {
+    font-size: 12px;
+}
+
+.bid-my-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.bid-my-action:empty {
+    display: none;
+}
+
+.bid-apply-btn {
+    padding: 7px 16px;
+    font-size: 13px;
+}
+
+.my-note {
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+/* 관리자 영역 */
+.bid-admin {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-soft);
+}
+
+.open-all-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--accent-yellow);
+    cursor: pointer;
+}
+
+.open-all-check input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-gold);
+}
+
+.open-all-check small {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.open-all-check.disabled {
+    color: var(--text-dim);
+    cursor: not-allowed;
+}
+
+.winner-select {
+    min-width: 130px;
+}
+
+@media (max-width: 768px) {
+    .bid-form-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .month-input {
+        width: 130px;
+    }
+}

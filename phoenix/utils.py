@@ -1,7 +1,10 @@
-"""라우터 공통 헬퍼 (권한 체크 / 문자열 정리)"""
+"""라우터 공통 헬퍼 (권한 체크 / 문자열 정리 / 시간)"""
+import re
+from datetime import datetime, timedelta, timezone
 from typing import Iterable, List, Optional
 from fastapi import HTTPException
 
+KST = timezone(timedelta(hours=9))
 SUPER_ADMIN = "슈퍼관리자"
 ADMIN_ROLES = {SUPER_ADMIN, "관리자"}
 CLASSES = ["기사", "요정", "법사", "군주", "다크엘프"]
@@ -29,6 +32,28 @@ def split_csv(raw: Optional[str], limit: Optional[int] = None) -> List[str]:
 
 def join_csv(parts: Iterable[str]) -> str:
     return ", ".join(parts)
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def today_kst() -> str:
+    return datetime.now(KST).strftime("%Y-%m-%d")
+
+
+def parse_ts(value) -> Optional[datetime]:
+    """Supabase timestamptz 문자열 → aware datetime (시간대 없으면 KST 로 간주)"""
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        s = str(value).strip().replace(" ", "T").replace("Z", "+00:00")
+        # 소수점 이하 자릿수가 6자리가 아닌 경우 보정 (예: .12+00:00 → .120000+00:00)
+        s = re.sub(r"\.(\d+)", lambda m: "." + (m.group(1) + "000000")[:6], s, count=1)
+        dt = datetime.fromisoformat(s)
+    return dt if dt.tzinfo else dt.replace(tzinfo=KST)
 
 
 def first_or_404(res, detail: str = "데이터를 찾을 수 없습니다.") -> dict:

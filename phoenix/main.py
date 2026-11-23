@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from routers import auth_router, raid_router, admin_router, item_router, meta_router
+from routers import auth_router, raid_router, admin_router, item_router, meta_router, bid_router, finance_router
 
 app = FastAPI(title="혈맹 보스탐 체크기")
 app.add_middleware(GZipMiddleware, minimum_size=500)
@@ -39,7 +39,7 @@ def asset(filename: str) -> str:
 
 templates.env.globals["asset"] = asset
 
-for r in (auth_router, raid_router, admin_router, item_router, meta_router):
+for r in (auth_router, raid_router, admin_router, item_router, meta_router, bid_router, finance_router):
     app.include_router(r.router)
 
 # URL 경로 → 템플릿 파일
@@ -51,6 +51,8 @@ PAGES = {
     "/distribution": "distribution.html",
     "/my-history": "my_history.html",
     "/attendance": "attendance.html",
+    "/bids": "bids.html",
+    "/finance": "finance.html",
     "/admin": "admin.html",
     "/member-list": "member_list.html",
     "/item-manage": "item_manage.html",

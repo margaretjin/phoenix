@@ -1,0 +1,353 @@
+/* =========================================================
+   [finance.css] 혈비 재정 관리 페이지 전용 스타일
+   ========================================================= */
+
+.c-expense { color: #f87171; font-weight: 700; }
+
+/* 요약 */
+.fin-kpi-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 1.3fr;
+    gap: 8px;
+}
+
+.fin-kpi-main {
+    border-color: var(--accent-gold);
+    background-color: rgba(245, 158, 11, 0.08);
+}
+
+.fin-kpi-main .kpi-val {
+    font-size: 18px;
+    color: #ffffff;
+}
+
+.fin-kpi-period {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+/* 입력 폼 */
+.fin-form-hint {
+    font-size: 11.5px;
+}
+
+.fin-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.fin-form-grid .full-span {
+    grid-column: 1 / -1;
+}
+
+.fin-amount-input {
+    font-weight: 800;
+    color: var(--accent-yellow);
+}
+
+/* 장부 필터 */
+.fin-filter-grid {
+    grid-template-columns: 110px 150px 170px 1fr;
+}
+
+/* 검색 아래 [+ 추가] · 자동 기록 보기 · 정렬 */
+.fin-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0 10px;
+}
+
+.fin-toolbar #sortToggleBtn {
+    margin-left: auto;
+}
+
+.fin-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-soft);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.fin-check input {
+    accent-color: var(--accent-gold);
+}
+
+/* 장부 표 */
+.fin-table td {
+    padding: 7px 6px;
+}
+
+.fin-table .cat-cell {
+    font-weight: 800;
+    color: var(--text-light);
+}
+
+.fin-table .memo-cell,
+.supply-table .memo-cell {
+    text-align: left;
+    white-space: normal;
+    min-width: 220px;
+    font-size: 12px;
+    color: var(--text-soft);
+}
+
+.fin-table tr.auto-row td {
+    background-color: rgba(56, 189, 248, 0.05);
+}
+
+.fin-table tr.is-editing td {
+    background-color: rgba(37, 99, 235, 0.12);
+}
+
+/* 엑셀 2행처럼 표 맨 위 합계줄 */
+.fin-table tr.sum-row td {
+    background-color: rgba(245, 158, 11, 0.1);
+    border-bottom: 2px solid rgba(245, 158, 11, 0.45);
+    font-weight: 900;
+    font-size: 13px;
+}
+
+.fin-table .sum-label {
+    color: var(--accent-yellow);
+}
+
+.fin-table .sum-net {
+    text-align: left;
+    color: var(--text-soft);
+}
+
+.fin-table .sum-net b {
+    color: #ffffff;
+    font-size: 14px;
+    margin-left: 4px;
+}
+
+/* 행 안에서 수정 */
+.edit-date { width: 118px; }
+.edit-cat { width: 130px; }
+.edit-money { width: 96px; text-align: right; font-weight: 800; }
+.edit-memo { width: 100%; }
+.edit-small { width: 70px; text-align: right; }
+.edit-supply { width: 96px; }
+
+.edit-qty-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.info-amount {
+    text-decoration: line-through dotted;
+}
+
+.qty-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background-color: var(--bg-chip);
+    border: 1px solid var(--border-strong);
+    color: var(--accent-yellow);
+    font-size: 11px;
+    font-weight: 800;
+    margin-right: 4px;
+}
+
+.memo-cell details summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.memo-cell details summary::after {
+    content: ' ▾ 상세';
+    color: var(--accent-sky);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.memo-cell details[open] summary::after {
+    content: ' ▴ 접기';
+}
+
+.auto-detail {
+    margin: 5px 0 0 16px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.fin-note {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.55;
+}
+
+.fin-note b {
+    color: var(--text-soft);
+}
+
+/* 비품 내역 팝업 */
+.supply-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 9px 12px;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+
+.supply-summary b {
+    font-size: 14px;
+}
+
+.supply-move-box {
+    margin-top: 4px;
+}
+
+.supply-history-wrap {
+    margin-top: 12px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.fin-sub-title {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--accent-yellow);
+    margin: 12px 0 6px;
+}
+
+.fin-sub-title small {
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.move-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.1fr 0.8fr 1.5fr auto;
+    gap: 6px;
+}
+
+.supply-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.inline-form {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.inline-form .input-common {
+    width: auto;
+    flex: 1 1 140px;
+}
+
+.inline-form .unit-input {
+    flex: 0 0 70px;
+}
+
+.inline-form .date-only {
+    flex: 0 0 170px;
+}
+
+/* 항목 칩 */
+.category-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 8px;
+}
+
+.category-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+}
+
+.chip-x {
+    background: none;
+    border: none;
+    color: inherit;
+    opacity: 0.7;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 0 0 0 2px;
+}
+
+.chip-x:hover {
+    opacity: 1;
+}
+
+@media (max-width: 640px) {
+    .fin-table.tbl-mcard .memo-cell {
+        min-width: 0;
+        color: var(--text-muted);
+    }
+
+    .fin-table.tbl-mcard tr.auto-row td {
+        background-color: transparent;
+    }
+
+    .fin-table.tbl-mcard tr.auto-row {
+        border-color: rgba(56, 189, 248, 0.45);
+    }
+
+    .fin-table.tbl-mcard tr.sum-row {
+        background-color: rgba(245, 158, 11, 0.1);
+        border-color: rgba(245, 158, 11, 0.45);
+    }
+
+    .fin-table.tbl-mcard tr.sum-row td,
+    .fin-table.tbl-mcard tr.is-editing td {
+        background-color: transparent;
+        border: none;
+    }
+
+    .fin-table.tbl-mcard tr.is-editing {
+        border-color: #3b82f6;
+    }
+
+    .fin-table.tbl-mcard tr.is-editing td.memo-cell {
+        display: block;
+    }
+
+    .fin-table.tbl-mcard .edit-date,
+    .fin-table.tbl-mcard .edit-cat,
+    .fin-table.tbl-mcard .edit-money {
+        width: 60%;
+    }
+}
+
+@media (max-width: 768px) {
+    .fin-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .fin-kpi-main,
+    .fin-kpi-grid > .kpi-box:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .move-form-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}

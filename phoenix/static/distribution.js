@@ -98,76 +98,7 @@ async function loadAllRaidsForDistribution() {
 }
 
 function buildCheckedEntries() {
-    checkedEntries = [];
-    const { bonusMap, sourceMap } = ClanApp.buildCastleTaxMaps(allRaids);
-    const todayStr = ClanApp.today();
-
-    allRaids.forEach(r => {
-        const details = ClanApp.extractItemDetails(r);
-        const participants = ClanApp.extractParticipants(r);
-
-        details.forEach((item, idx) => {
-            const entryKey = `${r.id}_${idx}`;
-            const isCastleTax = ClanApp.isCastleTaxItem(item.name);
-            // 성세금포함 금액이 합산된 성세금 아이템은 체크하지 않아도 분배관리에 표시(공성 참여자 대상)
-            const bonusInfo = isCastleTax ? bonusMap[entryKey] : null;
-            const hasIncludedBonus = Boolean(bonusInfo && bonusInfo.includedItems.length > 0);
-            const isIncludedType = item.sale_type === '성세금포함';
-            if (!item.dist_checked && !hasIncludedBonus && !isIncludedType) return;
-
-            // 합산 대상 성세금 아이템이 없으면 → 성세금포함 아이템을 공성 참여자 대상 일반 항목처럼 분배
-            const isCastleTaxIncluded = isIncludedType && Boolean((sourceMap[entryKey] || {}).target_key);
-            // 성세금포함 아이템의 분배 대상은 드랍탐이 아니라 해당 일자 공성 참여자
-            const siegeParticipants = isIncludedType
-                ? ClanApp.extractParticipants(ClanApp.findSiegeRaid(allRaids, sourceMap, r, idx, item))
-                : null;
-            const effParticipants = siegeParticipants || participants;
-            const effCount = effParticipants.length;
-
-            // 혈분배일 미지정 성세금(합산분 있음)은 오늘 날짜를 혈분배일로 간주
-            const distDate = (item.dist_date || '').trim() || (hasIncludedBonus ? todayStr : '');
-            const hasDistDate = Boolean(distDate);
-            const doneMemberCount = (hasDistDate && !isCastleTaxIncluded)
-                ? ClanApp.countDistDone(r, idx, distDate, effParticipants).done
-                : 0;
-
-            const isFullyDone = isCastleTaxIncluded || (hasDistDate && effCount > 0 && doneMemberCount === effCount);
-            const itemState = isCastleTaxIncluded ? 'done' : (!hasDistDate ? 'wait' : (isFullyDone ? 'done' : 'progress'));
-
-            const basePrice = Number(item.price || 0);
-            const bonusPrice = bonusInfo ? bonusInfo.bonusPrice : 0;
-            const price = basePrice + bonusPrice;
-            const netPool = isCastleTaxIncluded ? 0 : ClanApp.netOf(price);
-            const infoNet = isCastleTaxIncluded ? ClanApp.netOf(price) : 0;
-
-            checkedEntries.push({
-                key: entryKey,
-                raid_id: r.id,
-                item_idx: idx,
-                raid_date: r.raid_date,
-                raid_time: r.raid_time,
-                name: item.name,
-                is_castle_tax_included: isCastleTaxIncluded,
-                castle_tax_date: item.castle_tax_date || '',
-                target_key: isCastleTaxIncluded ? sourceMap[entryKey].target_key : '',
-                base_price: basePrice,
-                bonus_price: bonusPrice,
-                included_items: bonusInfo ? bonusInfo.includedItems : [],
-                price,
-                net_pool: netPool,
-                info_net: infoNet,
-                info_share: (isCastleTaxIncluded && effCount > 0) ? Math.floor(infoNet / effCount) : 0,
-                per_share: (!isCastleTaxIncluded && effCount > 0 && netPool > 0) ? Math.floor(netPool / effCount) : 0,
-                dist_date: distDate,
-                item_state: itemState,
-                is_done: isFullyDone,
-                done_count: doneMemberCount,
-                participants: effParticipants,
-                raid_ref: r,
-                full_details_ref: details
-            });
-        });
-    });
+    checkedEntries = ClanApp.buildDistEntries(allRaids);
 }
 
 function getPeriodFilteredEntries() {

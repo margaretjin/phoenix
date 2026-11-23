@@ -73,7 +73,9 @@ window.ClanApp = {
             { href: '/item-status', label: '템보유현황' },
             { href: '/distribution', label: '분배관리' },
             { href: '/my-history', label: '참여내역' },
-            { href: '/attendance', label: '참여도' }
+            { href: '/attendance', label: '참여도' },
+            { href: '/bids', label: '입찰' },
+            { href: '/finance', label: '재정' }
         ];
 
         const adminTabs = [];
@@ -672,6 +674,80 @@ window.ClanApp = {
         return siegeRaid || null;
     },
 
+    // 분배관리 대상 아이템 목록 (분배관리 · 재정 페이지 공용)
+    // 체크된 아이템 + 성세금포함 합산분이 있는 성세금 + 성세금포함 아이템
+    buildDistEntries(allRaids = []) {
+        const entries = [];
+        const { bonusMap, sourceMap } = this.buildCastleTaxMaps(allRaids);
+        const todayStr = this.today();
+
+        allRaids.forEach(r => {
+            const details = this.extractItemDetails(r);
+            const participants = this.extractParticipants(r);
+
+            details.forEach((item, idx) => {
+                const entryKey = `${r.id}_${idx}`;
+                const bonusInfo = this.isCastleTaxItem(item.name) ? bonusMap[entryKey] : null;
+                const hasIncludedBonus = Boolean(bonusInfo && bonusInfo.includedItems.length > 0);
+                const isIncludedType = item.sale_type === '성세금포함';
+                if (!item.dist_checked && !hasIncludedBonus && !isIncludedType) return;
+
+                // 합산 대상 성세금 아이템이 없으면 → 성세금포함 아이템을 공성 참여자 대상 일반 항목처럼 분배
+                const isCastleTaxIncluded = isIncludedType && Boolean((sourceMap[entryKey] || {}).target_key);
+                // 성세금포함 아이템의 분배 대상은 드랍탐이 아니라 해당 일자 공성 참여자
+                const siegeParticipants = isIncludedType
+                    ? this.extractParticipants(this.findSiegeRaid(allRaids, sourceMap, r, idx, item))
+                    : null;
+                const effParticipants = siegeParticipants || participants;
+                const effCount = effParticipants.length;
+
+                // 혈분배일 미지정 성세금(합산분 있음)은 오늘 날짜를 혈분배일로 간주
+                const distDate = (item.dist_date || '').trim() || (hasIncludedBonus ? todayStr : '');
+                const hasDistDate = Boolean(distDate);
+                const doneMemberCount = (hasDistDate && !isCastleTaxIncluded)
+                    ? this.countDistDone(r, idx, distDate, effParticipants).done
+                    : 0;
+
+                const isFullyDone = isCastleTaxIncluded || (hasDistDate && effCount > 0 && doneMemberCount === effCount);
+                const itemState = isCastleTaxIncluded ? 'done' : (!hasDistDate ? 'wait' : (isFullyDone ? 'done' : 'progress'));
+
+                const basePrice = Number(item.price || 0);
+                const bonusPrice = bonusInfo ? bonusInfo.bonusPrice : 0;
+                const price = basePrice + bonusPrice;
+                const netPool = isCastleTaxIncluded ? 0 : this.netOf(price);
+                const infoNet = isCastleTaxIncluded ? this.netOf(price) : 0;
+
+                entries.push({
+                    key: entryKey,
+                    raid_id: r.id,
+                    item_idx: idx,
+                    raid_date: r.raid_date,
+                    raid_time: r.raid_time,
+                    name: item.name,
+                    is_castle_tax_included: isCastleTaxIncluded,
+                    castle_tax_date: item.castle_tax_date || '',
+                    target_key: isCastleTaxIncluded ? sourceMap[entryKey].target_key : '',
+                    base_price: basePrice,
+                    bonus_price: bonusPrice,
+                    included_items: bonusInfo ? bonusInfo.includedItems : [],
+                    price,
+                    net_pool: netPool,
+                    info_net: infoNet,
+                    info_share: (isCastleTaxIncluded && effCount > 0) ? Math.floor(infoNet / effCount) : 0,
+                    per_share: (!isCastleTaxIncluded && effCount > 0 && netPool > 0) ? Math.floor(netPool / effCount) : 0,
+                    dist_date: distDate,
+                    item_state: itemState,
+                    is_done: isFullyDone,
+                    done_count: doneMemberCount,
+                    participants: effParticipants,
+                    raid_ref: r,
+                    full_details_ref: details
+                });
+            });
+        });
+        return entries;
+    },
+
     // 참여자 1명의 분배 정보 (혈분배일 키 → 아이템 키 → 구버전 키 순서)
     getDistInfo(raid, itemIdx, itemDistDate, memberId, defaultProxy = memberId) {
         const distMap = (raid && raid.distributions) || {};
@@ -795,6 +871,25 @@ window.ClanApp = {
     },
 
     // =====================================================
+    // 팝업창 (모달): .modal 바깥 클릭 · ESC · [data-close-modal] 버튼으로 닫힘
+    // =====================================================
+    modal: {
+        open(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.remove('hidden');
+            document.body.classList.add('modal-open');
+            const first = el.querySelector('input:not([type=hidden]):not([disabled]), select, textarea');
+            if (first) setTimeout(() => first.focus(), 30);
+        },
+        close(id) {
+            const el = id ? document.getElementById(id) : null;
+            (el ? [el] : document.querySelectorAll('.modal:not(.hidden)')).forEach(m => m.classList.add('hidden'));
+            if (!document.querySelector('.modal:not(.hidden)')) document.body.classList.remove('modal-open');
+        }
+    },
+
+    // =====================================================
     // 엑셀(CSV) 다운로드
     // =====================================================
     downloadExcel({ date = '', month = '', start = '', end = '' } = {}) {
@@ -822,6 +917,17 @@ window.ClanApp = {
 
 // document.getElementById 단축
 window.$id = (id) => document.getElementById(id);
+
+// 팝업창: 배경 클릭 / 닫기 버튼 / ESC
+document.addEventListener('click', (e) => {
+    if (!(e.target instanceof Element)) return;
+    if (e.target.classList.contains('modal')) ClanApp.modal.close(e.target.id);
+    const closer = e.target.closest('[data-close-modal]');
+    if (closer) ClanApp.modal.close(closer.closest('.modal').id);
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.querySelector('.modal:not(.hidden)')) ClanApp.modal.close();
+});
 
 // 자동완성 박스 바깥을 누르거나, 화면/표를 스크롤하면 닫기 (목록 자체 스크롤은 제외)
 const closeAllSuggest = () => document.querySelectorAll('.suggest-list:not(.hidden)').forEach(el => ClanApp.suggest.close(el));

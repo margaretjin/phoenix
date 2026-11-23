@@ -166,7 +166,6 @@ async function loadItemStatusData() {
     else if (mode === 'today' || mode === 'custom_date') params = { date: dateVal };
 
     const raids = await ClanApp.fetchRaids(params);
-    const todayStr = ClanApp.today();
 
     flattenedItems = [];
     raids.forEach(r => {
@@ -210,7 +209,6 @@ async function loadItemStatusData() {
                 event_item: Boolean(item.event_item),
                 winner: (item.winner || '').trim(),
                 taken_date: item.taken_date || '',
-                default_taken_date: item.taken_date || todayStr,
                 dist_date: distDate,
                 dist_checked: isChecked,
                 full_details_ref: details,
@@ -320,7 +318,7 @@ function editRowHtml(row, i) {
                 </div>
             </td>
             <td>
-                <input type="date" id="stTaken_${i}" class="tbl-input tbl-date-input" value="${row.default_taken_date}" onchange="onLiveRowInput(${i})">
+                <input type="date" id="stTaken_${i}" class="tbl-input tbl-date-input" value="${row.taken_date}" title="아이템을 건넨 날짜를 직접 지정" onchange="onLiveRowInput(${i})">
             </td>
             <td>${checkCellHtml(row, i)}</td>
             <td>${row.dist_date ? `<span class="txt-date">${ClanApp.toShortDate(row.dist_date)}</span>` : '-'}</td>
@@ -548,7 +546,7 @@ async function onDistCheckToggle(i) {
         alliance: cur.alliance,
         price: cur.price,
         winner: cur.winner,
-        taken_date: takenEl ? takenEl.value : (target.taken_date || (cur.winner ? ClanApp.today() : '')),
+        taken_date: takenEl ? takenEl.value : (target.taken_date || ''),
         dist_date: distChecked ? (target.dist_date || '') : '',
         dist_checked: distChecked,
         castle_tax_date: cur.saleType === '성세금포함' ? cur.castle_tax_date : ''
@@ -568,7 +566,8 @@ async function saveItemRow(i, forcedWinner = null) {
     const isCastleTax = ClanApp.isCastleTaxItem(target.name);
     const canDist = canDistFor(cur, winner, target.name);
     const chkEl = $id(`stDistChk_${i}`);
-    const takenDate = winner ? (cur.taken_date || target.taken_date || ClanApp.today()) : '';
+    // 수령완료일은 아이템을 건넨 사람이 직접 지정 (수령자 저장과 별개)
+    const takenDate = winner ? (cur.taken_date || '') : '';
     const winnerAllowed = !(cur.alliance === '' && !isCastleTax && !(target.clan_owned || target.event_item));
 
     await postItemDetails(target, {
