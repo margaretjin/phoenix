@@ -90,7 +90,7 @@ function distBadgeHtml(state, label, id = '') {
     return ClanApp.badge(label, distToneOf(state, label), '', id);
 }
 
-// 수령자 배지: 혈원 명단(본캐·보조캐)에 있으면 민트 배지, 없으면 '외판' 배지
+// 수령자 배지: 혈원 명단(본캐·보조캐)에 있으면 밝은 회색 배지, 없으면 '외판' 배지
 function winnerMatch(name) {
     const n = String(name || '').trim();
     if (!n) return null;
@@ -103,7 +103,7 @@ function winnerBadgeHtml(name, emptyText = '-') {
     if (!m) return emptyText;
     if (m.inRoster) {
         const sub = m.main && m.main !== m.name ? ` <small>(본캐 ${ClanApp.escapeHtml(m.main)})</small>` : '';
-        return `<span class="badge badge-mint winner-badge" title="혈원 명단">✔ ${ClanApp.escapeHtml(m.name)}${sub}</span>`;
+        return `<span class="badge badge-light winner-badge" title="혈원 명단">${ClanApp.escapeHtml(m.name)}${sub}</span>`;
     }
     return `<span class="badge badge-green winner-badge" title="혈원 명단에 없는 이름">${ClanApp.escapeHtml(m.name)} · 외판</span>`;
 }
