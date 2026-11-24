@@ -136,6 +136,14 @@ def create_bid(req: BidCreateRequest):
     if dup.data:
         raise HTTPException(status_code=400, detail="이미 진행 중인 입찰이 있는 아이템입니다.")
 
+    # 입찰 등록 = 피닉스가 파는 아이템 → 연합분배대기였다면 피닉스(구분대기)로
+    item = details[req.item_idx]
+    if not (item.get("alliance") or "").strip() and (item.get("sale_type") or "보유중") == "보유중":
+        details[req.item_idx] = normalize_detail({**item, "alliance": "피닉스", "sale_type": "보유중"})
+        supabase.table("raid_logs").update({
+            "item_details": details, "dropped_items": dropped_text_of(details)
+        }).eq("id", req.raid_id).execute()
+
     res = supabase.table("item_bids").insert({
         "raid_id": req.raid_id,
         "item_idx": req.item_idx,
@@ -228,10 +236,12 @@ def confirm_bid(bid_id: int, req: BidConfirmRequest):
     if idx >= len(details) or details[idx].get("name") != bid["item_name"]:
         raise HTTPException(status_code=400, detail="보스탐 기록의 아이템 순서가 바뀌어 자동 반영할 수 없습니다. 템보유현황에서 직접 입력해 주세요.")
 
+    # 성세금포함 아이템은 구분을 그대로 두고 수령자 · 가격만 반영
+    keep_castle = (details[idx].get("sale_type") == "성세금포함")
     details[idx] = normalize_detail({
         **details[idx],
         "alliance": "피닉스",
-        "sale_type": "내판",
+        "sale_type": "성세금포함" if keep_castle else "내판",
         "winner": winner,
         "price": int(bid.get("price") or 0)
         # 수령완료일(taken_date)은 아이템을 건넨 사람이 템보유현황에서 직접 지정

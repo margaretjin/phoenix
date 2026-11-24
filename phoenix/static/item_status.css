@@ -115,3 +115,24 @@ body.admin-mode .item-status-table td {
         font-size: 11px;
     }
 }
+
+/* 수정 모드 관리칸: [저장][취소][삭제] 아래 같은 너비의 [초기화] */
+.row-actions-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+}
+
+.btn-row-reset {
+    width: 100%;
+    padding: 4px 6px;
+    border-radius: 5px;
+    border: 1px solid #f59e0b;
+    background-color: rgba(245, 158, 11, 0.14);
+    color: #fbbf24;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+}

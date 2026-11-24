@@ -9,6 +9,7 @@ const RECEIVE_DONE_HOLD = ['이벤트', '분배금혈귀'];
 let flattenedItems = [];
 let visibleRows = [];          // 현재 화면에 그려진 행 (인덱스 i 기준)
 let editingItemKeys = new Set();
+let activeBidKeys = new Set();  // 입찰 진행 중인 아이템 (`${raid_id}_${item_idx}`)
 
 window.onload = async () => {
     const user = ClanApp.initPage('/item-status', () => {
@@ -183,7 +184,8 @@ async function loadItemStatusData() {
     else if (mode === 'week') params = ClanApp.getWeekRange(dateVal);
     else if (mode === 'today' || mode === 'custom_date') params = { date: dateVal };
 
-    const raids = await ClanApp.fetchRaids(params);
+    const [raids, bidData] = await Promise.all([ClanApp.fetchRaids(params), ClanApp.getJSON('/api/bids?status=진행', null)]);
+    activeBidKeys = new Set(((bidData && bidData.bids) || []).map(b => `${b.raid_id}_${b.item_idx}`));
 
     flattenedItems = [];
     raids.forEach(r => {
@@ -219,8 +221,9 @@ async function loadItemStatusData() {
                 hold_state: holdState,
                 alliance,
                 castle_tax_date: castleTaxDate,
-                dist_state: distInfo.state,
-                dist_label: distInfo.label,
+                // 입찰 진행 중이면 분배상태 = 입찰진행중
+                dist_state: activeBidKeys.has(`${r.id}_${idx}`) ? '입찰진행중' : distInfo.state,
+                dist_label: activeBidKeys.has(`${r.id}_${idx}`) ? '입찰진행중' : distInfo.label,
                 price: Number(item.price || 0),
                 policy_price: Number(ClanApp.priceMap[item.name] || 0),
                 clan_owned: Boolean(item.clan_owned),
@@ -342,10 +345,13 @@ function editRowHtml(row, i) {
             <td>${checkCellHtml(row, i)}</td>
             <td>${row.dist_date ? `<span class="txt-date">${ClanApp.toShortDate(row.dist_date)}</span>` : '-'}</td>
             <td>
-                <div class="row-actions">
-                    <button type="button" class="btn-sm btn-sm-green btn-xs" onclick="saveItemRow(${i})">저장</button>
-                    <button type="button" class="btn-sm btn-sm-dark btn-xs" onclick="cancelEditItemRow(${i})">취소</button>
-                    ${superDelete}
+                <div class="row-actions-stack">
+                    <div class="row-actions">
+                        <button type="button" class="btn-sm btn-sm-green btn-xs" onclick="saveItemRow(${i})">저장</button>
+                        <button type="button" class="btn-sm btn-sm-dark btn-xs" onclick="cancelEditItemRow(${i})">취소</button>
+                        ${superDelete}
+                    </div>
+                    <button type="button" class="btn-row-reset" onclick="resetItemRow(${i})">초기화</button>
                 </div>
             </td>
         </tr>
@@ -618,6 +624,25 @@ async function saveItemRow(i, forcedWinner = null) {
         dist_checked: canDist ? (chkEl ? chkEl.checked : Boolean(target.dist_checked)) : false,
         castle_tax_date: cur.saleType === '성세금포함' ? cur.castle_tax_date : ''
     }, '저장 실패');
+}
+
+// 잘못 입력한 항목을 처음(드랍 직후) 상태로 되돌림: 연합분배대기 · 수령자/날짜/체크 없음 · 내판가
+async function resetItemRow(i) {
+    if (!ClanApp.isAdminModeOn) return;
+    const target = visibleRows[i];
+    if (!target) return;
+    if (!confirm(`[${ClanApp.getItemAlias(target.name)}] 입력 내용을 모두 지우고 처음 상태로 되돌리시겠습니까?\n(보유상태 · 판매가격 · 수령자 · 수령완료일 · 분배 체크 · 혈분배일 초기화)`)) return;
+    await postItemDetails(target, {
+        name: target.name,
+        sale_type: '보유중',
+        alliance: '',
+        price: Number(target.policy_price || 0),
+        winner: '',
+        taken_date: '',
+        dist_date: '',
+        dist_checked: false,
+        castle_tax_date: ''
+    }, '초기화 실패');
 }
 
 async function deleteItemRow(i) {

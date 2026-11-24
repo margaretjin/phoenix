@@ -662,6 +662,7 @@ body.admin-mode .user-block {
 .badge-rose   { color: #fb7185; background-color: rgba(244, 63, 94, 0.18); border-color: #f43f5e; }
 .badge-gray   { color: #9ca3af; background-color: var(--bg-chip); border-color: #52525b; }
 .badge-mint   { color: #a7f3d0; background-color: rgba(167, 243, 208, 0.15); border-color: #6ee7b7; }
+.badge-orange { color: #fb923c; background-color: rgba(249, 115, 22, 0.16); border-color: #f97316; }
 .badge-light  { color: #e4e4e7; background-color: rgba(228, 228, 231, 0.08); border-color: #a1a1aa; }
 
 /* 12. 아이디 자동완성 드롭다운 (수령자 / 수령 아이디 공통) */

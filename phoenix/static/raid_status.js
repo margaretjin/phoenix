@@ -20,7 +20,6 @@ window.onload = async () => {
     updateDateDisplay();
 
     await ClanApp.loadMeta();
-    $id('taxLabel').textContent = `혈비 ${ClanApp.taxRate}%`;
     await loadDateRaids();
 };
 
@@ -122,12 +121,6 @@ function renderTimeGrid() {
     }).join('');
 }
 
-function getEffectiveItemPrice(item) {
-    if (item.sale_type === '이벤트') return 0;
-    const saved = Number(item.price || 0);
-    return saved > 0 ? saved : Number(ClanApp.priceMap[item.name] || 0);
-}
-
 // 일별현황 아이템 구분 배지 (템보유현황과 동일한 색상)
 function getItemStatusBadge(item, rec, itemIdx) {
     const winner = (item.winner || '').trim();
@@ -156,21 +149,6 @@ function renderSlotDetails() {
     const pCount = ClanApp.extractParticipants(rec).length;
     $id('slotParticipantCount').textContent = `총 ${parties.length}파티 (${pCount}명)`;
 
-    // 분배대기(보유중)는 금액 미표시·합계 제외, 분배금은 내판/외판 판매대금에서만 계산
-    const includedTotal = rec
-        ? Object.keys(castleBonusMap).filter(k => k.startsWith(`${rec.id}_`)).reduce((acc, k) => acc + castleBonusMap[k].bonusPrice, 0)
-        : 0;
-    const totalItemPrice = editableItems.reduce((acc, it) => acc + (it.sale_type === '보유중' ? 0 : getEffectiveItemPrice(it)), 0) + includedTotal;
-    const distributablePrice = editableItems.reduce((acc, it, i) => {
-        if (it.sale_type !== '내판' && it.sale_type !== '외판') return acc;
-        const bonus = ClanApp.isCastleTaxItem(it.name) ? bonusOf(rec, i) : null;
-        return acc + getEffectiveItemPrice(it) + (bonus ? bonus.bonusPrice : 0);
-    }, 0);
-    const netPool = ClanApp.netOf(distributablePrice);
-    const perMemberShare = (pCount > 0 && netPool > 0) ? Math.floor(netPool / pCount) : 0;
-
-    $id('slotItemTotalBadge').textContent = `총 ${totalItemPrice.toLocaleString()} (단위:아데나)`;
-
     const partyContainer = $id('slotPartyList');
     if (parties.length === 0) {
         partyContainer.innerHTML = `<div class="empty-party-msg">해당 보스탐에 등록된 파티 기록이 없습니다.</div>`;
@@ -178,13 +156,12 @@ function renderSlotDetails() {
         partyContainer.innerHTML = parties.map(p => {
             const names = [{ id: p.leader, isLeader: true }]
                 .concat(ClanApp.uniqueMembers(p.leader, p.members).map(m => ({ id: m, isLeader: false })));
-            const rows = names.map(n => `
-                <div class="party-person-row">
+            const chips = names.map(n => `
+                <span class="party-person">
                     <span class="${n.isLeader ? 'party-leader-name' : 'party-member-name'}">${ClanApp.escapeHtml(n.id)}</span>
-                    <span class="party-person-share">${perMemberShare.toLocaleString()}</span>
                     ${ClanApp.isAdminModeOn ? `<button type="button" class="btn-person-del" title="삭제" onclick="deleteMember(${ClanApp.jsArg(n.id)})">✕</button>` : ''}
-                </div>`).join('');
-            return `<div class="party-row-item"><div class="party-member-stack">${rows}</div></div>`;
+                </span>`).join('');
+            return `<div class="party-row-item"><div class="party-inline-flow">${chips}</div></div>`;
         }).join('');
     }
 
@@ -207,7 +184,6 @@ function renderItemDetailsSection(rec) {
         return;
     }
 
-    const priceSpan = (v) => `<span class="item-matched-price">${Number(v).toLocaleString()}</span>`;
     itemContainer.innerHTML = editableItems.map((item, idx) => {
         const delBtn = ClanApp.isAdminModeOn
             ? `<button type="button" class="btn-sm btn-sm-red btn-tiny" onclick="removeDropItemRow(${idx})">삭제</button>`
@@ -219,7 +195,6 @@ function renderItemDetailsSection(rec) {
                     <span class="item-badge-name">↳ 🎁 ${ClanApp.itemNameHtml(inc.name)}
                         <span class="included-from">(${inc.raid_date.slice(2)} ${ClanApp.escapeHtml(inc.raid_time)} 획득)</span></span>
                     ${ClanApp.badge('성세금포함', 'indigo', 'badge-sm item-status-tag')}
-                    ${inc.price > 0 ? priceSpan(inc.price) : ''}
                 </div>
             </div>`).join('') : '';
 
@@ -228,7 +203,6 @@ function renderItemDetailsSection(rec) {
                 <div class="item-view-line">
                     <span class="item-badge-name">🎁 ${ClanApp.itemNameHtml(item.name)}</span>
                     ${getItemStatusBadge(item, rec, idx)}
-                    ${item.sale_type === '보유중' ? '' : priceSpan(getEffectiveItemPrice(item))}
                     ${delBtn}
                 </div>
             </div>

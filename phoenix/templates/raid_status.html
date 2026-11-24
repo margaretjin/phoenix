@@ -48,16 +48,12 @@
             <div id="statusTimeGrid" class="common-time-grid"></div>
         </section>
 
-        <!-- 선택된 보스탐 상세: 왼쪽 드랍 아이템 / 오른쪽 파티원 -->
+        <!-- 선택된 보스탐 상세: 위 드랍 아이템 / 아래 파티원 (보스탐 기록 하단과 같은 모양) -->
         <div class="raid-detail-columns">
-            <!-- 왼쪽: 드랍 아이템 -->
+            <!-- 드랍 아이템 -->
             <section class="card-box raid-detail-items">
                 <div class="item-section-header">
-                    <span class="section-label">
-                        🎁 드랍 아이템 내역
-                        <span class="slot-gray-note">(실제 판매가는 변경될수있습니다)</span>
-                    </span>
-                    <span id="slotItemTotalBadge" class="slot-green-meta">총 0 (단위:아데나)</span>
+                    <span class="section-label">🎁 드랍 아이템 내역</span>
                 </div>
 
                 <div id="slotItemList" class="item-list-wrap">
@@ -71,12 +67,11 @@
                 </div>
             </section>
 
-            <!-- 오른쪽: 파티원 명단 + 혈비 제외 분배금 -->
+            <!-- 파티원 명단 -->
             <section class="card-box raid-detail-parties">
                 <div class="item-section-header">
                     <span id="slotParticipantCount" class="section-label">총 0파티 (0명)</span>
                     <div class="header-right-group">
-                        <span class="slot-gray-note"><span id="taxLabel">혈비 20%</span> 제외 분배 <br> (실제 분배금은 변경될수있습니다)</span>
                         <button type="button" class="btn-sm btn-sm-red btn-tiny admin-only" onclick="deleteEntireRaidSlot()">전체삭제</button>
                     </div>
                 </div>

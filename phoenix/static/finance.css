@@ -7,7 +7,7 @@
 /* 요약 */
 .fin-kpi-grid {
     display: grid;
-    grid-template-columns: 1.3fr 1fr 1fr 1.3fr;
+    grid-template-columns: 1.4fr 1fr 1fr;
     gap: 8px;
 }
 
@@ -21,9 +21,58 @@
     color: #ffffff;
 }
 
-.fin-kpi-period {
-    font-size: 13px;
-    color: var(--text-muted);
+.fin-kpi-grid .kpi-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.fin-kpi-grid .kpi-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* KPI 안 기간 표시 (전체 / 11월) */
+.fin-period-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background-color: var(--bg-chip);
+    border: 1px solid var(--border-strong);
+    color: var(--accent-sky);
+    font-size: 10.5px;
+    font-weight: 800;
+}
+
+/* 기간 설정 (전체 / 월별) */
+.fin-period-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.fin-period-title {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--accent-yellow);
+    white-space: nowrap;
+}
+
+.fin-period-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.fin-period-chip {
+    flex: 0 0 auto;
+    padding: 5px 12px;
 }
 
 /* 입력 폼 */
@@ -46,36 +95,213 @@
     color: var(--accent-yellow);
 }
 
-/* 장부 필터 */
-.fin-filter-grid {
-    grid-template-columns: 110px 150px 170px 1fr;
-}
-
-/* 검색 아래 [+ 추가] · 자동 기록 보기 · 정렬 */
-.fin-toolbar {
+/* 장부 상단 검색 + 오른쪽 [비품관리] */
+.fin-search-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
+}
+
+.fin-search-row .fin-search {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.fin-search-row .fin-cat-filter {
+    flex: 0 0 150px;
+    width: 150px;
+}
+
+/* 검색 아래: [📦 비품관리] (파티장 연초록) · [✍️ 입력] (흰색) · 정렬 */
+.fin-btn-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin: 8px 0 10px;
 }
 
-.fin-toolbar #sortToggleBtn {
-    margin-left: auto;
-}
-
-.fin-check {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--text-soft);
+.fin-big-btn {
+    flex: 1 1 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 900;
     white-space: nowrap;
     cursor: pointer;
 }
 
-.fin-check input {
-    accent-color: var(--accent-gold);
+.fin-supply-btn {
+    background-color: rgba(167, 243, 208, 0.14);
+    border: 1px solid var(--accent-mint);
+    color: var(--accent-mint);
+}
+
+.fin-supply-btn:hover {
+    background-color: rgba(167, 243, 208, 0.26);
+}
+
+.fin-input-btn {
+    background-color: #ffffff;
+    border: 1px solid #ffffff;
+    color: #111111;
+}
+
+.fin-input-btn:hover {
+    background-color: #e5e7eb;
+}
+
+.fin-sort-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+}
+
+.fin-btn-row .fin-big-btn {
+    flex: 1 1 0;
+}
+
+/* 추가 팝업: 복구비 기준 (인원 / 1회 다이) */
+.fin-seg {
+    display: flex;
+    gap: 6px;
+}
+
+.fin-seg-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 7px;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-strong);
+    color: var(--text-soft);
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.fin-seg-btn.active {
+    background-color: rgba(37, 99, 235, 0.2);
+    border-color: #3b82f6;
+    color: #ffffff;
+}
+
+.fin-table .cat2-cell {
+    color: var(--accent-gold);
+    font-weight: 800;
+}
+
+.auto-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background-color: var(--bg-chip);
+    border: 1px solid var(--border-strong);
+    color: var(--text-soft);
+    font-size: 11px;
+    font-weight: 700;
+    margin-right: 2px;
+}
+
+.note-text {
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* 기부 묶음: 기부자별 물품 배지 */
+.don-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px;
+    margin-right: 10px;
+}
+
+.item-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background-color: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    color: var(--accent-yellow);
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.item-badge.money {
+    background-color: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.5);
+    color: #4ade80;
+}
+
+.fin-table tr.sub-row td:first-child {
+    color: var(--text-faint, #666);
+}
+
+.auto-edit-tags {
+    margin-bottom: 4px;
+}
+
+/* 입력 팝업: 물품명 · 수량 · 이름(비고) 한 줄 → [추가] → 배지 */
+.fi-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 1fr) auto;
+    gap: 5px;
+    align-items: center;
+}
+
+.fi-line-5 {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 0.9fr) auto;
+}
+
+.fi-pending {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+    padding: 8px;
+    min-height: 38px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 8px;
+}
+
+.item-badge.pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    padding: 3px 4px 3px 9px;
+}
+
+.fi-empty {
+    font-size: 11.5px;
+}
+
+/* 자동 줄 표시 (🔄) · 참고 줄 (총금액 제외) */
+.auto-mark {
+    font-size: 12px;
+    margin-left: 2px;
+}
+
+.fin-table tr.ref-row td {
+    opacity: 0.6;
+}
+
+.supply-toolbar .stock-btn {
+    flex: 1 1 0;
+    padding: 9px 12px;
+    font-size: 13.5px;
+}
+
+.person-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background-color: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    color: var(--accent-sky);
+    font-size: 11px;
+    font-weight: 800;
+    margin-right: 4px;
 }
 
 /* 장부 표 */
@@ -97,15 +323,19 @@
     color: var(--text-soft);
 }
 
-.fin-table tr.auto-row td {
-    background-color: rgba(56, 189, 248, 0.05);
+.fin-table tr.is-editing td.memo-cell {
+    min-width: 190px;
 }
 
 .fin-table tr.is-editing td {
     background-color: rgba(37, 99, 235, 0.12);
 }
 
-/* 엑셀 2행처럼 표 맨 위 합계줄 */
+/* 엑셀처럼 합계줄은 머리글(항목) 위 */
+.fin-table thead tr.sum-row td {
+    text-align: center;
+}
+
 .fin-table tr.sum-row td {
     background-color: rgba(245, 158, 11, 0.1);
     border-bottom: 2px solid rgba(245, 158, 11, 0.45);
@@ -129,12 +359,22 @@
 }
 
 /* 행 안에서 수정 */
-.edit-date { width: 118px; }
-.edit-cat { width: 130px; }
-.edit-money { width: 96px; text-align: right; font-weight: 800; }
+.edit-date { width: 112px; }
+.edit-cat { width: 108px; }
+.edit-money { width: 84px; text-align: right; font-weight: 800; }
 .edit-memo { width: 100%; }
 .edit-small { width: 70px; text-align: right; }
-.edit-supply { width: 96px; }
+.edit-person { width: 78px; flex: 0 0 auto; }
+
+.edit-cat2-stack,
+.edit-memo-line {
+    display: flex;
+    gap: 4px;
+}
+
+.edit-cat2-stack {
+    flex-direction: column;
+}
 
 .edit-qty-line {
     display: flex;
@@ -216,6 +456,12 @@
     margin-top: 4px;
 }
 
+.supply-mgr-wrap {
+    margin-top: 8px;
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
 .supply-history-wrap {
     margin-top: 12px;
     max-height: 50vh;
@@ -236,8 +482,47 @@
 
 .move-form-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1.1fr 0.8fr 1.5fr auto;
+    grid-template-columns: 1fr 1.1fr 1.3fr 0.9fr 0.8fr 1.4fr auto;
     gap: 6px;
+}
+
+.move-form-grid .hidden {
+    display: none;
+}
+
+.move-amount-line {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.move-amount-line:empty {
+    display: none;
+}
+
+/* 하루 1줄 입출 내역: 입 비고 / 출 비고 */
+.supply-history-table .memo-cell {
+    min-width: 140px;
+}
+
+.hist-note {
+    display: block;
+    line-height: 1.5;
+}
+
+.supply-del-line {
+    margin-top: 10px;
+    text-align: right;
+}
+
+.chip-x {
+    background: none;
+    border: none;
+    color: #f87171;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 0 2px;
 }
 
 .supply-toolbar {
@@ -263,52 +548,19 @@
     flex: 0 0 70px;
 }
 
-.inline-form .date-only {
-    flex: 0 0 170px;
-}
-
-/* 항목 칩 */
-.category-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    margin-bottom: 8px;
-}
-
-.category-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11.5px;
-}
-
-.chip-x {
-    background: none;
-    border: none;
-    color: inherit;
-    opacity: 0.7;
-    cursor: pointer;
-    font-size: 10px;
-    font-weight: 900;
-    padding: 0 0 0 2px;
-}
-
-.chip-x:hover {
-    opacity: 1;
-}
-
 @media (max-width: 640px) {
+    /* 모바일: 머리글은 숨기고 합계줄만 카드로 */
+    .fin-table.tbl-mcard thead {
+        display: block;
+    }
+
+    .fin-table.tbl-mcard thead tr.head-row {
+        display: none;
+    }
+
     .fin-table.tbl-mcard .memo-cell {
         min-width: 0;
         color: var(--text-muted);
-    }
-
-    .fin-table.tbl-mcard tr.auto-row td {
-        background-color: transparent;
-    }
-
-    .fin-table.tbl-mcard tr.auto-row {
-        border-color: rgba(56, 189, 248, 0.45);
     }
 
     .fin-table.tbl-mcard tr.sum-row {
@@ -342,12 +594,54 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .fin-kpi-main,
-    .fin-kpi-grid > .kpi-box:last-child {
+    .fin-kpi-main {
+        grid-column: 1 / -1;
+    }
+
+    .fin-period-row {
+        align-items: flex-start;
+    }
+
+    .fin-search-row {
+        flex-wrap: wrap;
+    }
+
+    .fin-search-row .fin-search {
+        flex: 1 1 100%;
+    }
+
+    .fin-search-row .fin-cat-filter {
+        flex: 1 1 auto;
+        width: auto;
+    }
+
+    .fin-big-btn {
+        font-size: 13px;
+    }
+
+    .fi-line {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .fi-line > :first-child,
+    .fi-line > button {
         grid-column: 1 / -1;
     }
 
     .move-form-grid {
         grid-template-columns: 1fr 1fr;
     }
+}
+
+/* [관리] 입출 내역: 날짜 줄 [수정] → 그날 기록을 한 건씩 펼쳐 행 안 수정 */
+.supply-history-table tr.hist-editing td {
+    background-color: rgba(37, 99, 235, 0.12);
+}
+
+.supply-history-table tr.hist-edit-row td {
+    background-color: rgba(37, 99, 235, 0.05);
+}
+
+.supply-history-table .hist-memo-input {
+    width: 140px;
 }

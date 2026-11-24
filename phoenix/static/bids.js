@@ -290,7 +290,7 @@ async function toggleOpenAll(id, open) {
 async function confirmBid(id, winner) {
     const b = bids.find(x => x.id === id);
     if (!b || !winner) return;
-    if (!confirm(`[${winner}] 님을 구매자로 확정하시겠습니까?\n템보유현황에 [피닉스 · 내판 · ${winner} · ${Number(b.price || 0).toLocaleString()}]으로 반영됩니다.\n(수령완료일은 아이템을 건넨 분이 템보유현황에서 지정)`)) return;
+    if (!confirm(`[${winner}] 님을 구매자로 확정하시겠습니까?\n템보유현황에 수령자 [${winner}] · 가격 [${Number(b.price || 0).toLocaleString()}]이 반영됩니다. (성세금포함이 아니면 내판)\n(수령완료일은 아이템을 건넨 분이 템보유현황에서 지정)`)) return;
     if (await ClanApp.send(`/api/bids/${id}/confirm`, { body: { winner, requester_role: ClanApp.role }, failMsg: '확정 실패' })) {
         await loadBids();
         await loadRaidsForPicker();
@@ -298,7 +298,6 @@ async function confirmBid(id, winner) {
 }
 
 async function cancelBid(id) {
-    if (!confirm('이 입찰을 취소하시겠습니까? (입찰 기록은 남습니다)')) return;
     if (await ClanApp.send(`/api/bids/${id}/cancel?${ClanApp.roleParam('requester_role')}`, { failMsg: '취소 실패' })) {
         await loadBids();
         await loadRaidsForPicker();
@@ -341,7 +340,7 @@ async function loadRaidsForPicker() {
     pickerItems = [];
     raids.forEach(r => {
         ClanApp.extractItemDetails(r).forEach((it, idx) => {
-            if (it.sale_type !== '보유중' || it.event_item || it.clan_owned || ClanApp.isCastleTaxItem(it.name)) return;
+            if (!['보유중', '성세금포함'].includes(it.sale_type) || it.event_item || it.clan_owned || ClanApp.isCastleTaxItem(it.name)) return;
             if (openKeys.has(`${r.id}_${idx}`)) return;
             pickerItems.push({ raid: r, idx, item: it });
         });
@@ -350,7 +349,7 @@ async function loadRaidsForPicker() {
     const sel = $id('bidItemSelect');
     sel.innerHTML = `<option value="">${pickerItems.length ? '아이템을 선택하세요' : '입찰 가능한 아이템이 없습니다'}</option>` +
         pickerItems.map((p, i) => `<option value="${i}">${ClanApp.toShortDate(p.raid.raid_date)} ${esc(p.raid.raid_time)} · ${esc(ClanApp.getItemAlias(p.item.name))}` +
-            `${p.item.alliance === '피닉스' ? ' (피닉스 판매대기)' : ''} · 내판가 ${Number(p.item.policy_price || 0).toLocaleString()}</option>`).join('');
+            `${p.item.sale_type === '성세금포함' ? ' (성세금포함)' : (p.item.alliance === '피닉스' ? ' (피닉스 판매대기)' : '')} · 내판가 ${Number(p.item.policy_price || 0).toLocaleString()}</option>`).join('');
     onBidItemChange();
 }
 

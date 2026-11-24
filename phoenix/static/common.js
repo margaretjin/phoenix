@@ -36,7 +36,7 @@ window.ClanApp = {
     // 보유상태 / 분배상태 → 배지 색상
     HOLD_TONE: { 보유중: 'amber', 내판: 'blue', 외판: 'green', 연합: 'teal', 이벤트: 'purple', 성세금포함: 'indigo', 분배금혈귀: 'rose' },
     DIST_TONE: {
-        분배대기: 'amber', 연합분배대기: 'amber', 분배시작: 'sky', 분배중: 'blue',
+        분배대기: 'amber', 연합분배대기: 'amber', 입찰진행중: 'orange', 분배시작: 'sky', 분배중: 'blue',
         분배완료: 'gray', 수령완료: 'gray', 연합: 'teal', 혈비귀속: 'teal',
         이벤트: 'purple', 이벤트템: 'purple', 성세금포함: 'indigo', 분배금혈귀: 'rose'
     },
@@ -288,6 +288,9 @@ window.ClanApp = {
         return selected;
     },
 
+    // 일반 혈원이 보스탐 기록을 입력할 수 있는 시간 (보스탐 시작 후 N시간)
+    RECORD_OPEN_HOURS: 6,
+
     getSlotStatus(dateStr, timeLabel, now = new Date()) {
         const hourNum = this.parseRaidHour(timeLabel);
         if (hourNum === null) return 'open';
@@ -295,7 +298,7 @@ window.ClanApp = {
         slotTime.setHours(hourNum, 0, 0, 0);
         const diffHours = (now - slotTime) / (1000 * 60 * 60);
         if (diffHours < 0) return 'future';
-        if (diffHours <= 3.0) return 'open';
+        if (diffHours <= this.RECORD_OPEN_HOURS) return 'open';
         return 'expired';
     },
 

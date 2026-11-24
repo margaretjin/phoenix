@@ -6,9 +6,11 @@
 - finance_supply_moves: 비품 사용(출) / 입고 / 재고조정 기록
   ※ 비품 구입은 장부 행(수량 + 비품)으로만 기록 → 재고 = 장부 구입수량 + 입고 - 사용
 
-분배 관련 자동 기록(혈비 20% · 혈귀속 · 분배금지급)은 보스탐 기록에서 화면이 바로 계산한다.
-그래서 따로 저장하지 않아 분배 정보를 고쳐도 장부가 항상 맞는다.
+템보유현황 · 분배관리에서 나오는 자동 줄(입찰판매 · 혈비지원템구입 · 성세금 · 분배금지급 · 혈귀속)은
+보스탐 기록에서 화면이 바로 계산한다. 따로 저장하지 않아 그쪽을 고치면 장부도 바로 맞춰진다.
+자동 줄에 단 비고 첨언만 clan_settings 의 finance_auto_notes 에 저장한다.
 """
+import json
 from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -30,6 +32,8 @@ class LedgerPayload(BaseModel):
     unit_price: Optional[float] = 0
     quantity: Optional[float] = 0
     supply_name: Optional[str] = ""
+    qty_unit: Optional[str] = ""     # 수량 단위: 비품 단위(개·마리) / 복구비지급은 명(인원) · 회(1회 다이)
+    person: Optional[str] = ""       # 기부자 / 당첨자
     memo: Optional[str] = ""
     requester_role: str
     requester_id: Optional[str] = ""
@@ -58,6 +62,12 @@ class MovePayload(BaseModel):
     requester_id: Optional[str] = ""
 
 
+class AutoNotePayload(BaseModel):
+    key: str                         # 자동 줄 키 (예: sale_12_0, pay_2026-11-24)
+    memo: str = ""
+    requester_role: str
+
+
 class AutoStartPayload(BaseModel):
     date: str
     requester_role: str
@@ -81,9 +91,46 @@ def _ledger_row(p: LedgerPayload) -> dict:
         "unit_price": unit_price,
         "quantity": quantity,
         "supply_name": (p.supply_name or "").strip(),
+        "qty_unit": (p.qty_unit or "").strip(),
+        "person": (p.person or "").strip(),
         "memo": (p.memo or "").strip(),
         "created_by": p.requester_id or ""
     }
+
+
+NEW_COLUMNS = ("qty_unit", "person")   # supabase_finance_update.sql 로 추가하는 컬럼
+
+
+def _save_ledger(row: dict, row_id: Optional[int] = None):
+    """새 컬럼(qty_unit · person)을 아직 추가하지 않은 DB에서도 저장되도록, 없는 컬럼을 빼고 재시도"""
+    def run(data):
+        q = supabase.table("finance_ledger")
+        return (q.update(data).eq("id", row_id) if row_id else q.insert(data)).execute()
+    data = dict(row)
+    for _ in range(len(NEW_COLUMNS) + 1):
+        try:
+            return run(data)
+        except Exception as e:
+            missing = [c for c in NEW_COLUMNS if c in data and c in str(e)]
+            if not missing:
+                raise
+            for c in missing:
+                data.pop(c, None)
+    return run(data)
+
+
+AUTO_NOTES_KEY = "finance_auto_notes"   # 자동 줄 비고 첨언 {키: 메모} (clan_settings 에 JSON 으로 저장)
+
+
+def _get_auto_notes() -> dict:
+    try:
+        res = supabase.table("clan_settings").select("setting_value").eq("setting_key", AUTO_NOTES_KEY).execute()
+        if res.data and res.data[0].get("setting_value"):
+            data = json.loads(res.data[0]["setting_value"])
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        pass
+    return {}
 
 
 def _get_auto_start() -> str:
@@ -112,7 +159,8 @@ def get_finance():
         "categories": rows("finance_categories", "sort_order", "id"),
         "supplies": rows("finance_supplies", "sort_order", "id"),
         "moves": rows("finance_supply_moves", "move_date", "id"),
-        "auto_start": _get_auto_start()
+        "auto_start": _get_auto_start(),
+        "auto_notes": _get_auto_notes()
     }
 
 
@@ -122,7 +170,7 @@ def get_finance():
 @router.post("/ledger")
 def create_ledger(p: LedgerPayload):
     require_admin(p.requester_role, "관리자만 재정을 기록할 수 있습니다.")
-    res = supabase.table("finance_ledger").insert(_ledger_row(p)).execute()
+    res = _save_ledger(_ledger_row(p))
     return {"status": "created", "data": (res.data or [None])[0]}
 
 
@@ -131,7 +179,7 @@ def update_ledger(row_id: int, p: LedgerPayload):
     require_admin(p.requester_role, "관리자만 재정을 수정할 수 있습니다.")
     row = _ledger_row(p)
     row.pop("created_by", None)
-    res = supabase.table("finance_ledger").update(row).eq("id", row_id).execute()
+    res = _save_ledger(row, row_id)
     first_or_404(res, "장부 내역을 찾을 수 없습니다.")
     return {"status": "updated"}
 
@@ -204,11 +252,46 @@ def create_move(p: MovePayload):
     return {"status": "created"}
 
 
+@router.put("/moves/{move_id}")
+def update_move(move_id: int, p: MovePayload):
+    """비품관리 [관리] 입출 내역에서 행 안 수정"""
+    require_admin(p.requester_role)
+    if (p.qty_in or 0) < 0 or (p.qty_out or 0) < 0 or not (p.qty_in or p.qty_out):
+        raise HTTPException(status_code=400, detail="입 또는 출 수량을 입력해 주세요.")
+    res = supabase.table("finance_supply_moves").update({
+        "move_date": p.move_date,
+        "qty_in": float(p.qty_in or 0),
+        "qty_out": float(p.qty_out or 0),
+        "memo": (p.memo or "").strip()
+    }).eq("id", move_id).execute()
+    first_or_404(res, "비품 기록을 찾을 수 없습니다.")
+    return {"status": "updated"}
+
+
 @router.delete("/moves/{move_id}")
 def delete_move(move_id: int, requester_role: str):
     require_admin(requester_role)
     supabase.table("finance_supply_moves").delete().eq("id", move_id).execute()
     return {"status": "deleted"}
+
+
+@router.post("/auto-note")
+def set_auto_note(p: AutoNotePayload):
+    """템보유현황 · 분배관리에서 자동으로 만들어진 줄에 비고 첨언"""
+    require_admin(p.requester_role)
+    key = p.key.strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="대상 줄을 찾을 수 없습니다.")
+    notes = _get_auto_notes()
+    memo = (p.memo or "").strip()
+    if memo:
+        notes[key] = memo
+    else:
+        notes.pop(key, None)
+    supabase.table("clan_settings").upsert({
+        "setting_key": AUTO_NOTES_KEY, "setting_value": json.dumps(notes, ensure_ascii=False)
+    }).execute()
+    return {"status": "updated"}
 
 
 @router.post("/auto-start")
